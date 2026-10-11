@@ -141,6 +141,10 @@ export default function EpisodeManagerModal({
   const [isBulkMenuOpen, setIsBulkMenuOpen] = useState(false);
   const bulkMenuRef = useRef<HTMLDivElement>(null);
 
+  // Status Filter Dropdown state & ref
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
+
   // Sub-modal 1: Single Episode Add / Edit Form Modal
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingEpisode, setEditingEpisode] = useState<EpisodeItem | null>(null);
@@ -162,7 +166,7 @@ export default function EpisodeManagerModal({
     setSelectedEpIds([]);
   }, [activeServerId, searchTerm, statusFilter, activeRange]);
 
-  // Close status dropdown & bulk menu on click outside
+  // Close status dropdown, filter menu & bulk menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
@@ -170,6 +174,9 @@ export default function EpisodeManagerModal({
       }
       if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target as Node)) {
         setIsBulkMenuOpen(false);
+      }
+      if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
+        setIsFilterMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -612,74 +619,9 @@ export default function EpisodeManagerModal({
 
           {/* Body */}
           <div className={styles.modalBody}>
-            {/* Stats & Status Filter Ribbon */}
-            <div className={styles.statsRibbon}>
-              <div className={styles.statItem}>
-                <FaServer style={{ color: '#e50914' }} />
-                <span>Máy chủ: <strong className={styles.statVal}>{activeServer?.name}</strong></span>
-              </div>
-              <div className={styles.statDivider}></div>
-
-              {/* Status Filter Pills */}
-              <button
-                type="button"
-                className={`${styles.filterPill} ${statusFilter === 'ALL' ? styles.filterPillActive : ''}`}
-                onClick={() => setStatusFilter('ALL')}
-                title="Xem tất cả các tập"
-              >
-                <span>Tất cả ({totalEpisodesCount})</span>
-              </button>
-
-              <button
-                type="button"
-                className={`${styles.filterPill} ${statusFilter === 'ACTIVE' ? styles.filterPillActiveGreen : ''}`}
-                onClick={() => setStatusFilter(statusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE')}
-                title="Lọc các tập đang hoạt động tốt"
-              >
-                <FaCheckCircle style={{ color: '#4ade80' }} />
-                <span>Hoạt động ({activeCount})</span>
-              </button>
-
-              {processingCount > 0 && (
-                <button
-                  type="button"
-                  className={`${styles.filterPill} ${statusFilter === 'PROCESSING' ? styles.filterPillActiveBlue : ''}`}
-                  onClick={() => setStatusFilter(statusFilter === 'PROCESSING' ? 'ALL' : 'PROCESSING')}
-                  title="Lọc các tập đang render / xử lý"
-                >
-                  <FaClock style={{ color: '#60a5fa' }} />
-                  <span>Đang xử lý ({processingCount})</span>
-                </button>
-              )}
-
-              {errorCount > 0 && (
-                <button
-                  type="button"
-                  className={`${styles.filterPill} ${statusFilter === 'ERROR' ? styles.filterPillActiveRed : ''}`}
-                  onClick={() => setStatusFilter(statusFilter === 'ERROR' ? 'ALL' : 'ERROR')}
-                  title="Lọc nhanh các tập bị lỗi để sửa"
-                >
-                  <FaExclamationTriangle style={{ color: '#ef4444' }} />
-                  <span>Lỗi link ({errorCount})</span>
-                </button>
-              )}
-
-              {disabledCount > 0 && (
-                <button
-                  type="button"
-                  className={`${styles.filterPill} ${statusFilter === 'DISABLED' ? styles.filterPillActive : ''}`}
-                  onClick={() => setStatusFilter(statusFilter === 'DISABLED' ? 'ALL' : 'DISABLED')}
-                  title="Lọc các tập đang tạm ẩn"
-                >
-                  <FaBan style={{ color: '#9ca3af' }} />
-                  <span>Tạm ẩn ({disabledCount})</span>
-                </button>
-              )}
-            </div>
-
-            {/* Server Tabs Bar */}
-            <div className={styles.serverTabsBar}>
-              <div className={styles.serverTabsList}>
+            {/* ROW 1: SLIM SERVER & RANGE NAVIGATION (34px height) */}
+            <div className={styles.serverAndRangeBar}>
+              <div className={styles.serverSectionLeft}>
                 {servers.map(server => (
                   <button
                     key={server.id}
@@ -690,51 +632,46 @@ export default function EpisodeManagerModal({
                       setTestPlayingEp(null);
                     }}
                   >
-                    <FaServer style={{ fontSize: '0.75rem', color: server.id === activeServerId ? '#e50914' : '#9ca3af' }} />
+                    <FaServer style={{ fontSize: '0.72rem', color: server.id === activeServerId ? '#e50914' : '#9ca3af' }} />
                     <span>{server.name}</span>
                     <span className={styles.serverBadgeCount}>
                       {server.episodes.length}
                     </span>
                   </button>
                 ))}
-              </div>
 
-              <button
-                type="button"
-                className={styles.addServerBtn}
-                onClick={handleAddNewServer}
-                title="Thêm máy chủ phát dự phòng"
-              >
-                <FaPlus /> Thêm Server
-              </button>
-            </div>
-
-            {/* Range Chunks Bar (For large series > 30 episodes) */}
-            {episodeRanges.length > 0 && (
-              <div className={styles.rangeTabsBar}>
-                <div className={styles.rangeTabsLabel}>
-                  <FaLayerGroup style={{ color: '#e50914' }} />
-                  <span>Dải tập:</span>
-                </div>
                 <button
                   type="button"
-                  className={`${styles.rangeTab} ${activeRange === 'ALL' ? styles.rangeTabActive : ''}`}
-                  onClick={() => setActiveRange('ALL')}
+                  className={styles.addServerBtn}
+                  onClick={handleAddNewServer}
+                  title="Thêm máy chủ phát dự phòng"
                 >
-                  Tất cả ({activeServer?.episodes.length})
+                  <FaPlus /> Server
                 </button>
-                {episodeRanges.map(rg => (
-                  <button
-                    key={rg.rangeKey}
-                    type="button"
-                    className={`${styles.rangeTab} ${activeRange === rg.rangeKey ? styles.rangeTabActive : ''}`}
-                    onClick={() => setActiveRange(rg.rangeKey)}
-                  >
-                    {rg.label}
-                  </button>
-                ))}
               </div>
-            )}
+
+              {/* Dải tập (Range Chunks) - Right side of row 1 */}
+              {episodeRanges.length > 0 && (
+                <div className={styles.rangeSectionRight}>
+                  <span className={styles.rangeLabel}>
+                    <FaLayerGroup style={{ color: '#e50914' }} /> Dải:
+                  </span>
+                  <select
+                    className={styles.rangeSelect}
+                    value={activeRange}
+                    onChange={(e) => setActiveRange(e.target.value)}
+                    title="Chọn phân đoạn tập phim"
+                  >
+                    <option value="ALL">Tất cả ({activeServer?.episodes.length} tập)</option>
+                    {episodeRanges.map(rg => (
+                      <option key={rg.rangeKey} value={rg.rangeKey}>
+                        {rg.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
             {/* Test Player Banner (If active) */}
             {testPlayingEp && (
@@ -765,7 +702,7 @@ export default function EpisodeManagerModal({
               </div>
             )}
 
-            {/* Action Toolbar */}
+            {/* ROW 2: COMPACT ACTION & FILTER TOOLBAR (38px height) */}
             <div className={styles.actionToolbar}>
               <div className={styles.toolbarLeft}>
                 <button
@@ -773,7 +710,7 @@ export default function EpisodeManagerModal({
                   className={styles.primaryAddEpBtn}
                   onClick={handleOpenAddForm}
                 >
-                  <FaPlus /> Thêm Tập Mới
+                  <FaPlus /> Thêm Tập
                 </button>
 
                 <button
@@ -785,13 +722,91 @@ export default function EpisodeManagerModal({
                 </button>
               </div>
 
+              {/* Center: Compact Status Filter Dropdown & Quick Error Toggle */}
+              <div className={styles.toolbarCenter} ref={filterMenuRef}>
+                <button
+                  type="button"
+                  className={styles.statusFilterBtn}
+                  onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                  title="Lọc danh sách tập theo trạng thái"
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    {statusFilter === 'ALL' && <span>Trạng thái: <strong>Tất cả ({totalEpisodesCount})</strong></span>}
+                    {statusFilter === 'ACTIVE' && <span><FaCheckCircle style={{ color: '#4ade80' }} /> Hoạt động ({activeCount})</span>}
+                    {statusFilter === 'PROCESSING' && <span><FaClock style={{ color: '#60a5fa' }} /> Đang xử lý ({processingCount})</span>}
+                    {statusFilter === 'ERROR' && <span><FaExclamationTriangle style={{ color: '#ef4444' }} /> Lỗi link ({errorCount})</span>}
+                    {statusFilter === 'DISABLED' && <span><FaBan style={{ color: '#9ca3af' }} /> Tạm ẩn ({disabledCount})</span>}
+                  </span>
+                  <FaChevronDown style={{ fontSize: '0.65rem', marginLeft: '0.2rem' }} />
+                </button>
+
+                {isFilterMenuOpen && (
+                  <div className={styles.statusMenu} style={{ top: 34, left: 0, minWidth: 175, zIndex: 50 }}>
+                    <button
+                      type="button"
+                      className={styles.statusMenuItem}
+                      onClick={() => { setStatusFilter('ALL'); setIsFilterMenuOpen(false); }}
+                    >
+                      Tất cả ({totalEpisodesCount})
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.statusMenuItem}
+                      onClick={() => { setStatusFilter('ACTIVE'); setIsFilterMenuOpen(false); }}
+                    >
+                      <FaCheckCircle style={{ color: '#4ade80' }} /> Hoạt động ({activeCount})
+                    </button>
+                    {processingCount > 0 && (
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => { setStatusFilter('PROCESSING'); setIsFilterMenuOpen(false); }}
+                      >
+                        <FaClock style={{ color: '#60a5fa' }} /> Đang xử lý ({processingCount})
+                      </button>
+                    )}
+                    {errorCount > 0 && (
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => { setStatusFilter('ERROR'); setIsFilterMenuOpen(false); }}
+                      >
+                        <FaExclamationTriangle style={{ color: '#ef4444' }} /> Lỗi link ({errorCount})
+                      </button>
+                    )}
+                    {disabledCount > 0 && (
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => { setStatusFilter('DISABLED'); setIsFilterMenuOpen(false); }}
+                      >
+                        <FaBan style={{ color: '#9ca3af' }} /> Tạm ẩn ({disabledCount})
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 1-Click Quick Error Filter Button if errors exist */}
+                {errorCount > 0 && (
+                  <button
+                    type="button"
+                    className={`${styles.quickErrorBtn} ${statusFilter === 'ERROR' ? styles.quickErrorBtnActive : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === 'ERROR' ? 'ALL' : 'ERROR')}
+                    title="Nhấn để chỉ lọc các tập bị lỗi link"
+                  >
+                    <FaExclamationTriangle />
+                    <span>{errorCount} lỗi</span>
+                  </button>
+                )}
+              </div>
+
               <div className={styles.toolbarRight}>
                 {/* Search Box */}
                 <div className={styles.searchBox}>
                   <FaSearch className={styles.searchIcon} />
                   <input
                     type="text"
-                    placeholder="Tìm theo số tập hoặc tên..."
+                    placeholder="Tìm tập..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
