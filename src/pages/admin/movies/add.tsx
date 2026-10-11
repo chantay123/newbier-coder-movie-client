@@ -18,6 +18,7 @@ import CinemaSelect from '@/components/Admin/Movies/CinemaSelect';
 import TagAutocompletePicker from '@/components/Admin/Movies/TagAutocompletePicker';
 import UpcomingMovieModal from '@/components/Admin/Movies/UpcomingMovieModal';
 import MovieWebSimulation from '@/components/Admin/Movies/MovieWebSimulation';
+import QuickCreateTaxonomyModal, { QuickCreateType } from '@/components/Admin/Movies/QuickCreateTaxonomyModal';
 import BackToTop from '@/components/UI/BackToTop';
 import { showCinemaAlert } from '@/components/UI/CinemaAlert';
 import {
@@ -181,6 +182,22 @@ const AddMoviePage = () => {
   const [autoSwitchStatus, setAutoSwitchStatus] = useState(true);
   const [targetStatusAfterRelease, setTargetStatusAfterRelease] = useState<'ongoing' | 'completed'>('ongoing');
   const [countdownEnabled, setCountdownEnabled] = useState(true);
+
+  // Quick Create Metadata Modal State
+  const [quickCreateModal, setQuickCreateModal] = useState<{ isOpen: boolean; type: QuickCreateType }>({
+    isOpen: false,
+    type: 'category'
+  });
+
+  const handleQuickCreated = (newItem: { id: string; name: string; slug: string; [key: string]: any }) => {
+    if (quickCreateModal.type === 'category') {
+      setAllCategories(prev => [...prev, newItem]);
+      setSelectedCategories(prev => [...prev, newItem.id]);
+    } else if (quickCreateModal.type === 'country') {
+      setAllCountries(prev => [...prev, newItem]);
+      setSelectedCountries(prev => [...prev, newItem.id]);
+    }
+  };
 
   // Showtimes templates with Pinning, Adding, Editing, Deleting
   const [showtimeTemplates, setShowtimeTemplates] = useState<ShowtimeTemplate[]>(PRESET_SHOWTIME_TEMPLATES);
@@ -1017,11 +1034,21 @@ const AddMoviePage = () => {
                   <div className="col-md-6">
                     <div className={styles.formGroup}>
                       <div className="d-flex justify-content-between align-items-center mb-1">
-                        <label className={styles.formLabel} style={{ margin: 0 }}>
-                          <span className={styles.labelTitle}>
-                            {MOVIE_FORM_I18N.step2.categoryLabel} <span className={styles.requiredAsterisk}>*</span>
-                          </span>
-                        </label>
+                        <div className="d-flex align-items-center gap-2">
+                          <label className={styles.formLabel} style={{ margin: 0 }}>
+                            <span className={styles.labelTitle}>
+                              {MOVIE_FORM_I18N.step2.categoryLabel} <span className={styles.requiredAsterisk}>*</span>
+                            </span>
+                          </label>
+                          <button
+                            type="button"
+                            style={{ background: 'none', border: 'none', color: '#e50914', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                            onClick={() => setQuickCreateModal({ isOpen: true, type: 'category' })}
+                            title="Tạo nhanh thể loại mới"
+                          >
+                            + Thêm nhanh
+                          </button>
+                        </div>
                         <div className={styles.searchFilterWrapper}>
                           <input
                             type="text"
@@ -1086,12 +1113,24 @@ const AddMoviePage = () => {
                   {/* Right Column: Countries */}
                   <div className="col-md-6">
                     <div className={styles.formGroup}>
-                      <label className={styles.formLabel}>
-                        <span className={styles.labelTitle}>
-                          {MOVIE_FORM_I18N.step2.countryLabel} <span className={styles.requiredAsterisk}>*</span>
-                        </span>
+                      <div className="d-flex justify-content-between align-items-center mb-1">
+                        <div className="d-flex align-items-center gap-2">
+                          <label className={styles.formLabel} style={{ margin: 0 }}>
+                            <span className={styles.labelTitle}>
+                              {MOVIE_FORM_I18N.step2.countryLabel} <span className={styles.requiredAsterisk}>*</span>
+                            </span>
+                          </label>
+                          <button
+                            type="button"
+                            style={{ background: 'none', border: 'none', color: '#e50914', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                            onClick={() => setQuickCreateModal({ isOpen: true, type: 'country' })}
+                            title="Tạo nhanh quốc gia mới"
+                          >
+                            + Thêm nhanh
+                          </button>
+                        </div>
                         <span className="text-muted small">Đã chọn: {selectedCountries.length}</span>
-                      </label>
+                      </div>
 
                       {/* Compact Scrollable Country Box */}
                       <div className={styles.compactChipScrollBox}>
@@ -2227,6 +2266,13 @@ const AddMoviePage = () => {
           </div>
         </form>
       </div>
+
+      <QuickCreateTaxonomyModal
+        isOpen={quickCreateModal.isOpen}
+        type={quickCreateModal.type}
+        onClose={() => setQuickCreateModal(prev => ({ ...prev, isOpen: false }))}
+        onCreated={handleQuickCreated}
+      />
 
       <BackToTop />
     </>
