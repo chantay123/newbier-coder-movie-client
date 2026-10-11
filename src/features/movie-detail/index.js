@@ -23,6 +23,6 @@ export { default as MovieMetaBento } from './components/MovieMetaBento/MovieMeta
 export { default as MovieCommentsSection } from './components/MovieCommentsSection/MovieCommentsSection';
 
 // Hooks
-export { useMovieDetail } from './hooks/useMovieDetail';
+export { useMovieDetail, normalizeMovieDetail } from './hooks/useMovieDetail';
 
 
