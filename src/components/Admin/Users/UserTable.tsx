@@ -1,7 +1,8 @@
 // src/components/Admin/Users/UserTable.tsx
 import React, { useState } from 'react';
-import { FaEdit, FaTrash, FaBan, FaUnlock, FaSearch, FaFilter, FaSortAmountDown, FaSortAmountUp, FaUserCircle } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaBan, FaUnlock, FaSearch, FaFilter, FaSortAmountDown, FaSortAmountUp, FaUserCircle, FaHistory } from 'react-icons/fa';
 import ConfirmModal from '../Common/ConfirmModal';
+import LoginHistoryModal from './LoginHistoryModal';
 
 interface User {
   _id: string;
@@ -32,6 +33,8 @@ const UserTable: React.FC<UserTableProps> = ({ users = [], onEdit, onDelete, onB
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filterRole, setFilterRole] = useState<string | null>(null);
   const [newActiveState, setNewActiveState] = useState<boolean | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyUser, setHistoryUser] = useState<User | null>(null);
 
   const handleDeleteClick = (user: User) => {
     setSelectedUser(user);
@@ -392,6 +395,16 @@ const UserTable: React.FC<UserTableProps> = ({ users = [], onEdit, onDelete, onB
                           >
                             <FaEdit />
                           </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => {
+                              setHistoryUser(user);
+                              setShowHistoryModal(true);
+                            }}
+                            title="Xem lịch sử đăng nhập & bảo mật"
+                          >
+                            <FaHistory />
+                          </button>
                           {getRoleName(user.role).toLowerCase() !== 'admin' && (
                             <>
                               <button
@@ -445,6 +458,22 @@ const UserTable: React.FC<UserTableProps> = ({ users = [], onEdit, onDelete, onB
         cancelText="Hủy"
         onConfirm={handleBanConfirm}
         onCancel={() => setShowBanModal(false)}
+      />
+
+      {/* User Login History & Auditing Modal */}
+      <LoginHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setHistoryUser(null);
+        }}
+        user={historyUser}
+        onUnblock={(userId) => {
+          onBanUser(userId, true);
+          if (historyUser) {
+            setHistoryUser({ ...historyUser, isActive: true });
+          }
+        }}
       />
 
       <style jsx>{`
