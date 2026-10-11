@@ -577,16 +577,17 @@ const AdminUsersPage = () => {
                 )}
               </div>
               {!error && (
-                <div className="card-footer d-flex justify-content-between align-items-center" style={{ backgroundColor: '#0e131d', borderTop: '1px solid rgba(255, 255, 255, 0.06)', padding: '12px 20px' }}>
-                  <small style={{ color: '#94a3b8' }}>
-                    Hiển thị {Array.isArray(users) ? users.length : 0} trên tổng số {userStats.totalUsers} người dùng
-                  </small>
-                  <PaginationComponent
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                    onPageChange={handlePageChange}
-                  />
-                </div>
+                <PaginationComponent
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  totalItems={userStats.totalUsers}
+                  pageSize={pagination.limit}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={(newSize) => {
+                    fetchUsers(1, newSize);
+                  }}
+                  itemName="người dùng"
+                />
               )}
             </div>
           </div>

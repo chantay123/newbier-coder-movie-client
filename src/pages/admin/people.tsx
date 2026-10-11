@@ -1,7 +1,7 @@
 // src/pages/admin/people.tsx
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import AdminRoute from '@/components/ProtectedRoute/AdminRoute';
@@ -27,6 +27,7 @@ import PeopleAwardsDrawer, { PersonItem, AwardItem } from '@/components/Admin/Pe
 import PeopleFormModal from '@/components/Admin/People/PeopleFormModal';
 import PeopleDeleteModal from '@/components/Admin/People/PeopleDeleteModal';
 import CinemaDropdown from '@/components/Admin/Common/CinemaDropdown';
+import AdminPagination from '@/components/Admin/Common/AdminPagination';
 import { ADMIN_PEOPLE_I18N } from '@/config/i18n/admin';
 import { INITIAL_ACTORS as MOCK_ACTORS, INITIAL_DIRECTORS as MOCK_DIRECTORS } from '@/mock/admin';
 
@@ -84,6 +85,21 @@ export default function PeopleAdminPage() {
       return matchSearch && matchStatus && matchVerify;
     });
   }, [currentList, searchTerm, statusFilter, verifyFilter]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, statusFilter, verifyFilter]);
+
+  const totalItems = filteredList.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage, pageSize]);
 
   const currentTabLabel = activeTab === 'actors' ? 'Diễn Viên' : 'Đạo Diễn';
 
@@ -319,7 +335,7 @@ export default function PeopleAdminPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredList.map((person) => (
+                    paginatedList.map((person) => (
                       <tr key={person.id} className={styles.tableRow}>
                         {/* Profile Info */}
                         <td>
@@ -453,6 +469,22 @@ export default function PeopleAdminPage() {
                   )}
                 </tbody>
               </table>
+
+              {/* Unified Cinema Dark Pagination */}
+              {totalItems > 0 && (
+                <AdminPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setCurrentPage(1);
+                  }}
+                  itemName={currentTabLabel.toLowerCase()}
+                />
+              )}
             </div>
           </div>
         </div>
