@@ -20,7 +20,14 @@ import {
   FaList,
   FaSearch,
   FaPaste,
-  FaExternalLinkAlt
+  FaExternalLinkAlt,
+  FaChevronLeft,
+  FaChevronRight,
+  FaAngleDoubleLeft,
+  FaAngleDoubleRight,
+  FaLayerGroup,
+  FaCheckSquare,
+  FaSquare
 } from 'react-icons/fa';
 import styles from '@/styles/EpisodeManager.module.css';
 import { showCinemaAlert } from '@/components/UI/CinemaAlert';
@@ -57,18 +64,36 @@ interface EpisodeManagerModalProps {
   } | null;
 }
 
+// Generate realistic mock episodes to test large datasets (120+ episodes)
+const generateMockEpisodes = (count: number): EpisodeItem[] => {
+  const list: EpisodeItem[] = [];
+  for (let i = 1; i <= count; i++) {
+    let status: EpisodeStatus = 'ACTIVE';
+    if (i === 4 || i === 48 || i === 95) status = 'PROCESSING';
+    if (i === 12 || i === 67 || i === 114) status = 'ERROR';
+    if (i === 25 || i === 80) status = 'DISABLED';
+
+    const quality = i % 5 === 0 ? '4K' : i % 2 === 0 ? '1080p' : '720p';
+    list.push({
+      id: `ep-${i}`,
+      episodeNumber: i,
+      name: `Tập ${i} - Chương ${i}`,
+      slug: `tap-${i}`,
+      linkM3u8: `https://stream.cinema.vn/hls/series/ep${i}/index.m3u8`,
+      linkEmbed: `https://player.cinema.vn/embed/series-ep${i}`,
+      quality,
+      status
+    });
+  }
+  return list;
+};
+
 const INITIAL_SERVERS: ServerGroup[] = [
   {
     id: 'srv-1',
-    name: 'Server VIP #1 (FPT HLS)',
+    name: 'Server VIP #1 (FPT HLS - 120 Tập)',
     serverType: 'HLS',
-    episodes: [
-      { id: 'ep-1', episodeNumber: 1, name: 'Tập 1 - Khởi Đầu', slug: 'tap-1', linkM3u8: 'https://stream.cinema.vn/hls/dune2/ep1/index.m3u8', linkEmbed: 'https://player.cinema.vn/embed/dune2-ep1', quality: '4K', status: 'ACTIVE' },
-      { id: 'ep-2', episodeNumber: 2, name: 'Tập 2 - Tiên Tri', slug: 'tap-2', linkM3u8: 'https://stream.cinema.vn/hls/dune2/ep2/index.m3u8', linkEmbed: 'https://player.cinema.vn/embed/dune2-ep2', quality: '4K', status: 'ACTIVE' },
-      { id: 'ep-3', episodeNumber: 3, name: 'Tập 3 - Sa Mạc Đỏ', slug: 'tap-3', linkM3u8: 'https://stream.cinema.vn/hls/dune2/ep3/index.m3u8', linkEmbed: 'https://player.cinema.vn/embed/dune2-ep3', quality: '1080p', status: 'ACTIVE' },
-      { id: 'ep-4', episodeNumber: 4, name: 'Tập 4 - Cuộc Chiến', slug: 'tap-4', linkM3u8: 'https://stream.cinema.vn/hls/dune2/ep4/index.m3u8', linkEmbed: 'https://player.cinema.vn/embed/dune2-ep4', quality: '1080p', status: 'PROCESSING' },
-      { id: 'ep-5', episodeNumber: 5, name: 'Tập 5 - Định Mệnh', slug: 'tap-5', linkM3u8: 'https://stream.cinema.vn/hls/dune2/ep5/broken.m3u8', linkEmbed: 'https://player.cinema.vn/embed/dune2-ep5', quality: '1080p', status: 'ERROR' }
-    ]
+    episodes: generateMockEpisodes(120)
   },
   {
     id: 'srv-2',
@@ -102,6 +127,19 @@ export default function EpisodeManagerModal({
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | EpisodeStatus>('ALL');
+  const [activeRange, setActiveRange] = useState<string>('ALL');
+
+  // Pagination for large episode collections (prevents DOM bloat & lag)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(24);
+  const [jumpInput, setJumpInput] = useState<string>('');
+  const [highlightEpId, setHighlightEpId] = useState<string | null>(null);
+
+  // Bulk actions selection
+  const [selectedEpIds, setSelectedEpIds] = useState<string[]>([]);
+  const [isBulkMenuOpen, setIsBulkMenuOpen] = useState(false);
+  const bulkMenuRef = useRef<HTMLDivElement>(null);
 
   // Sub-modal 1: Single Episode Add / Edit Form Modal
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -118,20 +156,27 @@ export default function EpisodeManagerModal({
   const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
   const statusMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close status dropdown on click outside
+  // Reset pagination & selection when server or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedEpIds([]);
+  }, [activeServerId, searchTerm, statusFilter, activeRange]);
+
+  // Close status dropdown & bulk menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
         setOpenStatusMenuId(null);
       }
+      if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target as Node)) {
+        setIsBulkMenuOpen(false);
+      }
     };
-    if (openStatusMenuId) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openStatusMenuId]);
+  }, []);
 
   const activeServer = useMemo(() => {
     return servers.find(s => s.id === activeServerId) || servers[0];
@@ -146,21 +191,167 @@ export default function EpisodeManagerModal({
     return activeServer ? activeServer.episodes.filter(e => e.status === 'ACTIVE').length : 0;
   }, [activeServer]);
 
+  const processingCount = useMemo(() => {
+    return activeServer ? activeServer.episodes.filter(e => e.status === 'PROCESSING').length : 0;
+  }, [activeServer]);
+
   const errorCount = useMemo(() => {
     return activeServer ? activeServer.episodes.filter(e => e.status === 'ERROR').length : 0;
+  }, [activeServer]);
+
+  const disabledCount = useMemo(() => {
+    return activeServer ? activeServer.episodes.filter(e => e.status === 'DISABLED').length : 0;
+  }, [activeServer]);
+
+  // Range Chunks Generator (e.g. Tập 1 - 50, Tập 51 - 100...) for large series
+  const episodeRanges = useMemo(() => {
+    if (!activeServer || activeServer.episodes.length <= 30) return [];
+    const total = activeServer.episodes.length;
+    const chunkSize = 50;
+    const ranges: { label: string; rangeKey: string; start: number; end: number }[] = [];
+    for (let i = 1; i <= total; i += chunkSize) {
+      const end = Math.min(i + chunkSize - 1, total);
+      ranges.push({ label: `Tập ${i} - ${end}`, rangeKey: `${i}-${end}`, start: i, end });
+    }
+    return ranges;
   }, [activeServer]);
 
   // Filtered Episodes
   const filteredEpisodes = useMemo(() => {
     if (!activeServer) return [];
-    if (!searchTerm.trim()) return activeServer.episodes;
-    const term = searchTerm.toLowerCase();
-    return activeServer.episodes.filter(ep =>
-      String(ep.episodeNumber).includes(term) ||
-      ep.name.toLowerCase().includes(term) ||
-      ep.slug.toLowerCase().includes(term)
+    let list = activeServer.episodes;
+
+    // 1. Filter by Status
+    if (statusFilter !== 'ALL') {
+      list = list.filter(ep => ep.status === statusFilter);
+    }
+
+    // 2. Filter by Episode Range
+    if (activeRange !== 'ALL') {
+      const [startStr, endStr] = activeRange.split('-');
+      const start = Number(startStr);
+      const end = Number(endStr);
+      if (!isNaN(start) && !isNaN(end)) {
+        list = list.filter(ep => {
+          const num = Number(ep.episodeNumber);
+          return !isNaN(num) && num >= start && num <= end;
+        });
+      }
+    }
+
+    // 3. Filter by Search Query
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(ep =>
+        String(ep.episodeNumber).includes(term) ||
+        ep.name.toLowerCase().includes(term) ||
+        ep.slug.toLowerCase().includes(term)
+      );
+    }
+
+    return list;
+  }, [activeServer, statusFilter, activeRange, searchTerm]);
+
+  // Paginated episodes (limits rendering to 24-48 items, keeping DOM light & fast)
+  const totalFilteredCount = filteredEpisodes.length;
+  const totalPages = pageSize > 0 ? Math.ceil(totalFilteredCount / pageSize) : 1;
+  const paginatedEpisodes = useMemo(() => {
+    if (pageSize <= 0) return filteredEpisodes;
+    const startIdx = (currentPage - 1) * pageSize;
+    return filteredEpisodes.slice(startIdx, startIdx + pageSize);
+  }, [filteredEpisodes, currentPage, pageSize]);
+
+  // Bulk selection helpers
+  const isAllCurrentPageSelected = paginatedEpisodes.length > 0 && paginatedEpisodes.every(ep => selectedEpIds.includes(ep.id));
+
+  const handleToggleSelectEp = (epId: string) => {
+    setSelectedEpIds(prev =>
+      prev.includes(epId) ? prev.filter(id => id !== epId) : [...prev, epId]
     );
-  }, [activeServer, searchTerm]);
+  };
+
+  const handleToggleSelectAllPage = () => {
+    if (isAllCurrentPageSelected) {
+      const pageIds = new Set(paginatedEpisodes.map(ep => ep.id));
+      setSelectedEpIds(prev => prev.filter(id => !pageIds.has(id)));
+    } else {
+      const newIds = new Set([...selectedEpIds, ...paginatedEpisodes.map(ep => ep.id)]);
+      setSelectedEpIds(Array.from(newIds));
+    }
+  };
+
+  const handleBulkChangeStatus = (newStatus: EpisodeStatus) => {
+    if (selectedEpIds.length === 0) return;
+    const selectedSet = new Set(selectedEpIds);
+    setServers(prev => prev.map(s => {
+      if (s.id !== activeServerId) return s;
+      return {
+        ...s,
+        episodes: s.episodes.map(e => selectedSet.has(e.id) ? { ...e, status: newStatus } : e)
+      };
+    }));
+    setIsBulkMenuOpen(false);
+    const labels: Record<EpisodeStatus, string> = {
+      ACTIVE: 'Hoạt động',
+      PROCESSING: 'Đang xử lý',
+      ERROR: 'Lỗi link',
+      DISABLED: 'Tạm ẩn'
+    };
+    showCinemaAlert(`Đã đổi trạng thái ${selectedEpIds.length} tập sang: ${labels[newStatus]}`, 'cinema');
+    setSelectedEpIds([]);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedEpIds.length === 0) return;
+    const count = selectedEpIds.length;
+    const selectedSet = new Set(selectedEpIds);
+    setServers(prev => prev.map(s => {
+      if (s.id !== activeServerId) return s;
+      return {
+        ...s,
+        episodes: s.episodes.filter(e => !selectedSet.has(e.id))
+      };
+    }));
+    setSelectedEpIds([]);
+    showCinemaAlert(`Đã xóa ${count} tập đã chọn!`, 'warning');
+  };
+
+  // Quick jump to episode
+  const handleJumpToEpisode = (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetNum = jumpInput.trim();
+    if (!targetNum) return;
+
+    // Check if target episode is inside filteredEpisodes
+    const targetIndex = filteredEpisodes.findIndex(ep => String(ep.episodeNumber) === targetNum);
+    if (targetIndex !== -1) {
+      const targetPage = pageSize > 0 ? Math.floor(targetIndex / pageSize) + 1 : 1;
+      setCurrentPage(targetPage);
+      const targetEp = filteredEpisodes[targetIndex];
+      setHighlightEpId(targetEp.id);
+      setTimeout(() => setHighlightEpId(null), 3500);
+      showCinemaAlert(`Đã nhảy tới Tập ${targetNum} (Trang ${targetPage})`, 'cinema');
+    } else {
+      // Find in server episodes (might be hidden by filters)
+      const foundInServer = activeServer?.episodes.find(ep => String(ep.episodeNumber) === targetNum);
+      if (foundInServer) {
+        setStatusFilter('ALL');
+        setActiveRange('ALL');
+        setSearchTerm('');
+        setTimeout(() => {
+          const idx = activeServer!.episodes.findIndex(ep => String(ep.episodeNumber) === targetNum);
+          const p = pageSize > 0 ? Math.floor(idx / pageSize) + 1 : 1;
+          setCurrentPage(p);
+          setHighlightEpId(foundInServer.id);
+          setTimeout(() => setHighlightEpId(null), 3500);
+        }, 50);
+        showCinemaAlert(`Đã đặt lại bộ lọc và chuyển tới Tập ${targetNum}`, 'cinema');
+      } else {
+        showCinemaAlert(`Không tìm thấy Tập ${targetNum} trong máy chủ này!`, 'warning');
+      }
+    }
+    setJumpInput('');
+  };
 
   if (!isOpen || !movie) return null;
 
@@ -421,29 +612,68 @@ export default function EpisodeManagerModal({
 
           {/* Body */}
           <div className={styles.modalBody}>
-            {/* Stats Ribbon */}
+            {/* Stats & Status Filter Ribbon */}
             <div className={styles.statsRibbon}>
               <div className={styles.statItem}>
                 <FaServer style={{ color: '#e50914' }} />
-                <span>Máy chủ hiện tại: <strong className={styles.statVal}>{activeServer?.name}</strong></span>
+                <span>Máy chủ: <strong className={styles.statVal}>{activeServer?.name}</strong></span>
               </div>
               <div className={styles.statDivider}></div>
-              <div className={styles.statItem}>
-                <span>Tổng số: <strong className={styles.statVal}>{totalEpisodesCount} tập</strong></span>
-              </div>
-              <div className={styles.statDivider}></div>
-              <div className={styles.statItem} style={{ color: '#4ade80' }}>
-                <FaCheckCircle />
-                <span>Hoạt động: <strong>{activeCount}</strong></span>
-              </div>
+
+              {/* Status Filter Pills */}
+              <button
+                type="button"
+                className={`${styles.filterPill} ${statusFilter === 'ALL' ? styles.filterPillActive : ''}`}
+                onClick={() => setStatusFilter('ALL')}
+                title="Xem tất cả các tập"
+              >
+                <span>Tất cả ({totalEpisodesCount})</span>
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.filterPill} ${statusFilter === 'ACTIVE' ? styles.filterPillActiveGreen : ''}`}
+                onClick={() => setStatusFilter(statusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE')}
+                title="Lọc các tập đang hoạt động tốt"
+              >
+                <FaCheckCircle style={{ color: '#4ade80' }} />
+                <span>Hoạt động ({activeCount})</span>
+              </button>
+
+              {processingCount > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.filterPill} ${statusFilter === 'PROCESSING' ? styles.filterPillActiveBlue : ''}`}
+                  onClick={() => setStatusFilter(statusFilter === 'PROCESSING' ? 'ALL' : 'PROCESSING')}
+                  title="Lọc các tập đang render / xử lý"
+                >
+                  <FaClock style={{ color: '#60a5fa' }} />
+                  <span>Đang xử lý ({processingCount})</span>
+                </button>
+              )}
+
               {errorCount > 0 && (
-                <>
-                  <div className={styles.statDivider}></div>
-                  <div className={styles.statItem} style={{ color: '#ef4444' }}>
-                    <FaExclamationTriangle />
-                    <span>Lỗi link: <strong>{errorCount}</strong></span>
-                  </div>
-                </>
+                <button
+                  type="button"
+                  className={`${styles.filterPill} ${statusFilter === 'ERROR' ? styles.filterPillActiveRed : ''}`}
+                  onClick={() => setStatusFilter(statusFilter === 'ERROR' ? 'ALL' : 'ERROR')}
+                  title="Lọc nhanh các tập bị lỗi để sửa"
+                >
+                  <FaExclamationTriangle style={{ color: '#ef4444' }} />
+                  <span>Lỗi link ({errorCount})</span>
+                </button>
+              )}
+
+              {disabledCount > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.filterPill} ${statusFilter === 'DISABLED' ? styles.filterPillActive : ''}`}
+                  onClick={() => setStatusFilter(statusFilter === 'DISABLED' ? 'ALL' : 'DISABLED')}
+                  title="Lọc các tập đang tạm ẩn"
+                >
+                  <FaBan style={{ color: '#9ca3af' }} />
+                  <span>Tạm ẩn ({disabledCount})</span>
+                </button>
               )}
             </div>
 
@@ -478,6 +708,33 @@ export default function EpisodeManagerModal({
                 <FaPlus /> Thêm Server
               </button>
             </div>
+
+            {/* Range Chunks Bar (For large series > 30 episodes) */}
+            {episodeRanges.length > 0 && (
+              <div className={styles.rangeTabsBar}>
+                <div className={styles.rangeTabsLabel}>
+                  <FaLayerGroup style={{ color: '#e50914' }} />
+                  <span>Dải tập:</span>
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.rangeTab} ${activeRange === 'ALL' ? styles.rangeTabActive : ''}`}
+                  onClick={() => setActiveRange('ALL')}
+                >
+                  Tất cả ({activeServer?.episodes.length})
+                </button>
+                {episodeRanges.map(rg => (
+                  <button
+                    key={rg.rangeKey}
+                    type="button"
+                    className={`${styles.rangeTab} ${activeRange === rg.rangeKey ? styles.rangeTabActive : ''}`}
+                    onClick={() => setActiveRange(rg.rangeKey)}
+                  >
+                    {rg.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Test Player Banner (If active) */}
             {testPlayingEp && (
@@ -529,16 +786,27 @@ export default function EpisodeManagerModal({
               </div>
 
               <div className={styles.toolbarRight}>
+                {/* Search Box */}
                 <div className={styles.searchBox}>
                   <FaSearch className={styles.searchIcon} />
                   <input
                     type="text"
-                    placeholder="Tìm tập..."
+                    placeholder="Tìm theo số tập hoặc tên..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', paddingRight: '0.3rem' }}
+                      onClick={() => setSearchTerm('')}
+                    >
+                      <FaTimes style={{ fontSize: '0.75rem' }} />
+                    </button>
+                  )}
                 </div>
 
+                {/* View Mode Toggle */}
                 <div className={styles.viewModeToggle}>
                   <button
                     type="button"
@@ -552,7 +820,7 @@ export default function EpisodeManagerModal({
                     type="button"
                     className={`${styles.viewModeBtn} ${viewMode === 'list' ? styles.viewModeBtnActive : ''}`}
                     onClick={() => setViewMode('list')}
-                    title="Xem dạng Danh Sách"
+                    title="Xem dạng Bảng"
                   >
                     <FaList />
                   </button>
@@ -560,99 +828,214 @@ export default function EpisodeManagerModal({
               </div>
             </div>
 
+            {/* Bulk Action Floating Bar (Visible when items selected) */}
+            {selectedEpIds.length > 0 && (
+              <div className={styles.bulkActionBar}>
+                <div className={styles.bulkLeft}>
+                  <input
+                    type="checkbox"
+                    className={styles.customCheckbox}
+                    checked={isAllCurrentPageSelected}
+                    onChange={handleToggleSelectAllPage}
+                    title="Chọn tất cả tập trong trang hiện tại"
+                  />
+                  <span>Đã chọn:</span>
+                  <span className={styles.bulkCountTag}>{selectedEpIds.length} tập</span>
+                  <button
+                    type="button"
+                    className={styles.filterPill}
+                    onClick={() => setSelectedEpIds([])}
+                  >
+                    Bỏ chọn
+                  </button>
+                  {selectedEpIds.length < totalFilteredCount && (
+                    <button
+                      type="button"
+                      className={styles.filterPill}
+                      onClick={() => setSelectedEpIds(filteredEpisodes.map(e => e.id))}
+                    >
+                      Chọn tất cả {totalFilteredCount} tập
+                    </button>
+                  )}
+                </div>
+
+                <div className={styles.bulkRight} ref={bulkMenuRef}>
+                  <button
+                    type="button"
+                    className={styles.bulkActionBtn}
+                    onClick={() => setIsBulkMenuOpen(!isBulkMenuOpen)}
+                  >
+                    <span>Đổi trạng thái</span>
+                    <FaChevronDown style={{ fontSize: '0.7rem' }} />
+                  </button>
+
+                  {isBulkMenuOpen && (
+                    <div className={styles.statusMenu} style={{ right: 80, minWidth: 150 }}>
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => handleBulkChangeStatus('ACTIVE')}
+                      >
+                        <FaCheckCircle style={{ color: '#4ade80' }} /> Hoạt động
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => handleBulkChangeStatus('PROCESSING')}
+                      >
+                        <FaClock style={{ color: '#60a5fa' }} /> Đang xử lý
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => handleBulkChangeStatus('ERROR')}
+                      >
+                        <FaExclamationTriangle style={{ color: '#f87171' }} /> Báo lỗi link
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.statusMenuItem}
+                        onClick={() => handleBulkChangeStatus('DISABLED')}
+                      >
+                        <FaBan style={{ color: '#9ca3af' }} /> Tạm ẩn
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className={`${styles.bulkActionBtn} ${styles.bulkDeleteBtn}`}
+                    onClick={handleBulkDelete}
+                    title="Xóa toàn bộ các tập đã chọn"
+                  >
+                    <FaTrash />
+                    <span>Xóa ({selectedEpIds.length})</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* MAIN CONTENT: Episodes List or Grid */}
-            {filteredEpisodes.length === 0 ? (
+            {totalFilteredCount === 0 ? (
               <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#6b7280', background: '#0a0a0c', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <FaFilm style={{ fontSize: '2rem', marginBottom: '0.5rem', opacity: 0.5 }} />
-                <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.95rem' }}>Chưa có tập phim nào</div>
+                <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.95rem' }}>Không tìm thấy tập phim nào</div>
                 <div style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
-                  {searchTerm ? 'Không tìm thấy tập nào khớp với từ khóa tìm kiếm.' : 'Hãy bấm "+ Thêm Tập Mới" hoặc "Nhập Hàng Loạt" để bắt đầu.'}
+                  {searchTerm || statusFilter !== 'ALL' || activeRange !== 'ALL'
+                    ? 'Không có tập nào khớp với bộ lọc hiện tại. Hãy xóa từ khóa hoặc chọn "Tất cả".'
+                    : 'Hãy bấm "+ Thêm Tập Mới" hoặc "Nhập Hàng Loạt" để bắt đầu.'}
                 </div>
               </div>
             ) : viewMode === 'grid' ? (
               /* GRID VIEW */
               <div className={styles.episodesGrid}>
-                {filteredEpisodes.map(ep => (
-                  <div key={ep.id} className={styles.episodeCard}>
-                    <div className={styles.cardHeaderRow}>
-                      <div className={styles.epBadgeGroup}>
-                        <span className={styles.epNumberBadge}>#{ep.episodeNumber}</span>
-                        <span className={styles.epQualityBadge}>{ep.quality || '1080p'}</span>
-                      </div>
-                      {renderStatusButton(ep)}
-                    </div>
+                {paginatedEpisodes.map(ep => {
+                  const isSelected = selectedEpIds.includes(ep.id);
+                  const isHighlighted = highlightEpId === ep.id;
 
-                    <div className={styles.cardBody}>
-                      <h4 className={styles.cardEpName} title={ep.name}>{ep.name}</h4>
-                      <div className={styles.cardEpSlug}>/{ep.slug}</div>
-                      <div className={styles.cardStreamInfo}>
-                        {ep.linkM3u8 ? (
-                          <>
-                            <span style={{ color: '#4ade80' }}>●</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkM3u8}>
-                              HLS: {ep.linkM3u8}
-                            </span>
-                          </>
-                        ) : ep.linkEmbed ? (
-                          <>
-                            <span style={{ color: '#60a5fa' }}>●</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkEmbed}>
-                              Embed: {ep.linkEmbed}
-                            </span>
-                          </>
-                        ) : (
-                          <span style={{ color: '#f87171' }}>● Chưa có link</span>
-                        )}
+                  return (
+                    <div
+                      key={ep.id}
+                      className={styles.episodeCard}
+                      style={{
+                        border: isHighlighted
+                          ? '1px solid #e50914'
+                          : isSelected
+                          ? '1px solid rgba(229, 9, 20, 0.45)'
+                          : undefined,
+                        boxShadow: isHighlighted ? '0 0 16px rgba(229, 9, 20, 0.4)' : undefined,
+                        transition: 'all 0.25s ease'
+                      }}
+                    >
+                      <div className={styles.cardHeaderRow}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input
+                            type="checkbox"
+                            className={styles.customCheckbox}
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectEp(ep.id)}
+                            title="Chọn tập này"
+                          />
+                          <div className={styles.epBadgeGroup}>
+                            <span className={styles.epNumberBadge}>#{ep.episodeNumber}</span>
+                            <span className={styles.epQualityBadge}>{ep.quality || '1080p'}</span>
+                          </div>
+                        </div>
+                        {renderStatusButton(ep)}
                       </div>
-                    </div>
 
-                    <div className={styles.cardFooterRow}>
-                      <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
-                        ID: {ep.id.substring(0, 8)}
-                      </span>
-                      <div className={styles.cardActionGroup}>
-                        <button
-                          type="button"
-                          className={`${styles.miniActionBtn} ${styles.miniActionBtnPlay}`}
-                          title="Phát thử tập này"
-                          onClick={() => setTestPlayingEp(ep)}
-                        >
-                          <FaPlay />
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.miniActionBtn}
-                          title="Sao chép link stream"
-                          onClick={() => {
-                            const link = ep.linkM3u8 || ep.linkEmbed || '';
-                            if (link) {
-                              navigator.clipboard.writeText(link);
-                              showCinemaAlert('Đã sao chép link stream!', 'cinema');
-                            }
-                          }}
-                        >
-                          <FaCopy />
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.miniActionBtn}
-                          title="Chỉnh sửa chi tiết tập phim"
-                          onClick={() => handleOpenEditForm(ep)}
-                        >
-                          <FaPen />
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.miniActionBtn} ${styles.miniActionBtnDelete}`}
-                          title="Xóa tập này"
-                          onClick={() => handleDeleteEpisode(ep.id, ep.name)}
-                        >
-                          <FaTrash />
-                        </button>
+                      <div className={styles.cardBody}>
+                        <h4 className={styles.cardEpName} title={ep.name}>{ep.name}</h4>
+                        <div className={styles.cardEpSlug}>/{ep.slug}</div>
+                        <div className={styles.cardStreamInfo}>
+                          {ep.linkM3u8 ? (
+                            <>
+                              <span style={{ color: '#4ade80' }}>●</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkM3u8}>
+                                HLS: {ep.linkM3u8}
+                              </span>
+                            </>
+                          ) : ep.linkEmbed ? (
+                            <>
+                              <span style={{ color: '#60a5fa' }}>●</span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkEmbed}>
+                                Embed: {ep.linkEmbed}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ color: '#f87171' }}>● Chưa có link</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={styles.cardFooterRow}>
+                        <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
+                          ID: {ep.id.substring(0, 8)}
+                        </span>
+                        <div className={styles.cardActionGroup}>
+                          <button
+                            type="button"
+                            className={`${styles.miniActionBtn} ${styles.miniActionBtnPlay}`}
+                            title="Phát thử tập này"
+                            onClick={() => setTestPlayingEp(ep)}
+                          >
+                            <FaPlay />
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.miniActionBtn}
+                            title="Sao chép link stream"
+                            onClick={() => {
+                              const link = ep.linkM3u8 || ep.linkEmbed || '';
+                              if (link) {
+                                navigator.clipboard.writeText(link);
+                                showCinemaAlert('Đã sao chép link stream!', 'cinema');
+                              }
+                            }}
+                          >
+                            <FaCopy />
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.miniActionBtn}
+                            title="Chỉnh sửa chi tiết tập phim"
+                            onClick={() => handleOpenEditForm(ep)}
+                          >
+                            <FaPen />
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.miniActionBtn} ${styles.miniActionBtnDelete}`}
+                            title="Xóa tập này"
+                            onClick={() => handleDeleteEpisode(ep.id, ep.name)}
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               /* CLEAN LIST VIEW */
@@ -660,67 +1043,202 @@ export default function EpisodeManagerModal({
                 <table className={styles.cleanTable}>
                   <thead>
                     <tr>
-                      <th style={{ width: '10%' }}>Số Tập</th>
+                      <th style={{ width: '4%' }}>
+                        <input
+                          type="checkbox"
+                          className={styles.customCheckbox}
+                          checked={isAllCurrentPageSelected}
+                          onChange={handleToggleSelectAllPage}
+                          title="Chọn tất cả trên trang này"
+                        />
+                      </th>
+                      <th style={{ width: '9%' }}>Số Tập</th>
                       <th style={{ width: '25%' }}>Tên Tập / Slug</th>
-                      <th style={{ width: '25%' }}>Nguồn Phát Stream</th>
+                      <th style={{ width: '24%' }}>Nguồn Phát Stream</th>
                       <th style={{ width: '10%' }}>Độ Phân Giải</th>
-                      <th style={{ width: '15%' }}>Trạng Thái</th>
-                      <th style={{ width: '15%', textAlign: 'center' }}>Thao Tác</th>
+                      <th style={{ width: '14%' }}>Trạng Thái</th>
+                      <th style={{ width: '14%', textAlign: 'center' }}>Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEpisodes.map(ep => (
-                      <tr key={ep.id}>
-                        <td>
-                          <span className={styles.epNumberBadge}>#{ep.episodeNumber}</span>
-                        </td>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.86rem' }}>{ep.name}</div>
-                          <div style={{ fontSize: '0.74rem', color: '#9ca3af', fontFamily: 'monospace' }}>/{ep.slug}</div>
-                        </td>
-                        <td>
-                          <div style={{ fontSize: '0.76rem', color: '#cbd5e1', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkM3u8 || ep.linkEmbed || ''}>
-                            {ep.linkM3u8 ? `HLS: ${ep.linkM3u8}` : ep.linkEmbed ? `Embed: ${ep.linkEmbed}` : 'Chưa có link'}
-                          </div>
-                        </td>
-                        <td>
-                          <span className={styles.epQualityBadge}>{ep.quality || '1080p'}</span>
-                        </td>
-                        <td>
-                          {renderStatusButton(ep)}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <div className={styles.cardActionGroup} style={{ justifyContent: 'center' }}>
-                            <button
-                              type="button"
-                              className={`${styles.miniActionBtn} ${styles.miniActionBtnPlay}`}
-                              title="Phát thử"
-                              onClick={() => setTestPlayingEp(ep)}
-                            >
-                              <FaPlay />
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.miniActionBtn}
-                              title="Sửa chi tiết"
-                              onClick={() => handleOpenEditForm(ep)}
-                            >
-                              <FaPen />
-                            </button>
-                            <button
-                              type="button"
-                              className={`${styles.miniActionBtn} ${styles.miniActionBtnDelete}`}
-                              title="Xóa"
-                              onClick={() => handleDeleteEpisode(ep.id, ep.name)}
-                            >
-                              <FaTrash />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {paginatedEpisodes.map(ep => {
+                      const isSelected = selectedEpIds.includes(ep.id);
+                      const isHighlighted = highlightEpId === ep.id;
+
+                      return (
+                        <tr
+                          key={ep.id}
+                          style={{
+                            background: isHighlighted
+                              ? 'rgba(229, 9, 20, 0.12)'
+                              : isSelected
+                              ? 'rgba(229, 9, 20, 0.05)'
+                              : undefined
+                          }}
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              className={styles.customCheckbox}
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectEp(ep.id)}
+                            />
+                          </td>
+                          <td>
+                            <span className={styles.epNumberBadge}>#{ep.episodeNumber}</span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.86rem' }}>{ep.name}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#9ca3af', fontFamily: 'monospace' }}>/{ep.slug}</div>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '0.76rem', color: '#cbd5e1', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkM3u8 || ep.linkEmbed || ''}>
+                              {ep.linkM3u8 ? `HLS: ${ep.linkM3u8}` : ep.linkEmbed ? `Embed: ${ep.linkEmbed}` : 'Chưa có link'}
+                            </div>
+                          </td>
+                          <td>
+                            <span className={styles.epQualityBadge}>{ep.quality || '1080p'}</span>
+                          </td>
+                          <td>
+                            {renderStatusButton(ep)}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <div className={styles.cardActionGroup} style={{ justifyContent: 'center' }}>
+                              <button
+                                type="button"
+                                className={`${styles.miniActionBtn} ${styles.miniActionBtnPlay}`}
+                                title="Phát thử"
+                                onClick={() => setTestPlayingEp(ep)}
+                              >
+                                <FaPlay />
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.miniActionBtn}
+                                title="Sửa chi tiết"
+                                onClick={() => handleOpenEditForm(ep)}
+                              >
+                                <FaPen />
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.miniActionBtn} ${styles.miniActionBtnDelete}`}
+                                title="Xóa"
+                                onClick={() => handleDeleteEpisode(ep.id, ep.name)}
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination Controls Bar */}
+            {totalFilteredCount > 0 && (
+              <div className={styles.paginationBar}>
+                <div className={styles.paginationInfo}>
+                  <span>
+                    Hiển thị <strong>{Math.min((currentPage - 1) * pageSize + 1, totalFilteredCount)} - {Math.min(currentPage * pageSize, totalFilteredCount)}</strong> trong tổng số <strong>{totalFilteredCount}</strong> tập
+                  </span>
+
+                  <span style={{ color: '#4b5563' }}>•</span>
+
+                  <span>Mỗi trang:</span>
+                  <select
+                    className={styles.pageSizeSelect}
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value={12}>12 tập</option>
+                    <option value={24}>24 tập</option>
+                    <option value={48}>48 tập</option>
+                    <option value={96}>96 tập</option>
+                    <option value={0}>Tất cả</option>
+                  </select>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className={styles.paginationControls}>
+                    <button
+                      type="button"
+                      className={styles.pageBtn}
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(1)}
+                      title="Trang đầu"
+                    >
+                      <FaAngleDoubleLeft />
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.pageBtn}
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      title="Trang trước"
+                    >
+                      <FaChevronLeft />
+                    </button>
+
+                    {/* Page Numbers */}
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                      .map((p, idx, arr) => {
+                        const prev = arr[idx - 1];
+                        return (
+                          <React.Fragment key={p}>
+                            {prev && p - prev > 1 && (
+                              <span style={{ color: '#6b7280', fontSize: '0.75rem', padding: '0 2px' }}>...</span>
+                            )}
+                            <button
+                              type="button"
+                              className={`${styles.pageBtn} ${currentPage === p ? styles.pageBtnActive : ''}`}
+                              onClick={() => setCurrentPage(p)}
+                            >
+                              {p}
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+
+                    <button
+                      type="button"
+                      className={styles.pageBtn}
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      title="Trang sau"
+                    >
+                      <FaChevronRight />
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.pageBtn}
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(totalPages)}
+                      title="Trang cuối"
+                    >
+                      <FaAngleDoubleRight />
+                    </button>
+
+                    {/* Quick Jump Input */}
+                    <form onSubmit={handleJumpToEpisode} className={styles.pageJumpBox} title="Nhập số tập để nhảy thẳng tới tập đó">
+                      <span>Đến tập:</span>
+                      <input
+                        type="text"
+                        placeholder="#"
+                        value={jumpInput}
+                        onChange={(e) => setJumpInput(e.target.value)}
+                        className={styles.pageJumpInput}
+                      />
+                    </form>
+                  </div>
+                )}
               </div>
             )}
           </div>
