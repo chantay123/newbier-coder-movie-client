@@ -13,7 +13,8 @@ import { useRouter } from 'next/router';  import {
   FaExclamationTriangle,
   FaAd,
   FaBell,
-  FaTags
+  FaTags,
+  FaUserTie
 } from 'react-icons/fa';
 import styles from '@/styles/AdminSidebar.module.css';
 import axios from 'axios';
@@ -112,6 +113,7 @@ const AdminSidebar = () => {
     { path: '/admin', icon: FaHome, label: 'Dashboard' },
     { path: '/admin/movies', icon: FaFilm, label: 'Movies' },
     { path: '/admin/taxonomies', icon: FaTags, label: 'Phân loại & Thuộc tính' },
+    { path: '/admin/people', icon: FaUserTie, label: 'Diễn viên & Đạo diễn' },
     // { path: '/admin/upcoming-movies', icon: FaPlayCircle, label: 'Phim sắp ra mắt' },
     { path: '/admin/users', icon: FaUsers, label: 'Users' },
     // { path: '/admin/premium', icon: FaCrown, label: 'Premium', badge: pendingPremiumCount },
