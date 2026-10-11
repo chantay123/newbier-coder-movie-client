@@ -8,6 +8,8 @@ import TrailerModal from '@/features/movie-detail/components/TrailerModal';
 import { showCinemaAlert } from '@/components/UI/CinemaAlert';
 import styles from '@/styles/AdminAddMovie.module.css';
 
+const MovieCardVerticalAny = MovieCardVertical as any;
+
 interface MovieWebSimulationProps {
   name: string;
   originName: string;
@@ -233,7 +235,7 @@ export const MovieWebSimulation: React.FC<MovieWebSimulationProps> = ({
               }
             }}
           >
-            <MovieCardVertical
+            <MovieCardVerticalAny
               movie={movieData}
               onPlayTrailer={handlePlayTrailer}
             />

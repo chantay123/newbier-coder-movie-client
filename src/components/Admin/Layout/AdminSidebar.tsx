@@ -12,7 +12,8 @@ import { useRouter } from 'next/router';  import {
   FaEnvelope,
   FaExclamationTriangle,
   FaAd,
-  FaBell
+  FaBell,
+  FaTags
 } from 'react-icons/fa';
 import styles from '@/styles/AdminSidebar.module.css';
 import axios from 'axios';
@@ -110,13 +111,14 @@ const AdminSidebar = () => {
   };  const menuItems: MenuItem[] = [
     { path: '/admin', icon: FaHome, label: 'Dashboard' },
     { path: '/admin/movies', icon: FaFilm, label: 'Movies' },
-    { path: '/admin/upcoming-movies', icon: FaPlayCircle, label: 'Phim sắp ra mắt' },
+    { path: '/admin/taxonomies', icon: FaTags, label: 'Phân loại & Thuộc tính' },
+    // { path: '/admin/upcoming-movies', icon: FaPlayCircle, label: 'Phim sắp ra mắt' },
     { path: '/admin/users', icon: FaUsers, label: 'Users' },
     // { path: '/admin/premium', icon: FaCrown, label: 'Premium', badge: pendingPremiumCount },
     // { path: '/admin/feedback', icon: FaEnvelope, label: 'Góp ý người dùng', badge: unreadFeedbackCount },
     // { path: '/admin/reports', icon: FaExclamationTriangle, label: 'Báo cáo lỗi' },
-    // { path: '/admin/advertisement', icon: FaAd, label: 'Quảng cáo' },
-    // { path: '/admin/notifications/email', icon: FaBell, label: 'Gửi thông báo' },
+    { path: '/admin/advertisement', icon: FaAd, label: 'Quảng cáo' },
+    { path: '/admin/notifications/email', icon: FaBell, label: 'Gửi thông báo' },
   ];
 
   return (
