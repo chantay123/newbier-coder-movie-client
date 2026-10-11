@@ -48,6 +48,7 @@ import { useRouter } from 'next/router';
 import { toast } from 'react-toastify';
 import AdminLayout from '../../components/Layout/AdminLayout';
 import CrawlModal from '../../components/Admin/CrawlModal';
+import EpisodeManagerModal from '../../components/Admin/Movies/EpisodeManagerModal';
 import axiosInstance from '../../API/config/axiosConfig';
 
 import {
@@ -1438,6 +1439,10 @@ const MoviesAdmin = () => {
     isOpen: false,
     movie: null
   });
+  const [episodeModal, setEpisodeModal] = useState<{ isOpen: boolean; movie: any | null }>({
+    isOpen: false,
+    movie: null
+  });
   const [crawlModalOpen, setCrawlModalOpen] = useState(false);
   const [sortField, setSortField] = useState<string>('updatedAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -2109,6 +2114,17 @@ const MoviesAdmin = () => {
                         title="Xem chi tiết"
                       >
                         <FaEye />
+                      </button>
+                      <button
+                        className={combinedStyles.detailButton}
+                        style={{ background: 'rgba(229, 9, 20, 0.12)', color: '#ff8080', border: '1px solid rgba(229, 9, 20, 0.3)' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEpisodeModal({ isOpen: true, movie });
+                        }}
+                        title="Quản lý tập phim & Stream Server"
+                      >
+                        <FaStream />
                       </button>                      <button
                         className={combinedStyles.editIconButtonSmall}
                         onClick={(e) => {
@@ -2250,6 +2266,12 @@ const MoviesAdmin = () => {
         isOpen={crawlModalOpen}
         onClose={() => setCrawlModalOpen(false)}
         onSuccess={() => fetchMovies(1)}
+      />
+
+      <EpisodeManagerModal
+        isOpen={episodeModal.isOpen}
+        movie={episodeModal.movie}
+        onClose={() => setEpisodeModal({ isOpen: false, movie: null })}
       />
     </div>
   );
