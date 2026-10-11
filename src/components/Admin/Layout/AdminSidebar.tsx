@@ -119,8 +119,8 @@ const AdminSidebar = () => {
     // { path: '/admin/premium', icon: FaCrown, label: 'Premium', badge: pendingPremiumCount },
     // { path: '/admin/feedback', icon: FaEnvelope, label: 'Góp ý người dùng', badge: unreadFeedbackCount },
     // { path: '/admin/reports', icon: FaExclamationTriangle, label: 'Báo cáo lỗi' },
-    { path: '/admin/advertisement', icon: FaAd, label: 'Quảng cáo' },
-    { path: '/admin/notifications/email', icon: FaBell, label: 'Gửi thông báo' },
+    // { path: '/admin/advertisement', icon: FaAd, label: 'Quảng cáo' },
+    // { path: '/admin/notifications/email', icon: FaBell, label: 'Gửi thông báo' },
   ];
 
   return (
