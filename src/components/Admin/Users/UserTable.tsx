@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { FaEdit, FaTrash, FaBan, FaUnlock, FaSearch, FaFilter, FaSortAmountDown, FaSortAmountUp, FaUserCircle, FaHistory } from 'react-icons/fa';
 import ConfirmModal from '../Common/ConfirmModal';
 import LoginHistoryModal from './LoginHistoryModal';
+import CinemaDropdown from '@/components/Admin/Common/CinemaDropdown';
+import { ADMIN_USERS_I18N } from '@/config/i18n/admin';
 
 interface User {
   _id: string;
@@ -215,55 +217,48 @@ const UserTable: React.FC<UserTableProps> = ({ users = [], onEdit, onDelete, onB
 
   return (
     <>
-      <div className="user-filters mb-3 p-3">
-        <div className="row align-items-center">
-          <div className="col-md-6 mb-3 mb-md-0">
-            <div className="input-group search-group">
-              <div className="input-group-prepend">
-                <span className="input-group-text bg-transparent border-right-0" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                  <FaSearch style={{ color: '#64748b' }} />
-                </span>
-              </div>
+      <div className="user-filters mb-3 p-3" style={{ backgroundColor: '#141416', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div className="d-flex align-items-center flex-wrap gap-2 flex-grow-1" style={{ maxWidth: 640 }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', flexGrow: 1, minWidth: 240 }}>
+              <FaSearch style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: '0.8rem', pointerEvents: 'none' }} />
               <input
                 type="text"
-                className="form-control border-left-0"
                 style={{
-                  backgroundColor: '#0e131d',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  color: '#f1f5f9'
+                  width: '100%',
+                  height: 36,
+                  padding: '0 0.75rem 0 2.2rem',
+                  backgroundColor: '#18181c',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 8,
+                  color: '#f1f5f9',
+                  fontSize: '0.84rem',
+                  outline: 'none'
                 }}
-                placeholder="Tìm theo tên hoặc email..."
+                placeholder={ADMIN_USERS_I18N.filters.searchPlaceholder}
                 value={searchQuery}
                 onChange={handleSearch}
               />
             </div>
+
+            {/* Role Filter Dropdown */}
+            <CinemaDropdown
+              options={[
+                { value: 'all', label: ADMIN_USERS_I18N.filters.allRoles },
+                { value: 'admin', label: ADMIN_USERS_I18N.filters.roleAdmin },
+                { value: 'moderator', label: ADMIN_USERS_I18N.filters.roleModerator },
+                { value: 'user', label: ADMIN_USERS_I18N.filters.roleUser }
+              ]}
+              value={filterRole || 'all'}
+              onChange={(val) => setFilterRole(val === 'all' ? null : val)}
+              prefixIcon={<FaFilter />}
+              size="filter"
+            />
           </div>
-          <div className="col-md-3 mb-3 mb-md-0">
-            <div className="input-group">
-              <div className="input-group-prepend">
-                <span className="input-group-text bg-transparent border-right-0" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                  <FaFilter style={{ color: '#64748b' }} />
-                </span>
-              </div>
-              <select
-                className="form-control border-left-0"
-                style={{
-                  backgroundColor: '#0e131d',
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
-                  color: '#f1f5f9'
-                }}
-                onChange={handleFilterChange}
-                defaultValue="all"
-              >
-                <option value="all">Tất cả vai trò</option>
-                <option value="admin">Admin</option>
-                <option value="moderator">Moderator</option>
-                <option value="user">User</option>
-              </select>
-            </div>
-          </div>
-          <div className="col-md-3 text-md-right">
-            <span className="badge p-2" style={{ backgroundColor: '#141b29', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+
+          <div>
+            <span className="badge" style={{ backgroundColor: '#18181c', color: '#9ca3af', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '0.45rem 0.75rem', fontSize: '0.8rem' }}>
               {filteredUsers.length} người dùng
             </span>
           </div>

@@ -25,6 +25,14 @@ import styles from '@/styles/AdminTaxonomies.module.css';
 import TaxonomyFormModal, { TaxonomyItem } from '@/components/Admin/Taxonomies/TaxonomyFormModal';
 import TaxonomyRecalculateModal from '@/components/Admin/Taxonomies/TaxonomyRecalculateModal';
 import TaxonomyDeleteModal from '@/components/Admin/Taxonomies/TaxonomyDeleteModal';
+import CinemaDropdown from '@/components/Admin/Common/CinemaDropdown';
+import { ADMIN_TAXONOMIES_I18N } from '@/config/i18n/admin';
+import {
+  INITIAL_CATEGORIES as MOCK_CATEGORIES,
+  INITIAL_COUNTRIES as MOCK_COUNTRIES,
+  INITIAL_FORMATS as MOCK_FORMATS,
+  INITIAL_YEARS as MOCK_YEARS
+} from '@/mock/admin';
 
 type TaxonomyTab = 'categories' | 'countries' | 'formats' | 'years';
 
@@ -77,10 +85,10 @@ export default function TaxonomiesAdminPage() {
   const [activeTab, setActiveTab] = useState<TaxonomyTab>('categories');
 
   // State collections
-  const [categories, setCategories] = useState<TaxonomyItem[]>(INITIAL_CATEGORIES);
-  const [countries, setCountries] = useState<TaxonomyItem[]>(INITIAL_COUNTRIES);
-  const [formats, setFormats] = useState<TaxonomyItem[]>(INITIAL_FORMATS);
-  const [years, setYears] = useState<TaxonomyItem[]>(INITIAL_YEARS);
+  const [categories, setCategories] = useState<TaxonomyItem[]>(MOCK_CATEGORIES);
+  const [countries, setCountries] = useState<TaxonomyItem[]>(MOCK_COUNTRIES);
+  const [formats, setFormats] = useState<TaxonomyItem[]>(MOCK_FORMATS);
+  const [years, setYears] = useState<TaxonomyItem[]>(MOCK_YEARS);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -312,15 +320,18 @@ export default function TaxonomiesAdminPage() {
             </div>
 
             <div className={styles.filterControls}>
-              <select
-                className={styles.filterSelect}
+              <CinemaDropdown
+                options={[
+                  { value: 'all', label: ADMIN_TAXONOMIES_I18N.filters.allStatuses },
+                  { value: 'active', label: ADMIN_TAXONOMIES_I18N.filters.statusActive },
+                  { value: 'inactive', label: ADMIN_TAXONOMIES_I18N.filters.statusInactive }
+                ]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="active">Đang kích hoạt</option>
-                <option value="inactive">Tạm ẩn</option>
-              </select>
+                onChange={(val) => setStatusFilter(val as any)}
+                prefixIcon={<FaFilm />}
+                size="filter"
+                ariaLabel="Lọc theo trạng thái"
+              />
             </div>
           </div>
 

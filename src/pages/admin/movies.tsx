@@ -49,6 +49,9 @@ import { toast } from 'react-toastify';
 import AdminLayout from '../../components/Layout/AdminLayout';
 import CrawlModal from '../../components/Admin/CrawlModal';
 import EpisodeManagerModal from '../../components/Admin/Movies/EpisodeManagerModal';
+import CinemaDropdown from '@/components/Admin/Common/CinemaDropdown';
+import { ADMIN_MOVIES_I18N, ADMIN_COMMON_I18N } from '@/config/i18n/admin';
+import { MOCK_ADMIN_MOVIES, INITIAL_CATEGORIES } from '@/mock/admin';
 import axiosInstance from '../../API/config/axiosConfig';
 
 import {
@@ -1450,6 +1453,7 @@ const MoviesAdmin = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [filterYear, setFilterYear] = useState<number | undefined>(undefined);
   const [filterType, setFilterType] = useState<string>('');
+  const [isOfflineMock, setIsOfflineMock] = useState<boolean>(false);
 
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [elasticsearchStatus, setElasticsearchStatus] = useState<ElasticsearchStatus | null>(null);
@@ -1477,74 +1481,84 @@ const MoviesAdmin = () => {
   const searchMovies = async (query: string, page: number) => {
     try {
       setLoading(true);
-
-      // Ensure current page is set
       const currentPageToUse = page || currentPage;
 
-      let response;
-
-      // Check Elasticsearch status and search content
-      if (query && query.trim() !== '' && elasticsearchStatus?.status === 'active') {
-        if (!isSearching) {
-          setIsSearching(true);
+      try {
+        let response;
+        if (query && query.trim() !== '' && elasticsearchStatus?.status === 'active') {
+          if (!isSearching) setIsSearching(true);
+          response = await searchMoviesWithElasticsearch(
+            currentPageToUse,
+            moviesPerPage,
+            query,
+            selectedCategory || undefined,
+            filterStatus !== 'all' ? filterStatus : undefined,
+            filterYear,
+            filterType || undefined
+          );
+        } else {
+          if (!query || query.trim() === '') setIsSearching(false);
+          response = await getMoviesForAdmin(
+            currentPageToUse,
+            moviesPerPage,
+            sortField,
+            sortDirection,
+            selectedCategory || undefined,
+            filterStatus !== 'all' ? filterStatus : undefined,
+            query,
+            filterYear,
+            filterType || undefined
+          );
         }
 
-        response = await searchMoviesWithElasticsearch(
-          currentPageToUse,
-          moviesPerPage,
-          query,
-          selectedCategory || undefined,
-          filterStatus !== 'all' ? filterStatus : undefined,
-          filterYear,
-          filterType || undefined
-        );
-      } else {
-        if (!query || query.trim() === '') {
-          setIsSearching(false);
+        if (response && response.movies && Array.isArray(response.movies) && response.movies.length > 0) {
+          setMovies(response.movies);
+          setIsOfflineMock(false);
+          const pagination = response.pagination || {};
+          setTotalMovies(pagination.totalItems || response.movies.length);
+          setTotalPages(pagination.totalPages || 1);
+          setLoading(false);
+          return;
         }
-
-        response = await getMoviesForAdmin(
-          currentPageToUse,
-          moviesPerPage,
-          sortField,
-          sortDirection,
-          selectedCategory || undefined,
-          filterStatus !== 'all' ? filterStatus : undefined,
-          query, // Pass query to MongoDB (will be ignored if empty)
-          filterYear,
-          filterType || undefined
-        );
+      } catch (apiError) {
+        console.warn('Backend search API unreachable, filtering in mock movies dataset:', apiError);
       }
 
-      // Process response data from service
-      if (response && response.movies && Array.isArray(response.movies)) {
-        setMovies(response.movies);
+      // Fallback search in mock dataset
+      setIsOfflineMock(true);
+      const q = (query || '').toLowerCase().trim();
+      let filtered = MOCK_ADMIN_MOVIES.filter(m =>
+        !q ||
+        m.name.toLowerCase().includes(q) ||
+        m.origin_name.toLowerCase().includes(q) ||
+        m.slug.toLowerCase().includes(q)
+      );
 
-        // Get pagination info
-        const pagination = response.pagination || {};
-        setTotalMovies(pagination.totalItems || 0);
-        setTotalPages(pagination.totalPages || 1);
-      } else {
-        console.warn('No movies array in search response:', response);
-        setMovies([]);
-        setTotalMovies(0);
-        setTotalPages(1);
+      if (selectedCategory) {
+        filtered = filtered.filter(m => m.category.some(c => c.id === selectedCategory));
+      }
+      if (filterStatus !== 'all') {
+        filtered = filtered.filter(m => m.status === filterStatus);
+      }
+      if (filterYear) {
+        filtered = filtered.filter(m => m.year === filterYear);
+      }
+      if (filterType) {
+        filtered = filtered.filter(m => m.type === filterType);
       }
 
+      setMovies(filtered as any);
+      setTotalMovies(filtered.length);
+      setTotalPages(Math.max(1, Math.ceil(filtered.length / moviesPerPage)));
       setLoading(false);
     } catch (error) {
       console.error('Error searching movies:', error);
-      toast.error('Không thể tìm kiếm phim');
       setLoading(false);
-      setMovies([]);
-      setTotalMovies(0);
-      setTotalPages(1);
     }
   };
 
   const fetchMovies = useCallback(async (page: number) => {
     try {
-
       if (searchQuery && searchQuery.trim() !== '') {
         await searchMovies(searchQuery, page);
         return;
@@ -1552,39 +1566,56 @@ const MoviesAdmin = () => {
 
       setLoading(true);
 
-      const response = await getMoviesForAdmin(
-        page,
-        moviesPerPage,
-        sortField,
-        sortDirection,
-        selectedCategory || undefined,
-        filterStatus !== 'all' ? filterStatus : undefined,
-        '',
-        filterYear,
-        filterType || undefined
-      );
+      try {
+        const response = await getMoviesForAdmin(
+          page,
+          moviesPerPage,
+          sortField,
+          sortDirection,
+          selectedCategory || undefined,
+          filterStatus !== 'all' ? filterStatus : undefined,
+          '',
+          filterYear,
+          filterType || undefined
+        );
 
-      if (response && response.movies && Array.isArray(response.movies)) {
-        setMovies(response.movies);
-
-        const pagination = response.pagination || {};
-        setTotalMovies(pagination.totalItems || 0);
-        setTotalPages(pagination.totalPages || 1);
-      } else {
-        console.warn('No movies array in response:', response);
-        setMovies([]);
-        setTotalMovies(0);
-        setTotalPages(1);
+        if (response && response.movies && Array.isArray(response.movies) && response.movies.length > 0) {
+          setMovies(response.movies);
+          setIsOfflineMock(false);
+          const pagination = response.pagination || {};
+          setTotalMovies(pagination.totalItems || response.movies.length);
+          setTotalPages(pagination.totalPages || 1);
+          setLoading(false);
+          return;
+        }
+      } catch (apiError) {
+        console.warn('Backend getMoviesForAdmin unreachable, using mock movies dataset:', apiError);
       }
 
+      // Fallback to rich mock dataset
+      setIsOfflineMock(true);
+      let filtered = [...MOCK_ADMIN_MOVIES];
+
+      if (selectedCategory) {
+        filtered = filtered.filter(m => m.category.some(c => c.id === selectedCategory));
+      }
+      if (filterStatus !== 'all') {
+        filtered = filtered.filter(m => m.status === filterStatus);
+      }
+      if (filterYear) {
+        filtered = filtered.filter(m => m.year === filterYear);
+      }
+      if (filterType) {
+        filtered = filtered.filter(m => m.type === filterType);
+      }
+
+      setMovies(filtered as any);
+      setTotalMovies(filtered.length);
+      setTotalPages(Math.max(1, Math.ceil(filtered.length / moviesPerPage)));
       setLoading(false);
     } catch (error) {
       console.error('Error fetching movies:', error);
-      toast.error('Không thể tải danh sách phim');
       setLoading(false);
-      setMovies([]);
-      setTotalMovies(0);
-      setTotalPages(1);
     }
   }, [searchQuery, moviesPerPage, sortField, sortDirection, selectedCategory,
       filterStatus, filterYear, filterType, elasticsearchStatus]);
@@ -1657,80 +1688,15 @@ const MoviesAdmin = () => {
   }, [currentPage, moviesPerPage, sortField, sortDirection, selectedCategory, filterStatus, filterYear, filterType, isSearching]);  useEffect(() => {
     const fetchCategories = async () => {
       try {
-
         const response = await axiosInstance.get('/admin/movies/categories');
-
-        if (response.data && response.data.categories) {
-          const categoriesFromAPI = response.data.categories;
-          setCategories(categoriesFromAPI);
-        } else {
-
-          if (movies && movies.length > 0) {
-            const categoriesMap = new Map();
-
-            movies.forEach(movie => {
-              if (Array.isArray(movie.category)) {
-                movie.category.forEach(cat => {
-                  if (typeof cat === 'object' && cat !== null && cat.id && cat.name) {
-                    categoriesMap.set(cat.id, {
-                      id: cat.id,
-                      name: cat.name,
-                      slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-')
-                    });
-                  }
-                  else if (typeof cat === 'string') {
-                    if (!categoriesMap.has(cat)) {
-                      categoriesMap.set(cat, {
-                        id: cat,
-                        name: cat,
-                        slug: cat.toLowerCase().replace(/\s+/g, '-')
-                      });
-                    }
-                  }
-                });
-              }
-            });
-
-            const uniqueCategories = Array.from(categoriesMap.values());
-            setCategories(uniqueCategories);
-          } else {
-            setCategories([]);
-          }
+        if (response.data && response.data.categories && response.data.categories.length > 0) {
+          setCategories(response.data.categories);
+          return;
         }
       } catch (error) {
-        console.error('Error fetching categories:', error);
-
-        if (movies && movies.length > 0) {
-          const categoriesMap = new Map();
-          movies.forEach(movie => {
-            if (Array.isArray(movie.category)) {
-              movie.category.forEach(cat => {
-                if (typeof cat === 'object' && cat !== null && cat.id && cat.name) {
-                  categoriesMap.set(cat.id, {
-                    id: cat.id,
-                    name: cat.name,
-                    slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-')
-                  });
-                }
-                else if (typeof cat === 'string') {
-                  if (!categoriesMap.has(cat)) {
-                    categoriesMap.set(cat, {
-                      id: cat,
-                      name: cat,
-                      slug: cat.toLowerCase().replace(/\s+/g, '-')
-                    });
-                  }
-                }
-              });
-            }
-          });
-
-          const uniqueCategories = Array.from(categoriesMap.values());
-          setCategories(uniqueCategories);
-        } else {
-          setCategories([]);
-        }
+        console.warn('Backend categories API unavailable, using mock categories:', error);
       }
+      setCategories(INITIAL_CATEGORIES as any);
     };
 
     fetchCategories();
@@ -1847,10 +1813,26 @@ const MoviesAdmin = () => {
 
   return (
     <div className={combinedStyles.container}>
-      <div ref={topRef}></div>
-
       <header className={combinedStyles.header}>
-        <h1 className={combinedStyles.headerTitle}>Quản lý Phim</h1>
+        <div className="d-flex align-items-center gap-2">
+          <h1 className={combinedStyles.headerTitle}>{ADMIN_MOVIES_I18N.pageTitle}</h1>
+          {isOfflineMock && (
+            <span
+              className="badge"
+              style={{
+                backgroundColor: 'rgba(229, 9, 20, 0.12)',
+                color: '#f87171',
+                border: '1px solid rgba(229, 9, 20, 0.3)',
+                fontSize: '0.74rem',
+                fontWeight: 500,
+                padding: '0.35rem 0.65rem'
+              }}
+              title={ADMIN_COMMON_I18N.notices.offlineHint}
+            >
+              {ADMIN_COMMON_I18N.notices.offlineMode}
+            </span>
+          )}
+        </div>
 
         {esStatusChecked && (
           <div className={combinedStyles.elasticsearchStatus}>
@@ -1922,85 +1904,86 @@ const MoviesAdmin = () => {
           </div>
         </div>
 
-        <div className={combinedStyles.filterControls}>
-          <div className={combinedStyles.filterSelect}>
-            <FaFilter className={combinedStyles.filterIcon} />
-            <select
-              id="categoryFilter"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className={combinedStyles.select}
-              aria-label="Lọc theo thể loại"
-            >
-              <option value="">Tất cả thể loại</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className={combinedStyles.filterControls} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'center' }}>
+          <CinemaDropdown
+            options={[
+              { value: '', label: ADMIN_MOVIES_I18N.filters.allCategories },
+              ...categories.map((c) => ({ value: c.id, label: c.name }))
+            ]}
+            value={selectedCategory}
+            onChange={(val) => {
+              setSelectedCategory(val);
+              setCurrentPage(1);
+            }}
+            prefixIcon={<FaFilter />}
+            size="filter"
+            ariaLabel="Lọc theo thể loại"
+          />
 
-          <div className={combinedStyles.filterSelect}>
-            <FaEye className={combinedStyles.filterIcon} />
-            <select
-              id="statusFilter"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'inactive')}
-              className={combinedStyles.select}
-              aria-label="Lọc theo trạng thái"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Đang hiển thị</option>
-              <option value="inactive">Đang ẩn</option>
-            </select>
-          </div>
+          <CinemaDropdown
+            options={[
+              { value: 'all', label: ADMIN_MOVIES_I18N.filters.allStatuses },
+              { value: 'active', label: ADMIN_MOVIES_I18N.filters.statusActive },
+              { value: 'inactive', label: ADMIN_MOVIES_I18N.filters.statusInactive }
+            ]}
+            value={filterStatus}
+            onChange={(val) => {
+              setFilterStatus(val);
+              setCurrentPage(1);
+            }}
+            prefixIcon={<FaEye />}
+            size="filter"
+            ariaLabel="Lọc theo trạng thái"
+          />
 
-          <div className={combinedStyles.filterSelect}>
-            <FaCalendarAlt className={combinedStyles.filterIcon} />
-            <select
-              id="yearFilter"
-              value={filterYear?.toString() || ''}
-              onChange={handleYearChange}
-              className={combinedStyles.select}
-              aria-label="Lọc theo năm"
-            >
-              <option value="">Tất cả năm</option>
-              {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
+          <CinemaDropdown
+            options={[
+              { value: '', label: ADMIN_MOVIES_I18N.filters.allYears },
+              ...Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map((y) => ({
+                value: y.toString(),
+                label: `Năm ${y}`
+              }))
+            ]}
+            value={filterYear?.toString() || ''}
+            onChange={(val) => {
+              setFilterYear(val ? parseInt(val) : undefined);
+              setCurrentPage(1);
+            }}
+            prefixIcon={<FaCalendarAlt />}
+            size="filter"
+            ariaLabel="Lọc theo năm"
+          />
 
-          <div className={combinedStyles.filterSelect}>
-            <FaFilm className={combinedStyles.filterIcon} />
-            <select
-              id="typeFilter"
-              value={filterType}
-              onChange={handleTypeChange}
-              className={combinedStyles.select}
-              aria-label="Lọc theo loại phim"
-            >
-              <option value="">Tất cả loại</option>
-              <option value="series">Phim bộ</option>
-              <option value="single">Phim lẻ</option>
-            </select>
-          </div>
+          <CinemaDropdown
+            options={[
+              { value: '', label: ADMIN_MOVIES_I18N.filters.allTypes },
+              { value: 'series', label: ADMIN_MOVIES_I18N.filters.typeSeries },
+              { value: 'single', label: ADMIN_MOVIES_I18N.filters.typeSingle }
+            ]}
+            value={filterType}
+            onChange={(val) => {
+              setFilterType(val);
+              setCurrentPage(1);
+            }}
+            prefixIcon={<FaFilm />}
+            size="filter"
+            ariaLabel="Lọc theo loại phim"
+          />
 
-          <div className={combinedStyles.filterSelect}>
-            <select
-              id="perPageFilter"
-              value={moviesPerPage}
-              onChange={handlePerPageChange}
-              className={combinedStyles.select}
-              aria-label="Số phim mỗi trang"
-            >
-              <option value="10">10 phim</option>
-              <option value="20">20 phim</option>
-              <option value="50">50 phim</option>
-              <option value="100">100 phim</option>
-            </select>
-          </div>
+          <CinemaDropdown
+            options={[
+              { value: 10, label: '10 phim / trang' },
+              { value: 20, label: '20 phim / trang' },
+              { value: 50, label: '50 phim / trang' }
+            ]}
+            value={moviesPerPage}
+            onChange={(val) => {
+              setMoviesPerPage(Number(val));
+              setCurrentPage(1);
+            }}
+            size="filter"
+            ariaLabel="Số phim mỗi trang"
+          />
 
           <button
             className={combinedStyles.refreshButton}
@@ -2016,10 +1999,10 @@ const MoviesAdmin = () => {
         <table className={combinedStyles.table}>
           <thead>
             <tr>
-              <th>TÊN PHIM</th>
-              <th>THÔNG TIN</th>
-              <th className={combinedStyles.ratingColumn}>ĐÁNH GIÁ</th>
-              <th>THAO TÁC</th>
+              <th>{ADMIN_MOVIES_I18N.tableHeaders.movieName}</th>
+              <th>{ADMIN_MOVIES_I18N.tableHeaders.info}</th>
+              <th className={combinedStyles.ratingColumn}>{ADMIN_MOVIES_I18N.tableHeaders.rating}</th>
+              <th>{ADMIN_MOVIES_I18N.tableHeaders.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -2028,25 +2011,40 @@ const MoviesAdmin = () => {
                 <td colSpan={4} className={combinedStyles.emptyTableRow}>
                   <div className={combinedStyles.emptyStateContainer}>
                     <FaSync className={`${combinedStyles.emptyStateIcon} ${combinedStyles.spinningIcon}`} />
-                    <div className={combinedStyles.emptyStateText}>Đang tải danh sách phim...</div>
+                    <div className={combinedStyles.emptyStateText}>{ADMIN_COMMON_I18N.notices.loading}</div>
                   </div>
                 </td>
               </tr>
             ) : movies.length === 0 ? (
               <tr>
                 <td colSpan={4} className={combinedStyles.emptyTableRow}>
-                  <div className={combinedStyles.emptyStateContainer}>
-                    <FaFilm className={combinedStyles.emptyStateIcon} />
-                    <div className={combinedStyles.emptyStateText}>
-                      {isSearching && searchQuery.trim() ?
-                        'Không tìm thấy phim nào khớp với tìm kiếm Elasticsearch' :
-                        'Không tìm thấy phim nào'
-                      }
+                  <div className={combinedStyles.emptyStateContainer} style={{ padding: '3.5rem 1rem', textAlign: 'center' }}>
+                    <FaFilm style={{ fontSize: '2.5rem', color: '#6b7280', marginBottom: '0.75rem', opacity: 0.6 }} />
+                    <div style={{ fontSize: '1.05rem', fontWeight: 600, color: '#f1f5f9', marginBottom: '0.35rem' }}>
+                      {ADMIN_MOVIES_I18N.emptyState.title}
                     </div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.84rem', maxWidth: 440, margin: '0 auto 1.25rem' }}>
+                      {ADMIN_MOVIES_I18N.emptyState.subtitle}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-secondary"
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.9rem' }}
+                      onClick={() => {
+                        setSelectedCategory('');
+                        setFilterStatus('all');
+                        setFilterYear(undefined);
+                        setFilterType('');
+                        setSearchQuery('');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      {ADMIN_MOVIES_I18N.emptyState.resetFilter}
+                    </button>
                   </div>
                 </td>
               </tr>
-            ): (
+            ) : (
               movies.map((movie) => (                <tr
                   key={movie._id}
                   className={combinedStyles.movieRow}
