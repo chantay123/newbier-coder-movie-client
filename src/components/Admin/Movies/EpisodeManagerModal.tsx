@@ -73,15 +73,14 @@ const generateMockEpisodes = (count: number): EpisodeItem[] => {
     if (i === 12 || i === 67 || i === 114) status = 'ERROR';
     if (i === 25 || i === 80) status = 'DISABLED';
 
-    const quality = i % 5 === 0 ? '4K' : i % 2 === 0 ? '1080p' : '720p';
     list.push({
       id: `ep-${i}`,
       episodeNumber: i,
-      name: `Tập ${i} - Chương ${i}`,
+      name: `Tập ${i}`,
       slug: `tap-${i}`,
       linkM3u8: `https://stream.cinema.vn/hls/series/ep${i}/index.m3u8`,
       linkEmbed: `https://player.cinema.vn/embed/series-ep${i}`,
-      quality,
+      quality: '1080p',
       status
     });
   }
@@ -947,72 +946,53 @@ export default function EpisodeManagerModal({
                 {paginatedEpisodes.map(ep => {
                   const isSelected = selectedEpIds.includes(ep.id);
                   const isHighlighted = highlightEpId === ep.id;
+                  const hasLink = Boolean(ep.linkM3u8 || ep.linkEmbed);
+
+                  const cleanName = ep.name.trim();
+                  const isBasicName = /^Tập\s*\d+(\s*[-:]*\s*Chương\s*\d+)?$/i.test(cleanName);
+                  const subTitle = isBasicName ? '' : cleanName.replace(/^Tập\s*\d+[\s:–-]*/i, '').trim();
 
                   return (
                     <div
                       key={ep.id}
                       className={styles.episodeCard}
                       style={{
-                        border: isHighlighted
-                          ? '1px solid #e50914'
+                        borderColor: isHighlighted
+                          ? '#e50914'
                           : isSelected
-                          ? '1px solid rgba(229, 9, 20, 0.45)'
-                          : undefined,
-                        boxShadow: isHighlighted ? '0 0 16px rgba(229, 9, 20, 0.4)' : undefined,
-                        transition: 'all 0.25s ease'
+                          ? 'rgba(229, 9, 20, 0.5)'
+                          : undefined
                       }}
+                      title={`${ep.name}${hasLink ? ` • ${ep.linkM3u8 || ep.linkEmbed}` : ' • Chưa có link'}`}
                     >
-                      <div className={styles.cardHeaderRow}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input
-                            type="checkbox"
-                            className={styles.customCheckbox}
-                            checked={isSelected}
-                            onChange={() => handleToggleSelectEp(ep.id)}
-                            title="Chọn tập này"
-                          />
-                          <div className={styles.epBadgeGroup}>
-                            <span className={styles.epNumberBadge}>#{ep.episodeNumber}</span>
-                            <span className={styles.epQualityBadge}>{ep.quality || '1080p'}</span>
-                          </div>
-                        </div>
-                        {renderStatusButton(ep)}
-                      </div>
-
-                      <div className={styles.cardBody}>
-                        <h4 className={styles.cardEpName} title={ep.name}>{ep.name}</h4>
-                        <div className={styles.cardEpSlug}>/{ep.slug}</div>
-                        <div className={styles.cardStreamInfo}>
-                          {ep.linkM3u8 ? (
-                            <>
-                              <span style={{ color: '#4ade80' }}>●</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkM3u8}>
-                                HLS: {ep.linkM3u8}
-                              </span>
-                            </>
-                          ) : ep.linkEmbed ? (
-                            <>
-                              <span style={{ color: '#60a5fa' }}>●</span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkEmbed}>
-                                Embed: {ep.linkEmbed}
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ color: '#f87171' }}>● Chưa có link</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={styles.cardFooterRow}>
-                        <span style={{ fontSize: '0.72rem', color: '#6b7280' }}>
-                          ID: {ep.id.substring(0, 8)}
+                      <div className={styles.cardLeftGroup}>
+                        <input
+                          type="checkbox"
+                          className={styles.customCheckbox}
+                          checked={isSelected}
+                          onChange={() => handleToggleSelectEp(ep.id)}
+                          title="Chọn tập này"
+                        />
+                        <span
+                          className={hasLink ? styles.streamDotActive : styles.streamDotMissing}
+                          title={hasLink ? 'Đã có stream URL' : 'Chưa có stream URL'}
+                        />
+                        <span className={styles.cardEpTitle}>
+                          Tập {ep.episodeNumber}
+                          {subTitle && <span className={styles.cardEpSubname}>• {subTitle}</span>}
                         </span>
+                      </div>
+
+                      <div className={styles.cardRightGroup}>
+                        {renderStatusButton(ep)}
                         <div className={styles.cardActionGroup}>
                           <button
                             type="button"
                             className={`${styles.miniActionBtn} ${styles.miniActionBtnPlay}`}
                             title="Phát thử tập này"
                             onClick={() => setTestPlayingEp(ep)}
+                            disabled={!hasLink}
+                            style={{ opacity: hasLink ? 1 : 0.35 }}
                           >
                             <FaPlay />
                           </button>
@@ -1025,6 +1005,8 @@ export default function EpisodeManagerModal({
                               if (link) {
                                 navigator.clipboard.writeText(link);
                                 showCinemaAlert('Đã sao chép link stream!', 'cinema');
+                              } else {
+                                showCinemaAlert('Tập này chưa có link stream!', 'warning');
                               }
                             }}
                           >
@@ -1033,7 +1015,7 @@ export default function EpisodeManagerModal({
                           <button
                             type="button"
                             className={styles.miniActionBtn}
-                            title="Chỉnh sửa chi tiết tập phim"
+                            title="Chỉnh sửa tập này"
                             onClick={() => handleOpenEditForm(ep)}
                           >
                             <FaPen />
@@ -1058,7 +1040,7 @@ export default function EpisodeManagerModal({
                 <table className={styles.cleanTable}>
                   <thead>
                     <tr>
-                      <th style={{ width: '4%' }}>
+                      <th style={{ width: '5%' }}>
                         <input
                           type="checkbox"
                           className={styles.customCheckbox}
@@ -1067,18 +1049,21 @@ export default function EpisodeManagerModal({
                           title="Chọn tất cả trên trang này"
                         />
                       </th>
-                      <th style={{ width: '9%' }}>Số Tập</th>
-                      <th style={{ width: '25%' }}>Tên Tập / Slug</th>
-                      <th style={{ width: '24%' }}>Nguồn Phát Stream</th>
-                      <th style={{ width: '10%' }}>Độ Phân Giải</th>
-                      <th style={{ width: '14%' }}>Trạng Thái</th>
-                      <th style={{ width: '14%', textAlign: 'center' }}>Thao Tác</th>
+                      <th style={{ width: '30%' }}>Tập Phim</th>
+                      <th style={{ width: '25%' }}>Nguồn Stream</th>
+                      <th style={{ width: '20%' }}>Trạng Thái</th>
+                      <th style={{ width: '20%', textAlign: 'center' }}>Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedEpisodes.map(ep => {
                       const isSelected = selectedEpIds.includes(ep.id);
                       const isHighlighted = highlightEpId === ep.id;
+                      const hasLink = Boolean(ep.linkM3u8 || ep.linkEmbed);
+
+                      const cleanName = ep.name.trim();
+                      const isBasicName = /^Tập\s*\d+(\s*[-:]*\s*Chương\s*\d+)?$/i.test(cleanName);
+                      const subTitle = isBasicName ? '' : cleanName.replace(/^Tập\s*\d+[\s:–-]*/i, '').trim();
 
                       return (
                         <tr
@@ -1100,19 +1085,35 @@ export default function EpisodeManagerModal({
                             />
                           </td>
                           <td>
-                            <span className={styles.epNumberBadge}>#{ep.episodeNumber}</span>
-                          </td>
-                          <td>
-                            <div style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.86rem' }}>{ep.name}</div>
-                            <div style={{ fontSize: '0.74rem', color: '#9ca3af', fontFamily: 'monospace' }}>/{ep.slug}</div>
-                          </td>
-                          <td>
-                            <div style={{ fontSize: '0.76rem', color: '#cbd5e1', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={ep.linkM3u8 || ep.linkEmbed || ''}>
-                              {ep.linkM3u8 ? `HLS: ${ep.linkM3u8}` : ep.linkEmbed ? `Embed: ${ep.linkEmbed}` : 'Chưa có link'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <span
+                                className={hasLink ? styles.streamDotActive : styles.streamDotMissing}
+                                title={hasLink ? 'Đã có stream' : 'Chưa có stream'}
+                              />
+                              <span style={{ fontWeight: 600, color: '#ffffff', fontSize: '0.84rem' }}>
+                                Tập {ep.episodeNumber}
+                              </span>
+                              {subTitle && (
+                                <span style={{ color: '#9ca3af', fontSize: '0.78rem' }}>
+                                  • {subTitle}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td>
-                            <span className={styles.epQualityBadge}>{ep.quality || '1080p'}</span>
+                            {ep.linkM3u8 ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(74, 222, 128, 0.1)', color: '#4ade80', padding: '0.15rem 0.45rem', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600 }}>
+                                HLS Stream
+                              </span>
+                            ) : ep.linkEmbed ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', padding: '0.15rem 0.45rem', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600 }}>
+                                Video Embed
+                              </span>
+                            ) : (
+                              <span style={{ color: '#f87171', fontSize: '0.75rem' }}>
+                                Chưa có link
+                              </span>
+                            )}
                           </td>
                           <td>
                             {renderStatusButton(ep)}
@@ -1124,6 +1125,8 @@ export default function EpisodeManagerModal({
                                 className={`${styles.miniActionBtn} ${styles.miniActionBtnPlay}`}
                                 title="Phát thử"
                                 onClick={() => setTestPlayingEp(ep)}
+                                disabled={!hasLink}
+                                style={{ opacity: hasLink ? 1 : 0.35 }}
                               >
                                 <FaPlay />
                               </button>

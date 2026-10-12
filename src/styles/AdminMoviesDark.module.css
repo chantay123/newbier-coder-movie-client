@@ -542,8 +542,7 @@
 
 /* Modal styles */
 .modalOverlay {
-  background-color: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.82);
 }
 
 .deleteModalContent,

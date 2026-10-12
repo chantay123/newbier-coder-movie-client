@@ -115,8 +115,12 @@ export default function MovieDetailModal({
                 {displayMovie.name}
               </h2>
               <div className={styles.movieSub}>
-                <span>{displayMovie.origin_name || displayMovie.name}</span>
-                <span>•</span>
+                {displayMovie.origin_name && displayMovie.origin_name !== displayMovie.name && (
+                  <>
+                    <span>{displayMovie.origin_name}</span>
+                    <span>•</span>
+                  </>
+                )}
                 <span
                   className={styles.idCopyBadge}
                   onClick={handleCopyId}
@@ -232,7 +236,9 @@ export default function MovieDetailModal({
               <div className={styles.detailsCol}>
                 <div className={styles.movieTitleBlock}>
                   <h3 className={styles.primaryName}>{displayMovie.name}</h3>
-                  <div className={styles.originName}>{displayMovie.origin_name || displayMovie.name}</div>
+                  {displayMovie.origin_name && displayMovie.origin_name !== displayMovie.name && (
+                    <div className={styles.originName}>{displayMovie.origin_name}</div>
+                  )}
                 </div>
 
                 {/* Metrics Ribbon */}
@@ -361,6 +367,7 @@ export default function MovieDetailModal({
                     title="Movie Trailer"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
+                    loading="lazy"
                   />
                 </div>
               ) : displayMovie.trailer_url ? (
