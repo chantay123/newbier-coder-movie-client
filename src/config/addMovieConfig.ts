@@ -202,7 +202,41 @@ export const POPULAR_ACTORS: string[] = [
   'IU (Lee Ji-eun)'
 ];
 
-// 13. Server Name Templates
+// 13. Preset Showtimes (Lịch chiếu phim phổ biến từ hệ thống)
+export interface ShowtimeTemplate {
+  id: string;
+  text: string;
+  isPinned: boolean;
+}
+
+export const PRESET_SHOWTIME_TEMPLATES: ShowtimeTemplate[] = [
+  { id: 'st-1', text: 'Tối Thứ 7 & Chủ Nhật (20:00)', isPinned: true },
+  { id: 'st-2', text: 'Mỗi ngày 1 tập lúc 19:00', isPinned: true },
+  { id: 'st-3', text: 'Đã khởi chiếu trọn bộ tại rạp', isPinned: true },
+  { id: 'st-4', text: 'Thứ 2, Thứ 4, Thứ 6 hàng tuần', isPinned: false },
+  { id: 'st-5', text: 'Suất chiếu đặc biệt (Sneak Show)', isPinned: false },
+  { id: 'st-6', text: 'Dự kiến khởi chiếu sớm', isPinned: false },
+  { id: 'st-7', text: 'Đang cập nhật lịch chiếu', isPinned: false }
+];
+
+export const PRESET_SHOWTIMES: string[] = PRESET_SHOWTIME_TEMPLATES.map(t => t.text);
+
+// 14. Preset Release Description Templates (Mô tả thời điểm ra mắt dự kiến)
+export interface ReleaseDescTemplate {
+  id: string;
+  text: string;
+  isPinned: boolean;
+}
+
+export const PRESET_RELEASE_DESC_TEMPLATES: ReleaseDescTemplate[] = [
+  { id: 'rd-1', text: 'Đang cập nhật lịch chiếu', isPinned: true },
+  { id: 'rd-2', text: 'Dự kiến Mùa Đông 2026', isPinned: true },
+  { id: 'rd-3', text: 'Dự kiến Quý 4/2026', isPinned: true },
+  { id: 'rd-4', text: 'Sắp khởi chiếu tại các rạp trên toàn quốc', isPinned: false },
+  { id: 'rd-5', text: 'Suất chiếu đặc biệt (Sneak Show) trước ngày công chiếu', isPinned: false }
+];
+
+// 14. Server Name Templates
 export const SERVER_TEMPLATES: string[] = [
   'Vietsub #1 (VIP 4K)',
   'Thuyết Minh #1 (VIP)',
@@ -384,6 +418,9 @@ export const MOVIE_FORM_I18N = {
     flagChieuRap: 'Phim Chiếu Rạp',
     flagCopyright: 'Bản Quyền Đã Xác Minh',
     flagExclusive: 'Phụ Đề Độc Quyền',
+    flagUpcoming: 'Phim Sắp Ra Mắt',
+    flagUpcomingDesc: 'Cho phép dữ liệu khuyết thiếu & hẹn giờ chuyển trạng thái',
+    upcomingModalTitle: 'Thiết Lập Lịch Ra Mắt & Tự Động Chuyển Trạng Thái',
     tmdbTitle: 'Điểm số & TMDB',
     tmdbIdLabel: 'TMDB Movie ID',
     voteAvgLabel: 'Điểm (0-10)',

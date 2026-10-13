@@ -609,26 +609,46 @@
   pointer-events: none;
 }
 
-/* Compact Scrollable Box for Categories & Countries */
+/* Compact Scrollable Box for Categories & Countries - Always-visible, easy-to-grab scrollbar */
 .compactChipScrollBox {
-  max-height: 115px;
-  overflow-y: auto;
+  max-height: 155px;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   background: #0d0d10;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  padding: 0.35rem;
+  padding: 0.45rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.04);
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 .compactChipScrollBox::-webkit-scrollbar {
-  width: 4px;
+  width: 7px;
+}
+
+.compactChipScrollBox::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
 }
 
 .compactChipScrollBox::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  transition: background 0.15s ease;
+}
+
+.compactChipScrollBox::-webkit-scrollbar-thumb:hover {
+  background: #e50914;
+}
+
+.compactChipScrollBox::-webkit-scrollbar-thumb:active {
+  background: #f40612;
 }
 
 .chipPill {
@@ -769,64 +789,324 @@
   color: #ffffff;
 }
 
-/* Step 3: Media Cards & Instant Previews */
+/* Step 3: Patchwork Artistic Media Preview */
 .mediaRow {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   flex-wrap: wrap;
 }
 
 .mediaInputsCol {
   flex: 1;
-  min-width: 280px;
+  min-width: 290px;
 }
 
 .mediaPreviewsCol {
   width: 100%;
-  max-width: 380px;
+  max-width: 440px;
 }
 
-.previewRow {
+.patchworkHeader {
   display: flex;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
-.posterPreviewBox {
-  width: 110px;
-  aspect-ratio: 2/3;
-  border-radius: 6px;
-  background: #0d0d10;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
+.patchworkNavTabs {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.patchworkTabBtn {
+  height: 26px;
+  padding: 0 0.55rem;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: #9ca3af;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.patchworkTabBtn:hover {
+  background: #18181c;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.patchworkTabBtnActive {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: #e50914;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.patchworkContainer {
+  position: relative;
+  width: 100%;
+  height: 265px;
+  background: #09090c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Base Patch Card - Stitched Fabric Rectangles */
+.patchCard {
+  position: absolute;
+  overflow: hidden;
+  cursor: pointer;
+  transition: top 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              left 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              width 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              height 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              box-shadow 0.32s ease,
+              border-color 0.32s ease;
+  background: #131317;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-  position: relative;
-  flex-shrink: 0;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: top, left, width, height;
 }
 
-.thumbPreviewBox {
-  flex: 1;
-  aspect-ratio: 16/9;
-  border-radius: 6px;
-  background: #0d0d10;
-  border: 1px dashed rgba(255, 255, 255, 0.15);
-  overflow: hidden;
+/* Patch 1: Poster (2:3 Vertical) */
+.patchPoster {
+  left: 0;
+  top: 0;
+  width: 44%;
+  height: 100%;
+  z-index: 1;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow: 4px 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* Patch 2: Thumbnail / Backdrop (16:9 Horizontal Top) */
+.patchThumb {
+  left: 36%;
+  top: 0;
+  width: 64%;
+  height: 56%;
+  z-index: 2;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow: -4px 6px 20px rgba(0, 0, 0, 0.7);
+}
+
+/* Patch 3: Trailer (Horizontal Bottom) - Use top: 48% to share coordinate system with expanded top: 0 */
+.patchTrailer {
+  left: 42%;
+  top: 48%;
+  width: 58%;
+  height: 52%;
+  z-index: 3;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  box-shadow: -4px -6px 22px rgba(0, 0, 0, 0.8);
+}
+
+/* Hovered or Clicked (Expanded) State - Expands & covers entire frame */
+.patchCardExpanded {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 20 !important;
+  border: 1.5px solid rgba(229, 9, 20, 0.7) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 35px rgba(0, 0, 0, 0.95) !important;
+}
+
+/* Status Pill Badge inside each patch */
+.patchBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  background: rgba(10, 10, 14, 0.85);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #e5e7eb;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  color: #6b7280;
-  position: relative;
+  gap: 0.3rem;
+  pointer-events: none;
 }
 
-.previewImg {
+.patchBadgeStatusReady {
+  color: #34d399;
+}
+
+.patchBadgeStatusError {
+  color: #f87171;
+}
+
+.patchBadgeStatusEmpty {
+  color: #9ca3af;
+}
+
+/* Close expand button on pinned/active patch */
+.patchCloseExpandBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+}
+
+.patchCloseExpandBtn:hover {
+  background: #e50914;
+  border-color: #e50914;
+}
+
+/* Media Content inside patch */
+.patchMediaInner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.patchImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Poster true 2:3 view when expanded */
+.patchCardExpanded .patchImgPoster {
+  object-fit: contain;
+  background: #060608;
+}
+
+/* Empty Gray State */
+.patchEmptyState {
+  width: 100%;
+  height: 100%;
+  background: #18181c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  padding: 0.75rem;
+  text-align: center;
+  user-select: none;
+}
+
+.patchEmptyTitle {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin-top: 0.35rem;
+}
+
+.patchEmptyDesc {
+  font-size: 0.65rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
+}
+
+/* Unavailable SVG state */
+.unavailableSvgBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.unavailableSvg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.85;
+}
+
+.unavailableSvgText {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #f87171;
+  margin-top: 0.25rem;
+}
+
+/* Trailer overlay & play button */
+.trailerOverlayBadge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  gap: 0.35rem;
+  transition: background 0.2s ease;
+  pointer-events: none;
+}
+
+.trailerPlayIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #e50914;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 18px rgba(229, 9, 20, 0.6);
+  padding-left: 2px;
+  transition: transform 0.2s ease, background 0.2s ease;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.patchCard:hover .trailerPlayIcon {
+  transform: scale(1.1);
+  background: #f40612;
+}
+
+.trailerPlayText {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.trailerIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 
 .previewPlaceholder {
@@ -1132,4 +1412,620 @@
   height: 100%;
   background: #e50914;
   transition: width 0.3s ease;
+}
+
+/* ==========================================================================
+   Step 5: Modern Toggle Switch Cards (Replaces standard checkboxes)
+   ========================================================================== */
+.switchCardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.switchCard {
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+  padding: 0 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.switchCard:hover {
+  background: #18181f;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.switchCardActive {
+  background: rgba(229, 9, 20, 0.08);
+  border-color: rgba(229, 9, 20, 0.45);
+}
+
+.switchCardUpcomingActive {
+  background: rgba(229, 9, 20, 0.12);
+  border-color: #e50914;
+}
+
+.switchCardContent {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  overflow: hidden;
+}
+
+.switchCardIcon {
+  font-size: 0.92rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.switchCardActive .switchCardIcon,
+.switchCardUpcomingActive .switchCardIcon {
+  color: #e50914;
+}
+
+.switchCardTitle {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.switchCardDesc {
+  font-size: 0.66rem;
+  color: #6b7280;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+}
+
+/* Crisp Cinema Switch Indicator */
+.switchTrack {
+  width: 32px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  position: relative;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.switchTrackActive,
+.switchTrackUpcoming {
+  background: #e50914;
+}
+
+.switchKnob {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.switchTrackActive .switchKnob,
+.switchTrackUpcoming .switchKnob {
+  transform: translateX(14px);
+}
+
+/* Dedicated Upcoming Status Strip (Không làm vỡ card) */
+.upcomingStatusStrip {
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  background: rgba(229, 9, 20, 0.08);
+  border: 1px solid rgba(229, 9, 20, 0.28);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  animation: slideUp 0.18s ease;
+}
+
+.upcomingStripLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.76rem;
+  color: #e2e8f0;
+}
+
+.upcomingStripText {
+  line-height: 1.3;
+}
+
+/* Preset Showtimes System */
+.showtimesContainer {
+  margin-top: 0.35rem;
+}
+
+.showtimeChipsGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.45rem;
+}
+
+.showtimeChip {
+  padding: 0.22rem 0.55rem;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: #9ca3af;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.showtimeChip:hover {
+  background: #1a1a20;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.showtimeChipActive {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: #e50914;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.showtimeInputRow {
+  display: flex;
+  gap: 0.35rem;
+}
+
+/* Upcoming Movie Control Banner */
+.upcomingControlBanner {
+  background: rgba(229, 9, 20, 0.08);
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.upcomingBannerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.upcomingBannerIcon {
+  color: #e50914;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.upcomingBannerTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.upcomingBannerDesc {
+  font-size: 0.7rem;
+  color: #cbd5e1;
+  margin-top: 0.1rem;
+}
+
+.upcomingBannerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.btnConfigUpcoming {
+  height: 28px;
+  padding: 0 0.65rem;
+  background: #e50914;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background-color 0.15s ease;
+}
+
+.btnConfigUpcoming:hover {
+  background: #f40612;
+}
+
+.btnQuickAdjust {
+  height: 28px;
+  padding: 0 0.55rem;
+  background: #18181f;
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btnQuickAdjust:hover {
+  background: #23232c;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Upcoming Modal Popup */
+.upcomingModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.upcomingModalCard {
+  width: 100%;
+  max-width: 520px;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  animation: slideUp 0.22s ease;
+}
+
+.modalHeader {
+  padding: 0.85rem 1.15rem;
+  background: #18181f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modalTitleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.modalTitle {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.modalCloseBtn:hover {
+  color: #ffffff;
+}
+
+.modalBody {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modalSectionTitle {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin-bottom: 0.4rem;
+}
+
+.quickDateRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.modalFooter {
+  padding: 0.75rem 1.15rem;
+  background: #18181f;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Underline Action Link (Gạch chân truy cập chi tiết) */
+.btnUnderlineAction {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #e50914;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: color 0.15s ease;
+}
+
+.btnUnderlineAction:hover {
+  color: #f40612;
+  text-decoration: underline;
+}
+
+.switchUpcomingSubline {
+  margin-top: 0.35rem;
+  padding-top: 0.3rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Compact Showtime & Template CRUD Management */
+.showtimeHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.btnManageTemplates {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #9ca3af;
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.15s ease;
+}
+
+.btnManageTemplates:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.btnManageTemplatesActive {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: #e50914;
+  color: #ffffff;
+}
+
+.pinnedShowtimesRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.showtimePinnedChip {
+  height: 24px;
+  padding: 0 0.5rem;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.showtimePinnedChip:hover {
+  background: #1c1c22;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.showtimePinnedChipActive {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: #e50914;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Template Manager Popover / Drawer Panel */
+.templateManagerPanel {
+  background: #101014;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  margin-top: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  animation: slideUp 0.18s ease;
+}
+
+.templateAddRow {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.templateList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.templateItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding: 0.28rem 0.5rem;
+  background: #15151b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  font-size: 0.73rem;
+  color: #e2e8f0;
+}
+
+.templateItemText {
+  flex: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+
+.templateItemText:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.templateItemActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.templateActionBtn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.72rem;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+}
+
+.templateActionBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.templatePinBtnActive {
+  color: #e50914 !important;
+}
+
+/* Card Demo Description Box (Demo tóm tắt theo trạng thái) */
+.cardDemoDescBox {
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  background: #111116;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+
+.cardDemoDescHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cardDemoBadgeUpcoming {
+  background: rgba(229, 9, 20, 0.15);
+  color: #e50914;
+  border: 1px solid rgba(229, 9, 20, 0.4);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cardDemoBadgeReleased {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cardDemoDescContent {
+  color: #9ca3af;
+  line-height: 1.45;
 }
