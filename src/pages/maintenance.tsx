@@ -1,12 +1,9 @@
+/**
+ * @file pages/maintenance.tsx
+ */
 import React from 'react';
 import Head from 'next/head';
 
-/**
- * @file pages/maintenance.js
- * @description Minimalist Cinema System Maintenance Page.
- * Styled in the exact dark aesthetic as the 404 page with zero noise, zero animations,
- * and high-contrast ambient gradient typography.
- */
 export default function Maintenance() {
   return (
     <>
@@ -31,13 +28,17 @@ export default function Maintenance() {
           align-items: center;
           justify-content: center;
           background-color: #080b10;
-          background-image: radial-gradient(circle at 50% 50%, rgba(229, 9, 20, 0.09) 0%, rgba(13, 17, 23, 0.65) 45%, #080b10 80%);
+          background-image: radial-gradient(
+            circle at 50% 50%,
+            rgba(229, 9, 20, 0.09) 0%,
+            rgba(13, 17, 23, 0.65) 45%,
+            #080b10 80%
+          );
           color: #ffffff;
           overflow: hidden;
           user-select: none;
           padding: 64px 20px 40px;
         }
-
         .minimal-maintenance-glow {
           position: absolute;
           top: 50%;
@@ -49,7 +50,6 @@ export default function Maintenance() {
           filter: blur(60px);
           pointer-events: none;
         }
-
         .minimal-maintenance-content {
           position: relative;
           z-index: 2;
@@ -59,7 +59,6 @@ export default function Maintenance() {
           justify-content: center;
           gap: 12px;
         }
-
         .minimal-maintenance-code {
           font-size: clamp(6.5rem, 18vw, 13rem);
           font-weight: 900;
@@ -70,7 +69,6 @@ export default function Maintenance() {
           -webkit-text-fill-color: transparent;
           filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.75));
         }
-
         .minimal-maintenance-subtitle {
           font-size: clamp(0.75rem, 1.8vw, 0.95rem);
           font-weight: 700;
@@ -78,14 +76,9 @@ export default function Maintenance() {
           letter-spacing: 4px;
           text-transform: uppercase;
         }
-
         @media (max-width: 768px) {
-          .minimal-maintenance-code {
-            letter-spacing: -2px;
-          }
-          .minimal-maintenance-subtitle {
-            letter-spacing: 2px;
-          }
+          .minimal-maintenance-code { letter-spacing: -2px; }
+          .minimal-maintenance-subtitle { letter-spacing: 2px; }
         }
       `}</style>
     </>

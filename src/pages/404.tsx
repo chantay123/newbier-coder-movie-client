@@ -1,3 +1,6 @@
+/**
+ * @file pages/404.tsx
+ */
 import React from 'react';
 import Head from 'next/head';
 
@@ -22,13 +25,17 @@ export default function Custom404() {
           align-items: center;
           justify-content: center;
           background-color: #080b10;
-          background-image: radial-gradient(circle at 50% 50%, rgba(229, 9, 20, 0.09) 0%, rgba(13, 17, 23, 0.65) 45%, #080b10 80%);
+          background-image: radial-gradient(
+            circle at 50% 50%,
+            rgba(229, 9, 20, 0.09) 0%,
+            rgba(13, 17, 23, 0.65) 45%,
+            #080b10 80%
+          );
           color: #ffffff;
           overflow: hidden;
           user-select: none;
           padding: 64px 20px 40px;
         }
-
         .minimal-404-glow {
           position: absolute;
           top: 50%;
@@ -40,7 +47,6 @@ export default function Custom404() {
           filter: blur(60px);
           pointer-events: none;
         }
-
         .minimal-404-code {
           position: relative;
           z-index: 2;
@@ -53,11 +59,8 @@ export default function Custom404() {
           -webkit-text-fill-color: transparent;
           filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.75));
         }
-
         @media (max-width: 768px) {
-          .minimal-404-code {
-            letter-spacing: -2px;
-          }
+          .minimal-404-code { letter-spacing: -2px; }
         }
       `}</style>
     </>
