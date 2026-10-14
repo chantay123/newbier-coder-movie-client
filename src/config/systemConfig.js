@@ -38,6 +38,12 @@ export const SYSTEM_CONFIG = {
   // Flag indicating whether to use mock data
   useMockData: process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true',
 
+  // Diagnostic logging gate for image / movie payload debugging.
+  // When set to 'true', safeFetchJson and the home-page normalizer
+  // will print one-time logs describing the raw movie object and the
+  // resolved image URLs. Set to 'false' (or leave unset) to silence.
+  debugMovies: process.env.NEXT_PUBLIC_DEBUG_MOVIES === 'true',
+
   // Global HTTP Request Timeout in milliseconds
   networkTimeoutMs: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '8000', 10),
 
@@ -49,6 +55,24 @@ export const SYSTEM_CONFIG = {
     heroAutoPlayInterval: parseInt(process.env.NEXT_PUBLIC_HERO_AUTOPLAY_INTERVAL || '6000', 10),
     heroDescLimit: parseInt(process.env.NEXT_PUBLIC_HERO_DESC_LIMIT || '220', 10)
   },
+
+  // Image Asset Origin
+  // Backend may return image URLs as either:
+  //   - absolute URLs (https://...) — used as-is
+  //   - protocol-relative URLs (//cdn.example.com/...) — prefixed with current protocol
+  //   - host-relative paths (/uploads/poster.jpg) — combined with this origin
+  // We extract the origin from the configured core API URL so we never
+  // double-prefix an already-absolute URL.
+  imageOrigin: (() => {
+    const raw = process.env.NEXT_PUBLIC_CORE_API_URL || process.env.NEXT_PUBLIC_API_URL || '';
+    try {
+      // Handles both 'https://host/api/v1' and 'https://host:5000/api'.
+      // new URL throws when the string is not a valid absolute URL.
+      return new URL(raw).origin;
+    } catch {
+      return '';
+    }
+  })(),
 
   // TMDB External API Configuration
   tmdb: {

@@ -5,6 +5,7 @@
  */
 
 import { MOVIE_CONFIG } from '@/config/movieConfig';
+import { SYSTEM_CONFIG } from '@/config/systemConfig';
 import {
   resolveCountryTaxonomy,
   resolveCategoryTaxonomy
@@ -38,8 +39,16 @@ export const extractMovieList = (json) => {
  * Safe HTTP Fetcher (Zero-Crash & Resilient).
  * Never throws uncaught errors and never spams red logs into the console.
  * Returns normalized data or safe fallback directly.
- * 
- * @param {string} endpoint - API path (e.g. '/movies/latest')
+ *
+ * Behavior:
+ *   - Adds a Bearer token (if one is present in storage) to every request.
+ *     Several `/api/v1/*` endpoints on the production backend require
+ *     auth (verified — 401 without a token). We attach the token only
+ *     when it is present so this stays safe for unauthenticated calls.
+ *   - On non-2xx responses, returns `fallback` without throwing.
+ *   - On network errors / timeouts / aborts, returns `fallback` quietly.
+ *
+ * @param {string} endpoint - API path (e.g. '/movies?page=1&limit=20')
  * @param {Object} [options={}] - Custom fetch options (headers, signal, timeout)
  * @param {*} [fallback=null] - Value returned when request fails or returns non-200
  * @returns {Promise<*>}
@@ -58,16 +67,71 @@ export async function safeFetchJson(endpoint, options = {}, fallback = null) {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const signal = options.signal || controller.signal;
 
-    const response = await fetch(url, { ...options, signal });
+    // Read the token once per call. Multiple storage lookups would be
+    // wasteful and we don't want to block the UI on storage churn.
+    const token = (typeof window !== 'undefined')
+      ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
+      : null;
+
+    const headers = {
+      Accept: 'application/json',
+      ...(options.headers || {}),
+    };
+    if (token && token !== 'undefined' && token !== 'null') {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal,
+    });
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // Controlled diagnostic: when NEXT_PUBLIC_DEBUG_MOVIES=true,
+      // log the failing request for /movies endpoints so we can see
+      // the real error from the backend.
+      if (SYSTEM_CONFIG.debugMovies && endpoint.includes('/movies')) {
+        // eslint-disable-next-line no-console
+        console.log('[debug-movies] NON-OK', url, 'status', response.status);
+      }
       // Graceful non-200 handling: returns fallback without throwing Error
       return fallback;
     }
 
-    return await response.json();
-  } catch {
+    const json = await response.json();
+
+    // Controlled diagnostic: when NEXT_PUBLIC_DEBUG_MOVIES=true and the
+    // endpoint is one of the home-page movie endpoints, log a compact
+    // view of the response so the shape can be inspected in DevTools.
+    if (SYSTEM_CONFIG.debugMovies && /\/movies(\?|$|\/)/.test(endpoint)) {
+      // eslint-disable-next-line no-console
+      console.log('[debug-movies] RESPONSE', {
+        endpoint,
+        url,
+        topLevelKeys: json && typeof json === 'object' ? Object.keys(json) : null,
+        envelopeResponseData: json?.responseData
+          ? { type: Array.isArray(json.responseData) ? 'array' : typeof json.responseData, keys: Array.isArray(json.responseData) ? null : Object.keys(json.responseData) }
+          : null,
+        count: Array.isArray(json?.responseData)
+          ? json.responseData.length
+          : (Array.isArray(json?.responseData?.data) ? json.responseData.data.length : null),
+        firstMovie: json?.responseData?.[0]
+          ?? json?.responseData?.data?.[0]
+          ?? json?.data?.[0]
+          ?? json?.movies?.[0]
+          ?? json?.[0]
+          ?? null
+      });
+    }
+
+    return json;
+  } catch (err) {
+    if (SYSTEM_CONFIG.debugMovies && endpoint.includes('/movies')) {
+      // eslint-disable-next-line no-console
+      console.log('[debug-movies] FETCH ERROR', url, err?.message || err);
+    }
     // Network abort, timeout, or unreachable host -> returns fallback quietly
     return fallback;
   }
@@ -117,6 +181,18 @@ const movieService = {
    */
   getLatestMovies: (signal) =>
     safeFetchMovieList('/movies', undefined, { signal }),
+
+  /**
+   * Fetches the homepage movie list per spec: `GET /api/v1/movies?page=1&limit=20`.
+   * Returns a normalized array of movies (or [] on any failure). The
+   * safeFetchJson layer attaches the Bearer token automatically when one
+   * is present (production endpoint requires auth — verified).
+   *
+   * @param {AbortSignal} [signal] - Optional signal for cancellation.
+   * @returns {Promise<Array<Object>>} Up to 20 normalized movies.
+   */
+  getHomeMovies: (signal) =>
+    safeFetchMovieList('/movies?page=1&limit=20', 20, { signal }),
 
   /**
    * Fetches movies by country slug (e.g. 'han-quoc', 'trung-quoc') with multi-tier fallback:

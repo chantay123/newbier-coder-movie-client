@@ -68,6 +68,10 @@ export const normalizeMovieDetail = (raw, slug = '') => {
     type: m.type || 'single',
     status: m.status || 'completed',
     trailer_url: m.trailer_url || m.tmdb?.trailer_url || '',
+    // Preserve the full trailer object so TrailerModal.resolveTrailer can use
+    // it for nhánh 2/3 (trailer.url, trailer.key, trailer.site).
+    // The normalized trailer_url above handles nhánh 1 (legacy flat field).
+    trailer: m.trailer || null,
     episodes,
     actors: actorsList,
     directors: directorsList

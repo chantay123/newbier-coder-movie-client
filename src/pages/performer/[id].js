@@ -239,7 +239,7 @@ const PerformerDetail = () => {
   return (
     <>
       <Head>
-        <title>{performer.name} - Thông tin diễn viên | MovieStreaming</title>
+        <title>{String(performer.name || 'Diễn viên')} - Thông tin diễn viên | MovieStreaming</title>
         <meta name="description" content={`Thông tin chi tiết về diễn viên ${performer.name} và các bộ phim đã tham gia`} />
       </Head>      <div
         className={styles.performerBanner}

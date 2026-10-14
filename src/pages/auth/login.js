@@ -58,6 +58,8 @@ export default function Login() {
         }
 
         try {
+            // Guard against double-submit while a request is already in flight
+            if (isLoading) return;
             setIsLoading(true);
             const result = await login({
                 username: email.trim(),
@@ -68,8 +70,8 @@ export default function Login() {
             if (result.success) {
                 setMessage(t.notifications.loginSuccess);
                 setTimeout(() => {
-                    const redirectUrl = (router.query.redirect && typeof router.query.redirect === 'string') 
-                        ? router.query.redirect 
+                    const redirectUrl = (router.query.redirect && typeof router.query.redirect === 'string')
+                        ? router.query.redirect
                         : '/';
                     router.push(redirectUrl);
                 }, 800);

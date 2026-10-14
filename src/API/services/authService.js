@@ -38,10 +38,13 @@ const authService = {
 
       // Check standard v1 response contract (responseStatus + responseData)
       if (data && data.responseStatus) {
-        if (data.responseStatus.responseCode === "000000" && data.responseData?.access_token) {
+        // Treat invalid-credentials (00000204) and any non-success code as auth failure
+        if (data.responseStatus.responseCode === AUTH_CONFIG.api.successCode && data.responseData?.access_token) {
           const accessToken = data.responseData.access_token;
           const refreshToken = data.responseData.refresh_token;
+          const userPayload = data.responseData.user || null;
 
+          // Persist tokens (do NOT log token values to console)
           localStorage.setItem("auth_token", accessToken);
           localStorage.setItem("token", accessToken);
           if (refreshToken) {
@@ -49,32 +52,45 @@ const authService = {
           }
 
           let user = null;
-          try {
-            const base64Url = accessToken.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-
-            const decoded = JSON.parse(jsonPayload);
-
+          // Prefer user payload returned by API; fall back to JWT claims
+          if (userPayload && typeof userPayload === 'object') {
             user = {
-              _id: decoded.sub || decoded.userId || decoded.id,
-              id: decoded.sub || decoded.userId || decoded.id,
-              username: decoded.username || payload.username,
-              fullname: decoded.username || '',
-              role: decoded.role || 'USER',
-              permissions: decoded.permissions || [],
-              sessionId: decoded.sessionId || '',
-              accountType: decoded.accountType || 'Normal',
+              ...userPayload,
+              _id: userPayload._id || userPayload.id || userPayload.sub,
+              id: userPayload._id || userPayload.id || userPayload.sub,
+              fullname: userPayload.fullname || userPayload.username || '',
+              username: userPayload.username || userPayload.email || payload.username,
+              role: userPayload.role || 'USER',
               token: accessToken
             };
-          } catch {
-            user = {
-              username: payload.username,
-              role: 'USER',
-              token: accessToken
-            };
+          } else {
+            try {
+              const base64Url = accessToken.split('.')[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+              }).join(''));
+
+              const decoded = JSON.parse(jsonPayload);
+
+              user = {
+                _id: decoded.sub || decoded.userId || decoded.id,
+                id: decoded.sub || decoded.userId || decoded.id,
+                username: decoded.username || payload.username,
+                fullname: decoded.fullname || decoded.username || '',
+                role: decoded.role || 'USER',
+                permissions: decoded.permissions || [],
+                sessionId: decoded.sessionId || '',
+                accountType: decoded.accountType || 'Normal',
+                token: accessToken
+              };
+            } catch {
+              user = {
+                username: payload.username,
+                role: 'USER',
+                token: accessToken
+              };
+            }
           }
 
           localStorage.setItem("user", JSON.stringify(user));
@@ -89,18 +105,25 @@ const authService = {
             data: data.responseData
           };
         } else {
-          const errorMessage = data.responseStatus.responseMessage || 'Invalid credentials';
-          throw new Error(errorMessage);
+          // Non-success code (e.g. 00000204 Invalid credentials)
+          const code = data.responseStatus.responseCode || 'unknown';
+          const apiMessage = data.responseStatus.responseMessage || 'Invalid credentials';
+          const message = code === AUTH_CONFIG.api.invalidCredentialsCode
+            ? 'Invalid username or password'
+            : apiMessage;
+          throw new Error(message);
         }
       }
 
       // Legacy fallback (token directly in response)
       if (!response.ok) {
-        let errorMessage = 'Đăng nhập thất bại';
-        if (data && (data.error || data.message)) {
+        let errorMessage = 'Invalid username or password';
+        if (response.status === 401 || response.status === 403) {
+          errorMessage = 'Invalid username or password';
+        } else if (data && (data.error || data.message)) {
           errorMessage = data.error || data.message;
         } else if (responseText.includes('<!DOCTYPE')) {
-          errorMessage = 'Lỗi kết nối máy chủ. Vui lòng kiểm tra lại API URL.';
+          errorMessage = 'Cannot reach the server. Please check the API URL.';
         }
         throw new Error(errorMessage);
       }
@@ -203,53 +226,190 @@ const authService = {
     }
   },
 
-  logout: () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
+  logout: async () => {
+    // Tell the backend to invalidate the refresh token. The server response
+    // is best-effort: we still clear local session state even if the call
+    // fails (network error, 401 because the token was already expired, etc.)
+    // so the user is not stuck on a "logged-in" UI.
+    try {
+      if (typeof window === 'undefined') {
+        authService._clearLocalSession();
+        return;
+      }
 
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      sessionStorage.removeItem("backendToken");
+      const accessToken = localStorage.getItem('auth_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+
+      // Build the URL the same way the rest of this service does.
+      const endpoint = `${API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/logout`;
+
+      // Only fire the request if we still have credentials. If the user is
+      // already partially logged out, just clear local state.
+      if (accessToken || refreshToken) {
+        const headers = { 'Accept': 'application/json' };
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+        const body = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
+
+        try {
+          await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body,
+            // Do not let a slow backend block local cleanup.
+            keepalive: true,
+          });
+        } catch (networkError) {
+          // Network / CORS / offline: still clear local state.
+          console.warn('Logout API call failed (continuing with local cleanup):', networkError?.message);
+        }
+      }
+    } finally {
+      authService._clearLocalSession();
     }
   },
 
-  refreshToken: async () => {
+  // Internal: wipe all client-side auth artifacts. Exposed for code paths
+  // (e.g. refresh failure, account-locked page) that need to log the user
+  // out without making another network call.
+  _clearLocalSession: () => {
+    if (typeof window === 'undefined') return;
     try {
-      const refreshToken = localStorage.getItem('refresh_token');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('isAccountLocked');
+    } catch {
+      /* localStorage may be disabled (private mode, etc.) */
+    }
+    try {
+      window.sessionStorage.removeItem('backendToken');
+      window.sessionStorage.removeItem('user');
+    } catch {
+      /* sessionStorage may be disabled in some browsers */
+    }
+  },
 
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
+  // ---------------------------------------------------------------------
+  // Refresh token
+  // ---------------------------------------------------------------------
+  //
+  // `POST /auth/refresh-token` requires `{ refreshToken }` in the body
+  // (verified against the live API: missing body returns 400 with
+  // `errors[].field = "refreshToken"`). The success shape is unknown from
+  // this environment (Swagger is behind auth), so we accept the same
+  // v1 contract used by login (`responseData.access_token` /
+  // `responseData.refresh_token`) and a few common legacy shapes.
+  //
+  // A single-flight lock (`_refreshInFlight`) prevents N parallel callers
+  // from triggering N refresh requests — all callers await the same promise.
+  _refreshInFlight: null,
+
+  refreshToken: async () => {
+    // Reuse the in-flight promise when several callers race to refresh.
+    if (authService._refreshInFlight) {
+      return authService._refreshInFlight;
+    }
+
+    const refreshToken = (typeof window !== 'undefined')
+      ? localStorage.getItem('refresh_token')
+      : null;
+
+    if (!refreshToken) {
+      const err = new Error('No refresh token available');
+      err.code = 'NO_REFRESH_TOKEN';
+      throw err;
+    }
+
+    const endpoint = `${API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/refresh-token`;
+
+    const promise = (async () => {
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
+        });
+      } catch (networkError) {
+        // Network / CORS / aborted: do NOT tear down the session.
+        const err = new Error('Network error while refreshing token');
+        err.code = 'NETWORK';
+        err.cause = networkError;
+        throw err;
       }
 
-      const response = await fetch(`${API_URL}/auth/refresh-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ refreshToken })
-      });
+      // The backend rejected our refresh token. Force a full logout so the
+      // user is taken back to the login page.
+      if (response.status === 401 || response.status === 403) {
+        authService._clearLocalSession();
+        const err = new Error('Refresh token rejected');
+        err.code = 'REFRESH_REJECTED';
+        err.status = response.status;
+        throw err;
+      }
 
       if (!response.ok) {
-        throw new Error('Failed to refresh token');
+        // Other failures (500, 502, …): keep the user signed in, the next
+        // request can try again.
+        const err = new Error(`Refresh failed (${response.status})`);
+        err.code = 'TRANSIENT';
+        err.status = response.status;
+        throw err;
       }
 
-      const data = await response.json();
-
-      if (!data.token) {
-        throw new Error('No token in refresh response');
+      // Parse the body defensively.
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        const err = new Error('Invalid refresh response');
+        err.code = 'INVALID_RESPONSE';
+        throw err;
       }
 
-      localStorage.setItem('auth_token', data.token);
+      // Accept v1 contract first, then fall back to legacy shapes.
+      const payload = data?.responseData || data || {};
+      const newAccessToken =
+        payload.access_token ||
+        payload.accessToken ||
+        data?.token ||
+        null;
+      const newRefreshToken =
+        payload.refresh_token ||
+        payload.refreshToken ||
+        data?.refreshToken ||
+        null;
 
-      return data.token;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
+      if (!newAccessToken) {
+        const err = new Error('No access token in refresh response');
+        err.code = 'INVALID_RESPONSE';
+        throw err;
+      }
 
-      authService.logout();
+      // Persist the new tokens. If the backend rotated the refresh token,
+      // store it; otherwise keep the existing one untouched.
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', newAccessToken);
+        localStorage.setItem('token', newAccessToken); // legacy alias
+        if (newRefreshToken) {
+          localStorage.setItem('refresh_token', newRefreshToken);
+        }
+      }
 
-      throw error;
-    }
+      return newAccessToken;
+    })();
+
+    authService._refreshInFlight = promise.finally(() => {
+      authService._refreshInFlight = null;
+    });
+
+    return authService._refreshInFlight;
   },
 
   getAuthHeader: async () => {
@@ -277,21 +437,32 @@ const authService = {
       if (token) {
         const tokenParts = token.split('.');
         if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          const expiry = payload.exp * 1000;
-
-          if (expiry < Date.now() + 60000) {
+          let payload;
+          try {
+            payload = JSON.parse(atob(tokenParts[1]));
+          } catch {
+            payload = null;
+          }
+          const exp = payload?.exp ? payload.exp * 1000 : null;
+          // Refresh proactively when the access token is about to expire.
+          if (exp && exp < Date.now() + 60000) {
             try {
               token = await authService.refreshToken();
             } catch (refreshError) {
-              console.error('Error refreshing token:', refreshError);
-              throw new Error('Session expired. Please log in again.');
+              // The refresh service already handles `REFRESH_REJECTED` by
+              // clearing the session. For transient / network errors, fall
+              // back to the existing (still-valid-ish) token so the caller
+              // can decide what to do.
+              if (refreshError?.code === 'REFRESH_REJECTED') {
+                throw new Error('Session expired. Please log in again.');
+              }
+              console.warn('Proactive token refresh failed; using existing token:', refreshError?.message);
             }
           }
         }
       }
 
-      return { 'Authorization': `Bearer ${token}` };
+      return token ? { 'Authorization': `Bearer ${token}` } : {};
     } catch (error) {
       console.error('Error getting auth header:', error);
       throw error;
@@ -775,44 +946,27 @@ const authService = {
     }
   },
 
+  // Polls backend to confirm the user account is still active.
+  //
+  // The previous implementation hit `/users/account/status` then
+  // `/auth/user-detail`, both of which return 404 on the live API
+  // (verified). Several other candidate paths (`/auth/me`, `/me`,
+  // `/auth/profile`, `/users/me`, `/account`, …) also 404. We have
+  // NO verified endpoint to call, so this function is intentionally
+  // disabled: it never opens a network request and never fakes a
+  // success / failure response. Real-time lock notifications remain
+  // available via the WebSocket effect in `auth.js` (when the backend
+  // supports WS) and the `403 isAccountLocked` signal surfaced by
+  // `axiosConfig.js` on any other API call.
   checkAccountStatus: async () => {
-    try {
-
-      const headers = await authService.getAuthHeader();
-
-      const response = await fetch(`${API_URL}/users/account/status`, {
-        method: 'GET',
-        headers: headers
-      });
-
-      if (response.status === 403) {
-        const errorData = await response.json();
-        if (errorData && errorData.isAccountLocked) {
-          console.warn('Account is locked:', errorData);
-          return {
-            isActive: false,
-            isAccountLocked: true,
-            message: errorData.message || 'Tài khoản đã bị khóa'
-          };
-        }
-      }
-
-      if (!response.ok) {
-        console.error('Error checking account status:', response.status);
-        throw new Error('Không thể kiểm tra trạng thái tài khoản');
-      }
-
-      const data = await response.json();
-
-      return {
-        isActive: true,
-        isAccountLocked: false,
-        message: data.message || 'Tài khoản đang hoạt động'
-      };
-    } catch (error) {
-      console.error('Error checking account status:', error);
-      throw error;
-    }
+    const reason =
+      'checkAccountStatus is disabled: backend has no verified account-status endpoint. ' +
+      'Use the WebSocket lock notifications or the 403 isAccountLocked response on other API calls instead.';
+    const err = new Error(reason);
+    err.code = 'NOT_IMPLEMENTED';
+    // We still throw so the caller (auth.js) can `console.warn` once and
+    // stop scheduling more calls. We never send a fake success.
+    throw err;
   }
 };
 

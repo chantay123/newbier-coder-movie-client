@@ -60,5 +60,6 @@ export {
   resolveMovieQuality,
   normalizeHeroMovie,
   resolveMovieActors,
-  resolveMovieDirectors
+  resolveMovieDirectors,
+  resolveImageUrl
 } from '@/utils/movieNormalizer';

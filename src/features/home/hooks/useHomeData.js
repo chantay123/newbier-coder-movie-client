@@ -9,28 +9,88 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   normalizeHeroMovie,
   resolveMovieBackdrop,
+  resolveImageUrl,
   LOCAL_DEFAULT_POSTER
 } from '@/config/movieConfig';
+import { SYSTEM_CONFIG } from '@/config/systemConfig';
 import { HOME_SECTIONS } from '@/config/homeSectionsConfig';
 import movieService from '@/API/services/movieService';
 import upcomingMovieService from '@/API/services/upcomingMovieService';
 
+// Module-level guard so the diagnostic only fires once per page load,
+// even if the home page re-mounts or re-fetches.
+let didLogHomeDiagnostic = false;
+
 /**
  * Normalizes movie data from various backend API formats into standard schema.
+ * All image fields are run through `resolveImageUrl` so relative paths
+ * returned by the API (e.g. `/uploads/poster.jpg`) get the proper origin
+ * prepended instead of being requested from the current page host.
+ *
  * @param {Object} movie - Raw movie object from API.
  * @param {number} [index=0] - Item index for diversified fallback backdrops.
  * @returns {Object} Normalized movie object.
  */
 const normalizeMovie = (movie, index = 0) => {
   if (!movie) return null;
-  const poster = movie.poster_url && typeof movie.poster_url === 'string' && movie.poster_url.trim() !== ''
-    ? (movie.poster_url.startsWith('http') ? movie.poster_url : movie.poster_url)
-    : (movie.thumb_url && typeof movie.thumb_url === 'string' && movie.thumb_url.trim() !== ''
-        ? movie.thumb_url
-        : LOCAL_DEFAULT_POSTER);
-  const thumb = movie.thumb_url && typeof movie.thumb_url === 'string' && movie.thumb_url.trim() !== ''
-    ? (movie.thumb_url.startsWith('http') ? movie.thumb_url : movie.thumb_url)
-    : poster;
+
+  // Discover all candidate field names the backend might use for posters
+  // and thumbs. We never overwrite a real URL with a placeholder unless
+  // EVERY field is empty — this protects against future schema drift.
+  const resolveFirstUsable = (candidates) => {
+    for (const c of candidates) {
+      const r = resolveImageUrl(c);
+      if (r) return r;
+    }
+    return '';
+  };
+
+  const posterCandidates = [
+    movie.poster_url, movie.poster, movie.posterUrl, movie.image
+  ];
+  const thumbCandidates = [
+    movie.thumb_url, movie.thumb, movie.thumbUrl, movie.thumbnail
+  ];
+
+  const posterResolved = resolveFirstUsable(posterCandidates);
+  const thumbResolved = resolveFirstUsable(thumbCandidates);
+  const poster = posterResolved || thumbResolved || LOCAL_DEFAULT_POSTER;
+  const thumb = thumbResolved || posterResolved || poster || LOCAL_DEFAULT_POSTER;
+  const backdrop = resolveMovieBackdrop(movie, index) || LOCAL_DEFAULT_BACKDROP;
+
+  // Controlled diagnostic (gated by NEXT_PUBLIC_DEBUG_MOVIES=true).
+  // Logs ONLY the FIRST movie's raw fields and the resolved URLs, once
+  // per page load, so we can identify the real cause of broken images
+  // without spamming the console.
+  if (SYSTEM_CONFIG.debugMovies && index === 0 && !didLogHomeDiagnostic) {
+    didLogHomeDiagnostic = true;
+    // eslint-disable-next-line no-console
+    console.log('[debug-movies] RAW movie keys:', movie ? Object.keys(movie) : null);
+    // eslint-disable-next-line no-console
+    console.log('[debug-movies] RAW image fields (movie[0]):', {
+      poster_url: movie?.poster_url,
+      thumb_url: movie?.thumb_url,
+      backdrop_url: movie?.backdrop_url,
+      // Common alternative field names so we can spot them in one glance:
+      poster: movie?.poster,
+      thumb: movie?.thumb,
+      backdrop: movie?.backdrop,
+      image: movie?.image,
+      imageUrl: movie?.imageUrl,
+      posterUrl: movie?.posterUrl,
+      backdropUrl: movie?.backdropUrl,
+      thumbUrl: movie?.thumbUrl,
+      tmdb_poster_path: movie?.tmdb?.poster_path,
+      tmdb_backdrop_path: movie?.tmdb?.backdrop_path,
+      nested: movie?.images && typeof movie.images === 'object' ? Object.keys(movie.images) : null
+    });
+    // eslint-disable-next-line no-console
+    console.log('[debug-movies] RESOLVED image URLs (movie[0]):', {
+      poster_url: poster,
+      thumb_url: thumb,
+      backdrop_url: backdrop
+    });
+  }
 
   return {
     ...movie,
@@ -38,7 +98,7 @@ const normalizeMovie = (movie, index = 0) => {
     name: movie.name || 'Phim Đang Cập Nhật',
     poster_url: poster,
     thumb_url: thumb,
-    backdrop_url: resolveMovieBackdrop(movie, index)
+    backdrop_url: backdrop
   };
 };
 
@@ -121,7 +181,8 @@ export const useHomeData = (initialSnapshot = null) => {
   }, []);
 
   /**
-   * Fetches latest movies with pagination for the homepage grid.
+   * Fetches the homepage movie list (page=1, limit=20) on first paint
+   * and subsequent pages for infinite scroll.
    */
   const fetchLatestMovies = useCallback(async (pageNumber = 1, isLoadMore = false) => {
     try {
@@ -131,7 +192,12 @@ export const useHomeData = (initialSnapshot = null) => {
         setLoading(true);
       }
 
-      const rawMovies = await movieService.getMoviesPage(pageNumber, 24);
+      // First page uses the dedicated `getHomeMovies()` which honors the
+      // exact spec `GET /api/v1/movies?page=1&limit=20`. Subsequent
+      // pages reuse `getMoviesPage` for pagination continuity.
+      const rawMovies = pageNumber === 1
+        ? await movieService.getHomeMovies()
+        : await movieService.getMoviesPage(pageNumber, 24);
 
       if (rawMovies.length > 0 && isMountedRef.current) {
         const normalized = rawMovies.map((m, idx) => normalizeMovie(m, idx));
