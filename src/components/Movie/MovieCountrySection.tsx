@@ -1,35 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import MovieCarouselSection from './MovieCarouselSection';
 import { MOVIE_CONFIG } from '../../config/movieConfig';
+import type { MovieLite } from '@/components/common/MovieCard/MovieCardVertical';
 
-const API_BASE = MOVIE_CONFIG.apiBaseUrl;
+type CountryMovie = {
+  country?: Array<{ slug?: string; name?: string }>;
+  [key: string]: unknown;
+};
+
+interface MovieCountrySectionProps {
+  onPlayTrailer?: (movie: MovieLite) => void;
+}
+
+const API_BASE: string = MOVIE_CONFIG.apiBaseUrl;
 
 /**
- * @file MovieCountrySection.js
+ * @file MovieCountrySection.tsx
  * @description Standardized country rails for Korean (K-Drama) and Chinese (C-Drama) movies.
  */
-export default function MovieCountrySection({ onPlayTrailer }) {
-  const [koreanMovies, setKoreanMovies] = useState([]);
-  const [chineseMovies, setChineseMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
+const MovieCountrySection: React.FC<MovieCountrySectionProps> = ({ onPlayTrailer }) => {
+  const [koreanMovies, setKoreanMovies] = useState<CountryMovie[]>([]);
+  const [chineseMovies, setChineseMovies] = useState<CountryMovie[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isSubscribed = true;
 
-    const fetchCountryMovies = async () => {
+    const fetchCountryMovies = async (): Promise<void> => {
       try {
         setLoading(true);
         const res = await fetch(`${API_BASE}/movies?page=1&limit=60`);
         if (!res.ok) throw new Error('Failed to fetch country movies');
         const data = await res.json();
-        const allMovies = data?.data?.movies || data?.movies || [];
+        const allMovies: CountryMovie[] = data?.data?.movies || data?.movies || [];
 
         if (allMovies.length > 0 && isSubscribed) {
           const kr = allMovies.filter((m) =>
-            m.country?.some?.((c) => c.slug === 'han-quoc' || c.name?.toLowerCase().includes('hàn'))
+            m.country?.some?.((c) => c.slug === 'han-quoc' || (c.name?.toLowerCase().includes('hàn') ?? false))
           );
           const cn = allMovies.filter((m) =>
-            m.country?.some?.((c) => c.slug === 'trung-quoc' || c.name?.toLowerCase().includes('trung'))
+            m.country?.some?.((c) => c.slug === 'trung-quoc' || (c.name?.toLowerCase().includes('trung') ?? false))
           );
 
           if (kr.length > 0) setKoreanMovies(kr);
@@ -51,25 +61,25 @@ export default function MovieCountrySection({ onPlayTrailer }) {
 
   return (
     <div className="movie-country-rails">
-      {/* Korean Drama Rail */}
       <MovieCarouselSection
         title="Phim Hàn Quốc Mới"
         badge="K-DRAMA"
         viewAllHref="/quoc-gia/han-quoc"
-        movies={koreanMovies}
+        movies={koreanMovies as unknown as MovieLite[]}
         loading={loading}
-        onPlayTrailer={onPlayTrailer}
+        onPlayTrailer={onPlayTrailer as unknown as (movie: MovieLite) => void}
       />
 
-      {/* Chinese Drama Rail */}
       <MovieCarouselSection
         title="Phim Trung Quốc Mới"
         badge="C-DRAMA"
         viewAllHref="/quoc-gia/trung-quoc"
-        movies={chineseMovies}
+        movies={chineseMovies as unknown as MovieLite[]}
         loading={loading}
-        onPlayTrailer={onPlayTrailer}
+        onPlayTrailer={onPlayTrailer as unknown as (movie: MovieLite) => void}
       />
     </div>
   );
-}
+};
+
+export default MovieCountrySection;

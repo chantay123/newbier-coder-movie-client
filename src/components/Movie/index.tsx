@@ -1,5 +1,5 @@
 /**
- * @file index.js
+ * @file Movie/index.tsx
  * @description Centralized Backward-Compatibility Barrel for Movie components.
  * Delegates seamlessly to the new Feature-Driven & Common architecture.
  */
@@ -32,4 +32,4 @@ export {
 // Legacy Compatibility components
 export { default as MovieCarouselSection } from './MovieCarouselSection';
 export { default as MovieGridSection } from './MovieGridSection';
-export { default as MovieFilter, filterStateToQueryParams } from './MovieFilter';
+export { default as MovieCountrySection } from './MovieCountrySection';

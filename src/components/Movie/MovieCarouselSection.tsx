@@ -3,28 +3,28 @@ import SectionHeader from './SectionHeader';
 import MovieCardVertical from './MovieCardVertical';
 import MovieCardHorizontal from './MovieCardHorizontal';
 import Skeleton from '../UI/Skeleton';
+import type { MovieLite } from '@/components/common/MovieCard/MovieCardVertical';
 
 /**
- * @file MovieCarouselSection.js
+ * @file MovieCarouselSection.tsx
  * @description Ultra-smooth, hardware-accelerated native horizontal scroll rail for movies.
- * Completely eliminates mobile card squishing bugs from react-slick.
- * Features:
- * - Hidden scrollbar across all browsers (Chrome, Safari, Firefox, iOS, Android)
- * - Native touch momentum scrolling (60/120fps) with scroll snap
- * - Desktop hover arrow navigation with bounds detection (disabled at start/end)
- * - Strict flex-shrink: 0 guaranteeing pristine card proportions on any screen
- *
- * @param {Object} props
- * @param {string} props.title - Section title.
- * @param {string} [props.badge] - Category badge (e.g. 'HOT', 'TOP 10', 'SẮP CHIẾU').
- * @param {React.ReactNode} [props.icon] - Optional heading icon.
- * @param {string} [props.viewAllHref] - URL for "Xem tất cả".
- * @param {Array<Object>} props.movies - Array of movies to display.
- * @param {'vertical'|'horizontal'} [props.variant='vertical'] - Card layout style.
- * @param {boolean} [props.loading=false] - If true and movies empty, renders skeleton.
- * @param {Function} [props.onPlayTrailer] - Callback to play trailer.
  */
-export default function MovieCarouselSection({
+
+type Variant = 'vertical' | 'horizontal';
+type ScrollDirection = 'left' | 'right';
+
+export interface MovieCarouselSectionProps {
+  title: string;
+  badge?: string;
+  icon?: React.ReactNode;
+  viewAllHref?: string;
+  movies?: MovieLite[];
+  variant?: Variant;
+  loading?: boolean;
+  onPlayTrailer?: (movie: MovieLite) => void;
+}
+
+const MovieCarouselSection: React.FC<MovieCarouselSectionProps> = ({
   title,
   badge,
   icon,
@@ -33,16 +33,13 @@ export default function MovieCarouselSection({
   variant = 'vertical',
   loading = false,
   onPlayTrailer
-}) {
-  const railRef = useRef(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-  const isHorizontal = variant === 'horizontal';
+}) => {
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(true);
+  const isHorizontal: boolean = variant === 'horizontal';
 
-  /**
-   * Checks scroll position to toggle visibility of navigation arrows.
-   */
-  const updateScrollBounds = useCallback(() => {
+  const updateScrollBounds = useCallback((): void => {
     const el = railRef.current;
     if (!el) return;
     const { scrollLeft, scrollWidth, clientWidth } = el;
@@ -62,10 +59,7 @@ export default function MovieCarouselSection({
     };
   }, [movies, updateScrollBounds]);
 
-  /**
-   * Smoothly scrolls the rail horizontally by direction.
-   */
-  const handleScroll = (direction) => {
+  const handleScroll = (direction: ScrollDirection): void => {
     const el = railRef.current;
     if (!el) return;
     const distance = el.clientWidth * 0.75;
@@ -89,7 +83,6 @@ export default function MovieCarouselSection({
       />
 
       <div className="rail-wrapper">
-        {/* Desktop Prev Arrow */}
         {canScrollLeft && (
           <button
             type="button"
@@ -101,7 +94,6 @@ export default function MovieCarouselSection({
           </button>
         )}
 
-        {/* Horizontal Scroll Track */}
         <div
           ref={railRef}
           className="movie-scroll-track"
@@ -123,7 +115,7 @@ export default function MovieCarouselSection({
           ) : (
             movies.map((movie, index) => (
               <div
-                key={movie._id || movie.slug || index}
+                key={movie._id || movie.slug || String(index)}
                 className={`rail-card-item ${isHorizontal ? 'card-item-horizontal' : 'card-item-vertical'}`}
               >
                 {isHorizontal ? (
@@ -143,7 +135,6 @@ export default function MovieCarouselSection({
           )}
         </div>
 
-        {/* Desktop Next Arrow */}
         {canScrollRight && (
           <button
             type="button"
@@ -166,36 +157,32 @@ export default function MovieCarouselSection({
           margin: 0 -8px;
         }
 
-        /* Native Horizontal Scroll Track */
         .movie-scroll-track {
           display: flex;
           overflow-x: auto;
           overflow-y: hidden;
           scroll-behavior: smooth;
-          -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS/Safari */
+          -webkit-overflow-scrolling: touch;
           scroll-snap-type: x proximity;
           gap: 12px;
           padding: 8px 8px 16px 8px;
           user-select: none;
 
-          /* Hide Scrollbar completely across all browsers */
-          scrollbar-width: none; /* Firefox */
-          -ms-overflow-style: none; /* IE & Edge */
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
 
         .movie-scroll-track::-webkit-scrollbar {
-          display: none; /* Chrome, Safari, Opera */
+          display: none;
           width: 0;
           height: 0;
         }
 
-        /* Card Item - Strict flex-shrink: 0 prevents any squishing */
         .rail-card-item {
           flex: 0 0 auto;
           scroll-snap-align: start;
         }
 
-        /* Vertical Poster Sizing (2:3 Aspect) */
         .card-item-vertical {
           width: 200px;
         }
@@ -212,7 +199,6 @@ export default function MovieCarouselSection({
           }
         }
 
-        /* Mobile Phone Viewport: 140px ensures ~2.3 cards visible, never squished! */
         @media (max-width: 576px) {
           .card-item-vertical {
             width: 142px;
@@ -226,14 +212,12 @@ export default function MovieCarouselSection({
           }
         }
 
-        /* Small mobile screens (iPhone SE, Galaxy A) */
         @media (max-width: 380px) {
           .card-item-vertical {
             width: 132px;
           }
         }
 
-        /* Horizontal Card Sizing (Top 10 View) */
         .card-item-horizontal {
           width: 340px;
         }
@@ -256,7 +240,6 @@ export default function MovieCarouselSection({
           }
         }
 
-        /* Navigation Arrows (Desktop) */
         .rail-nav-btn {
           position: absolute;
           top: calc(50% - 10px);
@@ -298,4 +281,6 @@ export default function MovieCarouselSection({
       `}</style>
     </section>
   );
-}
+};
+
+export default MovieCarouselSection;

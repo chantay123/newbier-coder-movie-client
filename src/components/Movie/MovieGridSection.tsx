@@ -2,27 +2,30 @@ import React from 'react';
 import SectionHeader from './SectionHeader';
 import MovieCardVertical from './MovieCardVertical';
 import Skeleton from '../UI/Skeleton';
+import type { MovieLite } from '@/components/common/MovieCard/MovieCardVertical';
 
 /**
- * @file MovieGridSection.js
+ * @file MovieGridSection.tsx
  * @description Responsive cinema poster grid for latest catalogue movies with load-more pagination.
- *
- * @param {Object} props
- * @param {string} [props.title='Phim Mới Cập Nhật'] - Section title.
- * @param {Array<Object>} props.movies - Array of movie objects to display in grid.
- * @param {boolean} [props.loading=false] - Initial loading state.
- * @param {boolean} [props.loadingMore=false] - Pagination load more state.
- * @param {boolean} [props.hasMore=true] - Whether more items exist to load.
- * @param {Function} [props.onLoadMore] - Callback to trigger next page load.
  */
-export default function MovieGridSection({
+
+export interface MovieGridSectionProps {
+  title?: string;
+  movies?: MovieLite[];
+  loading?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+}
+
+const MovieGridSection: React.FC<MovieGridSectionProps> = ({
   title = 'Phim Mới Cập Nhật',
   movies = [],
   loading = false,
   loadingMore = false,
   hasMore = true,
   onLoadMore
-}) {
+}) => {
   return (
     <section className="movie-grid-section mb-5" aria-label={title}>
       <SectionHeader
@@ -32,7 +35,6 @@ export default function MovieGridSection({
         viewAllText="Xem tất cả"
       />
 
-      {/* Grid container */}
       <div className="row g-2 g-sm-3">
         {loading && (!movies || movies.length === 0) ? (
           [...Array(10)].map((_, i) => (
@@ -54,7 +56,7 @@ export default function MovieGridSection({
         ) : (
           movies.map((movie, index) => (
             <div
-              key={movie._id || movie.slug || index}
+              key={movie._id || movie.slug || String(index)}
               className="col-6 col-sm-4 col-md-3 col-lg-3 col-xl-2-4 mb-3"
             >
               <MovieCardVertical movie={movie} />
@@ -63,7 +65,6 @@ export default function MovieGridSection({
         )}
       </div>
 
-      {/* Load more button */}
       {hasMore && onLoadMore && (
         <div className="text-center mt-4">
           <button
@@ -122,4 +123,6 @@ export default function MovieGridSection({
       `}</style>
     </section>
   );
-}
+};
+
+export default MovieGridSection;
