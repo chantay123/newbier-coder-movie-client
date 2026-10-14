@@ -2,9 +2,14 @@ import React from 'react';
 import Link from 'next/link';
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaEnvelope, FaPhoneAlt, FaMapMarkerAlt, FaHeart } from 'react-icons/fa';
 
-const Footer = () => {
-  const currentYear = new Date().getFullYear();
-  
+/**
+ * @file Footer.tsx
+ * @description Application footer with brand, navigation links, and contact info.
+ */
+
+const Footer: React.FC = () => {
+  const currentYear: number = new Date().getFullYear();
+
   return (
     <footer className="footer">
       <div className="container">
@@ -27,6 +32,7 @@ const Footer = () => {
               <a href="#" className="social-link"><FaInstagram /></a>
               <a href="#" className="social-link"><FaYoutube /></a>
             </div>
+            */}
           </div>
 
           <div className="col-lg-2 col-md-6 mb-4 mb-md-0">
@@ -68,7 +74,8 @@ const Footer = () => {
                 <FaEnvelope className="contact-icon" />
                 <span>quangnguyen31072004@gmail.com</span>
               </li>
-            </ul> */}
+            </ul>
+            {/* newsletter removed */}
           </div>
         </div>
 
@@ -283,7 +290,7 @@ const Footer = () => {
             text-align: center;
             gap: 15px;
           }
-          
+
           .footer-bottom-links {
             justify-content: center;
           }

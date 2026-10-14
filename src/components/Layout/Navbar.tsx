@@ -1,32 +1,113 @@
-import React, { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { 
-  FaSearch, 
-  FaBars, 
-  FaTimes, 
-  FaFilm, 
-  FaTv, 
-  FaHeart, 
-  FaBookmark, 
-  FaHistory, 
+import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import {
+  FaSearch,
+  FaBars,
+  FaTimes,
+  FaFilm,
+  FaHeart,
+  FaBookmark,
+  FaHistory,
   FaSignOutAlt,
-  FaUserCircle, 
+  FaUserCircle,
   FaUserPlus,
-  FaTimesCircle, 
+  FaTimesCircle,
   FaChevronDown
-} from "react-icons/fa";
-import { useRouter } from "next/router";
-import { useAuth } from "../../utils/auth";
-import searchHistoryService from "../../API/services/searchHistoryService";
-import FeedbackForm from "../Feedback/FeedbackForm";
-import movieService, { safeFetchJson, extractMovieList } from "@/API/services/movieService";
-import { LOCAL_DEFAULT_POSTER } from "@/config/movieFallbackConfig";
-import { TMDB_CONFIG } from "@/config/systemConfig";
-import { 
-  MAIN_NAV_ITEMS, 
-  USER_NAV_ITEMS, 
-  NAVBAR_SEARCH_CONFIG 
-} from "@/config/navigationConfig";
+} from 'react-icons/fa';
+import { useRouter } from 'next/router';
+// .js deps - cast for strict TS
+import { useAuth as useAuthRaw } from '../../utils/auth';
+const { useAuth } = { useAuth: useAuthRaw as unknown as () => AuthApi };
+import searchHistoryServiceRaw from '../../API/services/searchHistoryService';
+const searchHistoryService = searchHistoryServiceRaw as unknown as {
+  saveSearchHistory: (q: string, filters?: Record<string, unknown>) => Promise<unknown>;
+};
+import FeedbackFormRaw from '../Feedback/FeedbackForm';
+const FeedbackFormComponent = FeedbackFormRaw as unknown as React.ComponentType<{
+  isOpen: boolean;
+  onClose: () => void;
+  ref?: React.Ref<unknown>;
+}>;
+import movieServiceRaw, { safeFetchJson, extractMovieList } from '@/API/services/movieService';
+const movieService = movieServiceRaw as unknown as {
+  getHeroMovies: (limit?: number) => Promise<unknown[]>;
+};
+import { LOCAL_DEFAULT_POSTER } from '@/config/movieFallbackConfig';
+import { TMDB_CONFIG } from '@/config/systemConfig';
+import {
+  MAIN_NAV_ITEMS,
+  USER_NAV_ITEMS,
+  NAVBAR_SEARCH_CONFIG
+} from '@/config/navigationConfig';
+
+/** ---------- local types ---------- */
+interface AuthUser {
+  avatar?: string;
+  image?: string;
+  fullname?: string;
+  name?: string;
+  email?: string;
+  [key: string]: unknown;
+}
+
+interface AuthApi {
+  user: AuthUser | null;
+  logout: () => void;
+  isAuthenticated: boolean;
+}
+
+interface IndicatorStyle {
+  left?: number;
+  width?: number;
+  opacity: number;
+}
+
+interface NavSubItem {
+  slug: string;
+  name: string;
+  href: string;
+}
+
+interface NavItemBase {
+  id: string;
+  label: string;
+  type?: 'link' | 'dropdown';
+  href?: string;
+  matchExact?: boolean;
+  matchPrefix?: string;
+  dropdownType?: 'genres' | 'countries';
+  items?: NavSubItem[];
+}
+
+interface SearchResultActor {
+  id?: number;
+  name?: string;
+  original_name?: string;
+  profile_path?: string | null;
+  known_for_department?: string;
+  known_for?: Array<{ title?: string; name?: string }>;
+  [key: string]: unknown;
+}
+
+interface SearchResultMovie {
+  name?: string;
+  title?: string;
+  origin_name?: string;
+  original_title?: string;
+  year?: number | string;
+  chieurap?: boolean;
+  quality?: string;
+  episode_current?: string;
+  time?: string;
+  type?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  slug?: string;
+  id?: string | number;
+  _id?: string | number;
+  createdAt?: string;
+  [key: string]: unknown;
+}
 
 const USER_ICONS = {
   user: <FaUserCircle className="me-2 text-primary" />,
@@ -35,11 +116,15 @@ const USER_ICONS = {
   history: <FaHistory className="me-2 text-info" />
 };
 
+interface CinemaAvatarSvgProps {
+  size?: number;
+  className?: string;
+}
+
 /**
  * Modern vector SVG Cinema Avatar matching the dark aesthetic.
- * Replaces blurry or missing raster fallback images.
  */
-export const CinemaAvatarSvg = ({ size = 32, className = '' }) => (
+export const CinemaAvatarSvg: React.FC<CinemaAvatarSvgProps> = ({ size = 32, className = '' }) => (
   <svg
     width={size}
     height={size}
@@ -69,10 +154,10 @@ export const CinemaAvatarSvg = ({ size = 32, className = '' }) => (
   </svg>
 );
 
-const getAvatarUrl = (user) => {
+const getAvatarUrl = (user: AuthUser | null | undefined): string | null => {
   if (!user) return null;
 
-  let avatarUrl = user.avatar || user.image;
+  let avatarUrl: string | undefined = user.avatar || user.image;
   if (!avatarUrl || avatarUrl === '/img/avatar.png') return null;
 
   if (avatarUrl.startsWith('/')) {
@@ -93,8 +178,14 @@ const getAvatarUrl = (user) => {
   return avatarUrl;
 };
 
-const UserAvatarDisplay = ({ user, size = 34, className = '' }) => {
-  const [imgError, setImgError] = useState(false);
+interface UserAvatarDisplayProps {
+  user: AuthUser | null;
+  size?: number;
+  className?: string;
+}
+
+const UserAvatarDisplay: React.FC<UserAvatarDisplayProps> = ({ user, size = 34, className = '' }) => {
+  const [imgError, setImgError] = useState<boolean>(false);
   const avatarUrl = getAvatarUrl(user);
 
   useEffect(() => {
@@ -116,62 +207,62 @@ const UserAvatarDisplay = ({ user, size = 34, className = '' }) => {
   return <CinemaAvatarSvg size={size} className={`rounded-circle ${className}`} />;
 };
 
-const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearchInput, setShowSearchInput] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+const Navbar: React.FC = () => {
+  const [isScrolled, setIsScrolled] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showSearchInput, setShowSearchInput] = useState<boolean>(false);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState<boolean>(false);
 
   // Navigation Dropdown States
-  const [showGenresDropdown, setShowGenresDropdown] = useState(false);
-  const [showCountriesDropdown, setShowCountriesDropdown] = useState(false);
-  const [lockedDropdown, setLockedDropdown] = useState(null); // 'genres' | 'countries' | null
-  const [mobileGenresOpen, setMobileGenresOpen] = useState(false);
-  const [mobileCountriesOpen, setMobileCountriesOpen] = useState(false);
-  const dropdownCloseTimeoutRef = useRef(null);
+  const [showGenresDropdown, setShowGenresDropdown] = useState<boolean>(false);
+  const [showCountriesDropdown, setShowCountriesDropdown] = useState<boolean>(false);
+  const [lockedDropdown, setLockedDropdown] = useState<'genres' | 'countries' | null>(null);
+  const [mobileGenresOpen, setMobileGenresOpen] = useState<boolean>(false);
+  const [mobileCountriesOpen, setMobileCountriesOpen] = useState<boolean>(false);
+  const dropdownCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Dual Search Dropdown States
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  const [searchMoviesResult, setSearchMoviesResult] = useState([]);
-  const [searchActorsResult, setSearchActorsResult] = useState([]);
-  const [searchDropdownLoading, setSearchDropdownLoading] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState<boolean>(false);
+  const [searchMoviesResult, setSearchMoviesResult] = useState<SearchResultMovie[]>([]);
+  const [searchActorsResult, setSearchActorsResult] = useState<SearchResultActor[]>([]);
+  const [searchDropdownLoading, setSearchDropdownLoading] = useState<boolean>(false);
 
   // Search History States
-  const [searchHistory, setSearchHistory] = useState([]);
-  const [showSearchHistory, setShowSearchHistory] = useState(false);
-  const [searchHistoryLoading, setSearchHistoryLoading] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<unknown[]>([]);
+  const [showSearchHistory, setShowSearchHistory] = useState<boolean>(false);
+  const [searchHistoryLoading, setSearchHistoryLoading] = useState<boolean>(false);
 
   const router = useRouter();
   const { user, logout, isAuthenticated } = useAuth();
 
-  const searchInputRef = useRef(null);
-  const mobileSearchInputRef = useRef(null);
-  const searchWrapperRef = useRef(null);
-  const mobileSearchWrapperRef = useRef(null);
-  const genresDropdownRef = useRef(null);
-  const countriesDropdownRef = useRef(null);
-  const feedbackRef = useRef(null);
-  const navRef = useRef(null);
-  const searchDebounceRef = useRef(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchWrapperRef = useRef<HTMLDivElement | null>(null);
+  const mobileSearchWrapperRef = useRef<HTMLDivElement | null>(null);
+  const genresDropdownRef = useRef<HTMLLIElement | null>(null);
+  const countriesDropdownRef = useRef<HTMLLIElement | null>(null);
+  const feedbackRef = useRef<HTMLDivElement | null>(null);
+  const navRef = useRef<HTMLUListElement | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [indicatorStyle, setIndicatorStyle] = useState({
+  const [indicatorStyle, setIndicatorStyle] = useState<IndicatorStyle>({
     left: 0,
     width: 0,
     opacity: 0
   });
 
-  const isActive = (path) => {
+  const isActive = (path: string): boolean => {
     if (path === '/' && router.pathname === '/') return true;
     if (path !== '/' && router.pathname.startsWith(path)) return true;
     return false;
   };
 
-  const isGenreActive = () => router.pathname.startsWith('/the-loai');
-  const isCountryActive = () => router.pathname.startsWith('/quoc-gia');
+  const isGenreActive = (): boolean => router.pathname.startsWith('/the-loai');
+  const isCountryActive = (): boolean => router.pathname.startsWith('/quoc-gia');
 
-  const handleDropdownMouseEnter = (type) => {
+  const handleDropdownMouseEnter = (type: 'genres' | 'countries'): void => {
     if (dropdownCloseTimeoutRef.current) {
       clearTimeout(dropdownCloseTimeoutRef.current);
     }
@@ -184,8 +275,8 @@ const Navbar = () => {
     }
   };
 
-  const handleDropdownMouseLeave = (type) => {
-    if (lockedDropdown === type) return; // Do not close if locked/clicked open
+  const handleDropdownMouseLeave = (type: 'genres' | 'countries'): void => {
+    if (lockedDropdown === type) return;
     if (dropdownCloseTimeoutRef.current) {
       clearTimeout(dropdownCloseTimeoutRef.current);
     }
@@ -195,20 +286,18 @@ const Navbar = () => {
       } else if (type === 'countries') {
         setShowCountriesDropdown(false);
       }
-    }, 380); // Smooth delay so menu does not disappear abruptly
+    }, 380);
   };
 
-  const handleDropdownClick = (type) => {
+  const handleDropdownClick = (type: 'genres' | 'countries'): void => {
     if (dropdownCloseTimeoutRef.current) {
       clearTimeout(dropdownCloseTimeoutRef.current);
     }
     if (lockedDropdown === type) {
-      // Toggle off / unlock
       setLockedDropdown(null);
       if (type === 'genres') setShowGenresDropdown(false);
       if (type === 'countries') setShowCountriesDropdown(false);
     } else {
-      // Pin / lock open
       setLockedDropdown(type);
       if (type === 'genres') {
         setShowGenresDropdown(true);
@@ -221,29 +310,29 @@ const Navbar = () => {
   };
 
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = (): void => {
       setIsScrolled(window.scrollY > 30);
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Update sliding indicator for active navbar item
   useEffect(() => {
-    const updateIndicator = () => {
+    const updateIndicator = (): void => {
       if (navRef.current && window.innerWidth >= 992) {
-        const navItems = navRef.current.querySelectorAll('.nav-link');
-        let activeItem = null;
+        const navItems = navRef.current.querySelectorAll<HTMLElement>('.nav-link');
+        let activeItem: HTMLElement | null = null;
 
-        navItems.forEach(item => {
+        navItems.forEach((item) => {
           if (item.classList.contains('active')) {
             activeItem = item;
           }
         });
 
         if (activeItem) {
-          const { left, width } = activeItem.getBoundingClientRect();
-          const navLeft = navRef.current.getBoundingClientRect().left;
+          const { left, width } = (activeItem as HTMLElement).getBoundingClientRect();
+          const navLeft = navRef.current?.getBoundingClientRect().left ?? 0;
 
           setIndicatorStyle({
             left: left - navLeft,
@@ -261,28 +350,26 @@ const Navbar = () => {
     return () => window.removeEventListener('resize', updateIndicator);
   }, [router.pathname, router.query]);
 
-  const fetchLiveSearch = async (queryText) => {
+  const fetchLiveSearch = async (queryText: string): Promise<void> => {
     const q = (queryText || '').trim();
     setSearchDropdownLoading(true);
 
     try {
       if (!q) {
-        // When empty, show latest spotlight movies and top popular performers
         const [latestMovies, tmdbActors] = await Promise.all([
           movieService.getHeroMovies(NAVBAR_SEARCH_CONFIG.movieLimit).catch(() => []),
           fetch(`${TMDB_CONFIG.baseUrl}/person/popular?api_key=${TMDB_CONFIG.apiKey}&language=vi-VN&page=1`)
-            .then(res => res.ok ? res.json() : { results: [] })
-            .then(data => (data.results || []).slice(0, NAVBAR_SEARCH_CONFIG.actorLimit))
+            .then((res) => res.ok ? res.json() : { results: [] })
+            .then((data: { results?: SearchResultActor[] }) => (data.results || []).slice(0, NAVBAR_SEARCH_CONFIG.actorLimit))
             .catch(() => [])
         ]);
 
-        setSearchMoviesResult(Array.isArray(latestMovies) ? latestMovies : []);
+        setSearchMoviesResult(Array.isArray(latestMovies) ? (latestMovies as SearchResultMovie[]) : []);
         setSearchActorsResult(Array.isArray(tmdbActors) ? tmdbActors : []);
       } else {
-        // Query both backend movies and TMDB person search
         const [moviesResp, tmdbActors] = await Promise.all([
           safeFetchJson(`/movies?search=${encodeURIComponent(q)}&limit=${NAVBAR_SEARCH_CONFIG.movieLimit}`, {}, null)
-            .then(res => {
+            .then((res: unknown) => {
               const list = extractMovieList(res);
               if (Array.isArray(list) && list.length > 0) return list;
               return safeFetchJson(`/movies/search?q=${encodeURIComponent(q)}`, {}, [])
@@ -290,12 +377,12 @@ const Navbar = () => {
             })
             .catch(() => []),
           fetch(`${TMDB_CONFIG.baseUrl}/search/person?api_key=${TMDB_CONFIG.apiKey}&query=${encodeURIComponent(q)}&language=vi-VN&page=1`)
-            .then(res => res.ok ? res.json() : { results: [] })
-            .then(data => (data.results || []).slice(0, NAVBAR_SEARCH_CONFIG.actorLimit))
+            .then((res) => res.ok ? res.json() : { results: [] })
+            .then((data: { results?: SearchResultActor[] }) => (data.results || []).slice(0, NAVBAR_SEARCH_CONFIG.actorLimit))
             .catch(() => [])
         ]);
 
-        setSearchMoviesResult(Array.isArray(moviesResp) ? moviesResp : []);
+        setSearchMoviesResult(Array.isArray(moviesResp) ? (moviesResp as SearchResultMovie[]) : []);
         setSearchActorsResult(Array.isArray(tmdbActors) ? tmdbActors : []);
       }
     } catch (err) {
@@ -305,7 +392,7 @@ const Navbar = () => {
     }
   };
 
-  const handleSearchInputChange = (e) => {
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const newQuery = e.target.value;
     setSearchQuery(newQuery);
     setShowSearchDropdown(true);
@@ -319,7 +406,7 @@ const Navbar = () => {
     }, NAVBAR_SEARCH_CONFIG.debounceMs);
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     if (searchQuery.trim()) {
       if (isAuthenticated) {
@@ -332,7 +419,7 @@ const Navbar = () => {
     }
   };
 
-  const toggleSearchInput = () => {
+  const toggleSearchInput = (): void => {
     setShowSearchInput(!showSearchInput);
     if (!showSearchInput) {
       setShowSearchDropdown(true);
@@ -340,61 +427,61 @@ const Navbar = () => {
     }
   };
 
-  const toggleMenu = () => {
+  const toggleMenu = (): void => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const closeMenu = () => {
+  const closeMenu = (): void => {
     setIsMenuOpen(false);
     setMobileGenresOpen(false);
     setMobileCountriesOpen(false);
   };
 
-  const toggleUserMenu = () => {
+  const toggleUserMenu = (): void => {
     setShowUserMenu(!showUserMenu);
   };
 
   // Outside click listener
   useEffect(() => {
-    // Outside click listener & Escape key handler
-    const handleClickOutside = (event) => {
-      const navbarCollapse = document.getElementById("navbarNav");
-      const navbarToggler = document.querySelector(".navbar-toggler");
-      const userMenu = document.getElementById("userMenu");
-      const userAvatar = document.querySelector(".profile-avatar");
+    const handleClickOutside = (event: MouseEvent): void => {
+      const target = event.target as Node;
+      const navbarCollapse = document.getElementById('navbarNav');
+      const navbarToggler = document.querySelector('.navbar-toggler');
+      const userMenu = document.getElementById('userMenu');
+      const userAvatar = document.querySelector('.profile-avatar');
 
       // Search dropdown click outside
-      const inDesktopSearch = searchWrapperRef.current && searchWrapperRef.current.contains(event.target);
-      const inMobileSearch = mobileSearchWrapperRef.current && mobileSearchWrapperRef.current.contains(event.target);
+      const inDesktopSearch = searchWrapperRef.current && searchWrapperRef.current.contains(target);
+      const inMobileSearch = mobileSearchWrapperRef.current && mobileSearchWrapperRef.current.contains(target);
       if (!inDesktopSearch && !inMobileSearch) {
         setShowSearchDropdown(false);
       }
 
       // Genres dropdown click outside
-      if (genresDropdownRef.current && !genresDropdownRef.current.contains(event.target)) {
+      if (genresDropdownRef.current && !genresDropdownRef.current.contains(target)) {
         setShowGenresDropdown(false);
         setLockedDropdown((prev) => (prev === 'genres' ? null : prev));
       }
 
       // Countries dropdown click outside
-      if (countriesDropdownRef.current && !countriesDropdownRef.current.contains(event.target)) {
+      if (countriesDropdownRef.current && !countriesDropdownRef.current.contains(target)) {
         setShowCountriesDropdown(false);
         setLockedDropdown((prev) => (prev === 'countries' ? null : prev));
       }
 
       // User menu click outside
-      if (showUserMenu && userMenu && !userMenu.contains(event.target) && userAvatar && !userAvatar.contains(event.target)) {
+      if (showUserMenu && userMenu && !userMenu.contains(target) && userAvatar && !userAvatar.contains(target)) {
         setShowUserMenu(false);
       }
 
       // Mobile drawer click outside
-      if (isMenuOpen && navbarCollapse && !navbarCollapse.contains(event.target) && !navbarToggler?.contains(event.target)) {
+      if (isMenuOpen && navbarCollapse && !navbarCollapse.contains(target) && !navbarToggler?.contains(target)) {
         setIsMenuOpen(false);
       }
     };
 
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
         setShowSearchDropdown(false);
         setShowSearchInput(false);
         setShowUserMenu(false);
@@ -404,15 +491,15 @@ const Navbar = () => {
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showUserMenu, isMenuOpen]);
 
-  const handleAvatarClick = (e) => {
+  const handleAvatarClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
     if (isAuthenticated) {
       toggleUserMenu();
@@ -421,32 +508,32 @@ const Navbar = () => {
     }
   };
 
-  const handleProfileClick = () => {
+  const handleProfileClick = (): void => {
     setShowUserMenu(false);
     router.push('/profile');
   };
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     setShowUserMenu(false);
     logout();
   };
 
-  const handleOverlayClick = (e) => {
+  const handleOverlayClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
     closeMenu();
   };
 
-  const saveToSearchHistory = async (query, filters = {}) => {
+  const saveToSearchHistory = async (query: string, filters: Record<string, unknown> = {}): Promise<void> => {
     if (!isAuthenticated || !query || typeof query !== 'string' || !query.trim()) return;
     try {
       await searchHistoryService.saveSearchHistory(query.trim(), filters);
     } catch (error) {
-      console.error("Error saving search history:", error);
+      console.error('Error saving search history:', error);
     }
   };
 
   // Dual search dropdown rendering
-  const renderDualSearchDropdown = () => {
+  const renderDualSearchDropdown = (): React.ReactNode => {
     if (!showSearchDropdown) return null;
 
     const hasMovies = searchMoviesResult && searchMoviesResult.length > 0;
@@ -492,13 +579,13 @@ const Navbar = () => {
                 {hasMovies ? (
                   <div className="search-items-list">
                     {searchMoviesResult.map((movie) => {
-                      const title = movie.name || movie.title || 'Phim chưa đặt tên';
-                      const originalTitle = movie.origin_name || movie.original_title || '';
-                      const year = movie.year || (movie.createdAt ? new Date(movie.createdAt).getFullYear() : '2026');
-                      const ratingBadge = movie.chieurap ? 'Chiếu Rạp' : (movie.quality || 'P');
-                      const episodeBadge = movie.episode_current || movie.time || (movie.type === 'series' ? 'Nhiều tập' : 'Full');
-                      const posterUrl = movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER;
-                      const movieSlug = movie.slug || movie.id || movie._id;
+                      const title: string = movie.name || movie.title || 'Phim chưa đặt tên';
+                      const originalTitle: string = movie.origin_name || movie.original_title || '';
+                      const year: number | string = movie.year || (movie.createdAt ? new Date(movie.createdAt).getFullYear() : '2026');
+                      const ratingBadge: string = movie.chieurap ? 'Chiếu Rạp' : (movie.quality || 'P');
+                      const episodeBadge: string = movie.episode_current || movie.time || (movie.type === 'series' ? 'Nhiều tập' : 'Full');
+                      const posterUrl: string = movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER;
+                      const movieSlug: string = String(movie.slug || movie.id || movie._id || '');
 
                       return (
                         <Link
@@ -532,7 +619,7 @@ const Navbar = () => {
                             )}
                             <div className="movie-row-badges">
                               <span className="meta-badge badge-rating">{ratingBadge}</span>
-                              <span className="meta-badge badge-year">{year}</span>
+                              <span className="meta-badge badge-year">{String(year)}</span>
                               <span className="meta-badge badge-episode">{episodeBadge}</span>
                             </div>
                           </div>
@@ -563,15 +650,15 @@ const Navbar = () => {
                 {hasActors ? (
                   <div className="search-items-list">
                     {searchActorsResult.map((actor) => {
-                      const actorAvatar = actor.profile_path
+                      const actorAvatar: string = actor.profile_path
                         ? TMDB_CONFIG.getImageUrl(actor.profile_path, 'w185', '/img/avatar.png')
                         : '/img/avatar.png';
-                      const actorName = actor.name || actor.original_name || 'Diễn viên';
-                      const actorRole = actor.known_for_department === 'Acting'
+                      const actorName: string = actor.name || actor.original_name || 'Diễn viên';
+                      const actorRole: string = actor.known_for_department === 'Acting'
                         ? 'Diễn viên'
                         : (actor.known_for_department || 'Diễn viên');
-                      const knownWork = actor.known_for?.[0]?.title || actor.known_for?.[0]?.name;
-                      const actorId = actor.id;
+                      const knownWork: string | undefined = actor.known_for?.[0]?.title || actor.known_for?.[0]?.name;
+                      const actorId: number | undefined = actor.id;
 
                       return (
                         <Link
@@ -630,7 +717,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className={`navbar navbar-expand-lg fixed-top ${isScrolled ? "navbar-scrolled" : "navbar-top"}`}>
+    <nav className={`navbar navbar-expand-lg fixed-top ${isScrolled ? 'navbar-scrolled' : 'navbar-top'}`}>
       {isMenuOpen && (
         <div
           className="menu-overlay d-lg-none"
@@ -640,7 +727,7 @@ const Navbar = () => {
       )}
 
       <div className="container-fluid px-3 px-lg-5">
-        {/* BRAND & TOGGLER (Always visible on desktop, hidden on mobile only when mobile search is active) */}
+        {/* BRAND & TOGGLER */}
         <div className={`d-flex align-items-center ${showSearchInput ? 'd-none d-lg-flex' : ''}`}>
           <button
             className="navbar-toggler border-0 d-lg-none p-0 me-2"
@@ -661,7 +748,7 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* MOBILE CONTROLS (SEARCH & AVATAR) - Hidden when mobile search is open */}
+        {/* MOBILE CONTROLS */}
         <div className={`d-flex d-lg-none align-items-center ms-auto gap-2 ${showSearchInput ? 'd-none' : ''}`}>
           <button
             className="btn btn-link text-white p-2 mobile-search-trigger-btn"
@@ -676,7 +763,7 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* MOBILE FULL-WIDTH SEARCH BAR (ACTIVE STATE) */}
+        {/* MOBILE FULL-WIDTH SEARCH BAR */}
         {showSearchInput && (
           <div className="mobile-search-fullbar d-flex d-lg-none align-items-center w-100" ref={mobileSearchWrapperRef}>
             <button
@@ -735,9 +822,8 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* EXACT NAVBAR ATTRIBUTES IN SPECIFIED ORDER (FROM NAVIGATION_CONFIG) */}
           <ul className="navbar-nav align-items-lg-center mx-auto" ref={navRef}>
-            {MAIN_NAV_ITEMS.map((navItem) => {
+            {MAIN_NAV_ITEMS.map((navItem: NavItemBase) => {
               if (navItem.type === 'dropdown') {
                 const isGenres = navItem.dropdownType === 'genres';
                 const isOpen = isGenres ? showGenresDropdown : showCountriesDropdown;
@@ -750,24 +836,23 @@ const Navbar = () => {
                     key={navItem.id}
                     className={`nav-item dropdown-wrapper ${active ? 'active' : ''}`}
                     ref={ref}
-                    onMouseEnter={() => handleDropdownMouseEnter(navItem.dropdownType)}
-                    onMouseLeave={() => handleDropdownMouseLeave(navItem.dropdownType)}
+                    onMouseEnter={() => handleDropdownMouseEnter(navItem.dropdownType as 'genres' | 'countries')}
+                    onMouseLeave={() => handleDropdownMouseLeave(navItem.dropdownType as 'genres' | 'countries')}
                   >
                     <button
                       type="button"
                       className={`nav-link nav-link-btn ${active ? 'active' : ''}`}
-                      onClick={() => handleDropdownClick(navItem.dropdownType)}
+                      onClick={() => handleDropdownClick(navItem.dropdownType as 'genres' | 'countries')}
                       aria-expanded={isOpen}
                     >
                       <span>{navItem.label}</span>
                       <FaChevronDown className={`chevron-icon ms-1 ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* Desktop Popover */}
                     {isOpen && (
                       <div className={`custom-dropdown-popover ${isGenres ? 'genres-popover' : 'countries-popover'} animate-fade-in d-none d-lg-block`}>
                         <div className={isGenres ? 'genres-grid' : 'countries-grid'}>
-                          {navItem.items.map((subItem) => (
+                          {(navItem.items || []).map((subItem) => (
                             <Link
                               key={subItem.slug}
                               href={subItem.href}
@@ -787,11 +872,10 @@ const Navbar = () => {
                       </div>
                     )}
 
-                    {/* Mobile Submenu */}
                     <div className="d-lg-none">
                       {isOpen && (
                         <div className="mobile-submenu">
-                          {navItem.items.map((subItem) => (
+                          {(navItem.items || []).map((subItem) => (
                             <Link
                               key={subItem.slug}
                               href={subItem.href}
@@ -811,12 +895,12 @@ const Navbar = () => {
               // Regular link
               const active = navItem.matchExact
                 ? router.pathname === navItem.href
-                : router.pathname.startsWith(navItem.href);
+                : (navItem.href ? router.pathname.startsWith(navItem.href) : false);
 
               return (
                 <li key={navItem.id} className={`nav-item ${active ? 'active' : ''}`}>
                   <Link
-                    href={navItem.href}
+                    href={navItem.href || '/'}
                     className={`nav-link ${active ? 'active' : ''}`}
                     onClick={closeMenu}
                   >
@@ -856,13 +940,11 @@ const Navbar = () => {
               )}
             </li>
 
-            {/* Minimalist gliding active indicator */}
             <div className="nav-indicator d-none d-lg-block" style={indicatorStyle} />
           </ul>
 
           {/* DESKTOP RIGHT ACTION SECTION */}
           <div className="d-none d-lg-flex align-items-center gap-3 ms-auto">
-            {/* Search Input Box with Attached Dual Dropdown */}
             <div className="search-wrapper position-relative" ref={searchWrapperRef}>
               <form onSubmit={handleSearch} className="expanded-search-form">
                 <div className="expanded-search-box">
@@ -895,15 +977,13 @@ const Navbar = () => {
                 </div>
               </form>
 
-              {/* DUAL DROPDOWN FOR MOVIES & ACTORS */}
               {renderDualSearchDropdown()}
             </div>
 
-            {/* Profile Avatar & Minimalist Dropdown */}
             <div
               className="profile-avatar position-relative"
               onClick={handleAvatarClick}
-              title={isAuthenticated ? (user?.fullname || user?.name || "Tài khoản cá nhân") : "Tài khoản / Đăng nhập"}
+              title={isAuthenticated ? (user?.fullname || user?.name || 'Tài khoản cá nhân') : 'Tài khoản / Đăng nhập'}
             >
               <UserAvatarDisplay user={user} size={36} className="avatar-desktop" />
               {isAuthenticated && <div className="user-status-indicator" />}
@@ -997,17 +1077,15 @@ const Navbar = () => {
         </div>
       )}
 
+      {/* FeedbackForm: .js dep, cast through unknown for strict TS */}
       {showFeedbackForm && (
-        <FeedbackForm
-          ref={feedbackRef}
+        <FeedbackFormComponent
           isOpen={showFeedbackForm}
           onClose={() => setShowFeedbackForm(false)}
         />
       )}
 
-      {/* MINIMALIST MODERN DESIGN SYSTEM STYLES */}
       <style jsx global>{`
-        /* Minimalist Header Shell */
         .navbar {
           height: 64px;
           transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -1044,7 +1122,6 @@ const Navbar = () => {
           transform: scale(1.02);
         }
 
-        /* Minimalist Navigation Items */
         .navbar-nav {
           position: relative;
           gap: 2px;
@@ -1095,7 +1172,6 @@ const Navbar = () => {
           color: #e50914 !important;
         }
 
-        /* Sliding Red Glowing Underline Indicator */
         .nav-indicator {
           position: absolute;
           bottom: -4px;
@@ -1107,7 +1183,6 @@ const Navbar = () => {
           pointer-events: none;
         }
 
-        /* Dropdown Wrapper & Popovers */
         .dropdown-wrapper {
           position: relative;
         }
@@ -1125,7 +1200,6 @@ const Navbar = () => {
           z-index: 1050;
         }
 
-        /* Genres Popover - Expansive 4-column balanced grid */
         .genres-popover {
           width: 660px;
           max-width: calc(100vw - 32px);
@@ -1139,7 +1213,6 @@ const Navbar = () => {
           gap: 4px 8px;
         }
 
-        /* Countries Popover - Expansive 3-column balanced grid */
         .countries-popover {
           width: 520px;
           max-width: calc(100vw - 32px);
@@ -1180,7 +1253,6 @@ const Navbar = () => {
           min-width: 0;
         }
 
-        /* Search Input Box - Permanently Wide & Consistent */
         .expanded-search-form {
           display: flex;
           align-items: center;
@@ -1255,7 +1327,6 @@ const Navbar = () => {
           transform: scale(1.1);
         }
 
-        /* DUAL SEARCH DROPDOWN (MOVIES & ACTORS) */
         .search-dual-dropdown {
           position: absolute;
           top: calc(100% + 10px);
@@ -1309,7 +1380,6 @@ const Navbar = () => {
           padding: 8px;
         }
 
-        /* Sleek scrollbar */
         .search-dual-body::-webkit-scrollbar {
           width: 5px;
         }
@@ -1357,7 +1427,6 @@ const Navbar = () => {
           gap: 3px;
         }
 
-        /* Movie Row */
         .search-movie-row {
           display: flex;
           align-items: center;
@@ -1444,7 +1513,6 @@ const Navbar = () => {
           color: #38bdf8;
         }
 
-        /* Actor Row */
         .search-actor-row {
           display: flex;
           align-items: center;
@@ -1550,7 +1618,6 @@ const Navbar = () => {
           text-decoration: underline;
         }
 
-        /* Profile Avatar & Menu */
         .profile-avatar {
           cursor: pointer;
           display: flex;
@@ -1646,7 +1713,6 @@ const Navbar = () => {
           border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        /* Responsive Media Queries for Navbar & Search */
         @media (min-width: 992px) and (max-width: 1199px) {
           .nav-link,
           .nav-link-btn {
@@ -1673,7 +1739,6 @@ const Navbar = () => {
           }
         }
 
-        /* Mobile Drawer & Mobile Search Specifics */
         @media (max-width: 991px) {
           .navbar-collapse {
             position: fixed;
