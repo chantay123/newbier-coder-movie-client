@@ -1,5 +1,5 @@
 /**
- * @file HeroBanner.js
+ * @file HeroBanner.tsx
  * @description Cinematic hero banner component with spotlight movie rotation and clean data handling.
  */
 
@@ -13,10 +13,54 @@ import {
   LOCAL_DEFAULT_BACKDROP
 } from '@/config/movieConfig';
 
+/** Category entry dùng cho pill chips */
+interface CategoryEntry {
+  slug?: string;
+  name?: string;
+}
+
+/** Movie thô từ API - loose shape */
+export type HeroMovie = Record<string, unknown> & {
+  _id?: string;
+  id?: string;
+  slug?: string;
+  name?: string;
+  origin_name?: string;
+  rating?: number | string;
+  quality?: string;
+  lang?: string;
+  year?: number | string;
+  time?: string;
+  content?: string;
+  description?: string;
+  status?: string;
+  type?: string;
+  episode_current?: string;
+  episode_total?: number;
+  category?: CategoryEntry[];
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+};
+
+/** Props cho HeroBanner */
+export interface HeroBannerProps {
+  movies?: HeroMovie[];
+  loading?: boolean;
+  onPlayTrailer?: (movie: HeroMovie) => void;
+}
+
+/** Props cho SpotlightDock */
+interface SpotlightDockProps {
+  movies: HeroMovie[];
+  currentIndex: number;
+  onSelect: (index: number) => void;
+}
+
 /**
  * Skeleton component preserving exact 100vh / 680px hero bounding box while loading.
  */
-export const HeroBannerSkeleton = () => {
+export const HeroBannerSkeleton: React.FC = () => {
   return (
     <section className={styles.heroBanner} aria-label="Đang tải phim tiêu điểm" style={{ pointerEvents: 'none' }}>
       {/* Background Media Placeholder with shimmer */}
@@ -104,11 +148,8 @@ export const HeroBannerSkeleton = () => {
 
 /**
  * Truncates text to a specified maximum length with ellipsis.
- * @param {string} text - Raw input text to truncate.
- * @param {number} maxLength - Maximum character count allowed.
- * @returns {string} Truncated string with trailing ellipsis if needed.
  */
-const truncateText = (text, maxLength) => {
+const truncateText = (text: string | null | undefined, maxLength: number): string => {
   if (!text) return '';
   return text.length > maxLength ? `${text.substring(0, maxLength).trim()}...` : text;
 };
@@ -116,10 +157,8 @@ const truncateText = (text, maxLength) => {
 /**
  * Resolves episode, series progress, or release status for badges.
  * Gracefully returns null for standalone released movies.
- * @param {Object} movie - Movie data object.
- * @returns {string|null} Formatted status label or null.
  */
-const resolveSeriesStatus = (movie) => {
+const resolveSeriesStatus = (movie: HeroMovie | null | undefined): string | null => {
   if (!movie) return null;
   if (movie.status === 'upcoming') {
     return 'Sắp khởi chiếu';
@@ -139,10 +178,8 @@ const resolveSeriesStatus = (movie) => {
 /**
  * Renders an interactive row of clickable category pill chips.
  * Gracefully returns null if no categories exist or if the array is empty.
- * @param {Array<Object>} categories - Array of category objects.
- * @returns {JSX.Element|null} Rendered category navigation container or null.
  */
-const renderCategoryPills = (categories) => {
+const renderCategoryPills = (categories: CategoryEntry[] | undefined | null): React.ReactNode => {
   if (!categories || !Array.isArray(categories) || categories.length === 0) {
     return null;
   }
@@ -170,13 +207,8 @@ const renderCategoryPills = (categories) => {
 /**
  * Renders an Apple TV+ style bottom-right horizontal floating dock for featured spotlight movies.
  * Leaves the entire upper backdrop open, uncluttered, and luminous for character art.
- * @param {Object} props - Component properties.
- * @param {Array<Object>} props.movies - Array of featured playlist movies.
- * @param {number} props.currentIndex - Currently active movie index.
- * @param {Function} props.onSelect - Callback invoked when a movie card is clicked.
- * @returns {JSX.Element|null} Rendered dock element or null.
  */
-const SpotlightDock = ({ movies, currentIndex, onSelect }) => {
+const SpotlightDock: React.FC<SpotlightDockProps> = ({ movies, currentIndex, onSelect }) => {
   if (!movies || movies.length <= 1) return null;
 
   return (
@@ -188,7 +220,7 @@ const SpotlightDock = ({ movies, currentIndex, onSelect }) => {
 
           return (
             <button
-              key={movie._id || idx}
+              key={movie._id || String(idx)}
               type="button"
               role="tab"
               aria-selected={isActive}
@@ -202,8 +234,9 @@ const SpotlightDock = ({ movies, currentIndex, onSelect }) => {
                 className={styles.dockThumbImg}
                 loading="lazy"
                 onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = LOCAL_DEFAULT_BACKDROP;
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = LOCAL_DEFAULT_BACKDROP;
                 }}
               />
               {isActive && (
@@ -223,24 +256,19 @@ const SpotlightDock = ({ movies, currentIndex, onSelect }) => {
 
 /**
  * HeroBanner component for displaying featured cinematic movies.
- * @param {Object} props
- * @param {Array<Object>} [props.movies] - Featured playlist movies passed from page/hook.
- * @param {Function} [props.onPlayTrailer] - Callback to open trailer modal.
- * @returns {JSX.Element} Rendered hero banner.
  */
-const HeroBanner = ({ movies = [], loading = false, onPlayTrailer }) => {
+const HeroBanner: React.FC<HeroBannerProps> = ({ movies = [], loading = false, onPlayTrailer }) => {
   // Use passed movies normalized defensively
   const rawList = movies && Array.isArray(movies) && movies.length > 0 ? movies.slice(0, 5) : [];
-  const candidateMovies = rawList.map((m, idx) => normalizeHeroMovie(m, idx));
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const candidateMovies = rawList.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as HeroMovie);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
 
   const activeMovie = candidateMovies[currentIndex] || candidateMovies[0];
 
   /**
    * Advances the hero spotlight to the next featured movie.
-   * @returns {void}
    */
-  const handleNextSpotlight = useCallback(() => {
+  const handleNextSpotlight = useCallback((): void => {
     if (candidateMovies.length <= 1) return;
     setCurrentIndex((prev) => (prev + 1) % candidateMovies.length);
   }, [candidateMovies.length]);
@@ -256,10 +284,8 @@ const HeroBanner = ({ movies = [], loading = false, onPlayTrailer }) => {
 
   /**
    * Selects a specific featured movie by index.
-   * @param {number} index - Index of candidate movie to activate.
-   * @returns {void}
    */
-  const handleSelectSpotlight = (index) => {
+  const handleSelectSpotlight = (index: number): void => {
     setCurrentIndex(index);
   };
 
@@ -274,13 +300,14 @@ const HeroBanner = ({ movies = [], loading = false, onPlayTrailer }) => {
       {/* Background Media */}
       <div className={styles.heroImage}>
         <img
-          key={activeMovie._id || currentIndex}
+          key={activeMovie._id || String(currentIndex)}
           src={activeMovie.backdrop_url}
           alt={activeMovie.name || 'Featured Movie'}
           className={styles.bannerImage}
           onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = LOCAL_DEFAULT_BACKDROP;
+            const img = e.currentTarget as HTMLImageElement;
+            img.onerror = null;
+            img.src = LOCAL_DEFAULT_BACKDROP;
           }}
         />
         <div className={styles.overlay} />

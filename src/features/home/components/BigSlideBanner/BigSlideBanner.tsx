@@ -1,15 +1,51 @@
+/**
+ * @file BigSlideBanner.tsx
+ * @description Cinematic widescreen anime spotlight banner.
+ * Elevated height with minimal filter overlays to highlight vivid anime artwork.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Skeleton from '@/components/UI/Skeleton';
 import SectionHeader from '@/components/common/MovieSection/SectionHeader';
 import styles from './BigSlideBanner.module.css';
 
-export const BigSlideBannerSkeleton = ({ title = "Tiêu Điểm Anime" }) => (
+/** Movie thô từ API - loose shape */
+export type SpotlightMovie = Record<string, unknown> & {
+  _id?: string;
+  id?: string;
+  slug?: string;
+  name?: string;
+  origin_name?: string;
+  rating?: number | string;
+  quality?: string;
+  lang?: string;
+  year?: number | string;
+  time?: string;
+  content?: string;
+  status?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+};
+
+/** Props cho BigSlideBanner */
+export interface BigSlideBannerProps {
+  movies?: SpotlightMovie[];
+  loading?: boolean;
+  onPlayTrailer?: (movie: SpotlightMovie) => void;
+  title?: string;
+  badge?: string;
+  viewAllHref?: string;
+  autoPlayInterval?: number;
+}
+
+/** Skeleton export */
+export const BigSlideBannerSkeleton: React.FC<{ title?: string }> = ({ title = 'Tiêu Điểm Anime' }) => (
   <section className={styles.bigSlideSection} aria-label="Đang tải anime tiêu điểm">
     {title && (
       <SectionHeader
         title={title}
-        // badge="ĐỘC BẢN"
         viewAllHref="/the-loai/hoat-hinh"
         viewAllText="Xem tất cả anime"
       />
@@ -48,45 +84,31 @@ export const BigSlideBannerSkeleton = ({ title = "Tiêu Điểm Anime" }) => (
   </section>
 );
 
-/**
- * @file BigSlideBanner.js
- * @description Cinematic widescreen anime spotlight banner.
- * Elevated height with minimal filter overlays to highlight vivid anime artwork.
- *
- * @param {Object} props
- * @param {Array<Object>} [props.movies] - List of movies to showcase.
- * @param {boolean} [props.loading=false] - Loading state
- * @param {Function} [props.onPlayTrailer] - Callback to open the trailer modal.
- * @param {string} [props.title="Tiêu Điểm Anime"] - Section header title.
- * @param {string} [props.badge="ANIME SPOTLIGHT"] - Top badge label.
- * @param {string} [props.viewAllHref="/the-loai/hoat-hinh"] - Link for view all.
- * @param {number} [props.autoPlayInterval=7000] - Duration per slide in ms.
- */
-export default function BigSlideBanner({
+const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
   movies = [],
   loading = false,
   onPlayTrailer,
-  title = "Tiêu Điểm Anime",
-  badge = "ANIME SPOTLIGHT",
-  viewAllHref = "/the-loai/hoat-hinh",
+  title = 'Tiêu Điểm Anime',
+  badge = 'ANIME SPOTLIGHT',
+  viewAllHref = '/the-loai/hoat-hinh',
   autoPlayInterval = 7000
-}) {
-  const displayMovies = Array.isArray(movies) ? movies : [];
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const timerRef = useRef(null);
-  const progressTimerRef = useRef(null);
+}) => {
+  const displayMovies: SpotlightMovie[] = Array.isArray(movies) ? movies : [];
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const currentMovie = displayMovies[currentIndex] || displayMovies[0];
+  const currentMovie: SpotlightMovie | undefined = displayMovies[currentIndex] || displayMovies[0];
 
   // Auto-play logic with progress bar
   useEffect(() => {
     if (!displayMovies || displayMovies.length <= 1) return;
 
     if (isPaused) {
-      clearInterval(timerRef.current);
-      clearInterval(progressTimerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
       return;
     }
 
@@ -106,12 +128,12 @@ export default function BigSlideBanner({
     }, autoPlayInterval);
 
     return () => {
-      clearInterval(timerRef.current);
-      clearInterval(progressTimerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
   }, [currentIndex, isPaused, displayMovies, autoPlayInterval]);
 
-  const handleSelectSlide = (index) => {
+  const handleSelectSlide = (index: number): void => {
     setCurrentIndex(index);
     setProgress(0);
   };
@@ -130,11 +152,10 @@ export default function BigSlideBanner({
 
   return (
     <section className={styles.bigSlideSection} aria-label="Tiêu Điểm Anime">
-      {/* Section Header to easily identify this exclusive feature on homepage */}
+      {/* Section Header */}
       {title && (
         <SectionHeader
           title={title}
-          // badge="ĐỘC BẢN"
           viewAllHref={viewAllHref}
           viewAllText="Xem tất cả anime"
         />
@@ -146,7 +167,7 @@ export default function BigSlideBanner({
         onMouseLeave={() => setIsPaused(false)}
       >
         <div className={styles.slideWrapper}>
-          {/* Background Backdrop Image with bright, clean display */}
+          {/* Background Backdrop Image */}
           <img
             key={currentMovie._id || currentMovie.slug}
             src={currentMovie.backdrop_url || currentMovie.poster_url || currentMovie.thumb_url}
@@ -211,7 +232,7 @@ export default function BigSlideBanner({
             <div className={styles.thumbnailsNav}>
               {displayMovies.slice(0, 5).map((movie, idx) => (
                 <div
-                  key={movie._id || movie.slug || idx}
+                  key={movie._id || movie.slug || String(idx)}
                   className={`${styles.thumbItem} ${idx === currentIndex ? styles.thumbItemActive : ''}`}
                   onClick={() => handleSelectSlide(idx)}
                   title={movie.name}
@@ -236,4 +257,6 @@ export default function BigSlideBanner({
       </div>
     </section>
   );
-}
+};
+
+export default BigSlideBanner;
