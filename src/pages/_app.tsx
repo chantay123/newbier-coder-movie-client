@@ -11,16 +11,16 @@ import '../styles/animation.css';
 import '../styles/subscription-details.css';
 import '../styles/feedbackAdmin.css';
 import { SessionProvider } from 'next-auth/react';
-import { AuthProvider, withAccountStatus } from '../utils/auth';
+import { AuthProvider, withAccountStatus } from '@/utils/auth';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import Layout from '../components/Layout';
-import OfflineNotice from '../components/OfflineNotice';
-import NetworkStatusBar from '../components/NetworkStatusBar';
-import CinemaAlert from '../components/UI/CinemaAlert';
-import AdContextProvider from '../context/AdContext';
-import { registerServiceWorker } from '../utils/serviceWorker';
-import { ROUTES } from '../config/routesConfig';
+import Layout from '@/layouts/ClientLayout';
+import OfflineNotice from '@/features/shared/components/UI/OfflineNotice';
+import NetworkStatusBar from '@/features/shared/components/UI/NetworkStatusBar';
+import CinemaAlert from '@/features/shared/components/UI/CinemaAlert';
+import AdContextProvider from '@/context/AdContext';
+import { registerServiceWorker } from '@/utils/serviceWorker';
+import { ROUTES } from '@/config/routesConfig';
 
 type AppPageProps = AppProps & { session?: unknown };
 

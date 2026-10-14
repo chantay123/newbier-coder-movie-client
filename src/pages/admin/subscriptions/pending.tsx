@@ -13,8 +13,8 @@ import {
   FaCalendarAlt,
   FaInfoCircle
 } from 'react-icons/fa';
-import subscriptionService from '../../../API/services/subscriptionService';
-import styles from '../../../styles/Admin.module.css';
+import subscriptionService from '@/API/services/subscriptionService';
+import styles from '@/styles/Admin.module.css';
 
 interface SubscriptionUser {
   fullname?: string;
@@ -88,9 +88,6 @@ const PendingSubscriptionsPage: React.FC = () => {
   const fetchPendingSubscriptions = async (page: number = 1): Promise<void> => {
     try {
       setLoading(true);
-      // subscriptionService is still a .js file with implicit `any` typing,
-      // but allowJs may still report a fixed-arity signature. Cast through
-      // an explicit object shape that permits the page arg.
       const svc = subscriptionService as unknown as {
         getAdminPendingSubscriptions: (p?: number) => Promise<PendingResponse | null>;
       };
@@ -128,9 +125,10 @@ const PendingSubscriptionsPage: React.FC = () => {
     try {
       setProcessingAction(true);
       if (modalAction === 'approve') {
-        const response = (await subscriptionService.approveSubscription(
-          selectedSubscription._id
-        )) as ServiceResult;
+        const svc = subscriptionService as unknown as {
+          approveSubscription: (id: string) => Promise<ServiceResult>;
+        };
+        const response = (await svc.approveSubscription(selectedSubscription._id)) as ServiceResult;
         if (response.success) {
           toast.success('Phê duyệt đăng ký thành công!');
           setPendingSubscriptions((prev) => prev.filter((s) => s._id !== selectedSubscription._id));
@@ -138,10 +136,12 @@ const PendingSubscriptionsPage: React.FC = () => {
           toast.error(response.message || 'Phê duyệt không thành công. Vui lòng thử lại!');
         }
       } else if (modalAction === 'reject') {
-        const response = (await subscriptionService.rejectSubscription(
-          selectedSubscription._id,
-          { reason: rejectionReason }
-        )) as ServiceResult;
+        const svc = subscriptionService as unknown as {
+          rejectSubscription: (id: string, payload: { reason: string }) => Promise<ServiceResult>;
+        };
+        const response = (await svc.rejectSubscription(selectedSubscription._id, {
+          reason: rejectionReason
+        })) as ServiceResult;
         if (response.success) {
           toast.success('Từ chối đăng ký thành công!');
           setPendingSubscriptions((prev) => prev.filter((s) => s._id !== selectedSubscription._id));
@@ -166,11 +166,9 @@ const PendingSubscriptionsPage: React.FC = () => {
     if (page < 1 || page > pagination.pages || page === pagination.page) return;
     try {
       setLoading(true);
-      // The .js service is exported as `any` in our TS surface, so an `unknown`
-      // narrowing is unnecessary; the cast is a no-op and just tells the reader
-      // that this call intentionally passes a page argument.
-      const response = await (subscriptionService as { getAdminPendingSubscriptions: (p?: number) => Promise<PendingResponse | null> })
-        .getAdminPendingSubscriptions(page);
+      const response = await (subscriptionService as unknown as {
+        getAdminPendingSubscriptions: (p?: number) => Promise<PendingResponse | null>;
+      }).getAdminPendingSubscriptions(page);
       if (response) {
         setPendingSubscriptions(response.pendingSubscriptions || []);
         setPagination(response.pagination || { page: 1, pages: 1, total: 0 });

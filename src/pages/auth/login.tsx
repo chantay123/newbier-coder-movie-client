@@ -7,10 +7,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { signIn } from 'next-auth/react';
 import axios, { AxiosError } from 'axios';
-import { useAuth } from '../../utils/auth';
-import { signInWithFacebook } from '../../utils/firebase';
-import { AUTH_CONFIG } from '../../config/authConfig';
-import styles from '../../styles/Login.module.css';
+import { useAuth } from '@/utils/auth';
+import { AUTH_CONFIG } from '@/config/authConfig';
+import styles from '@/styles/Login.module.css';
 import type { NextPage } from 'next';
 import type { ReactElement } from 'react';
 
@@ -26,7 +25,7 @@ import {
 
 const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = () => {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, loading: authLoading, user } = useAuth();
   const t = AUTH_CONFIG.login;
 
   const [email, setEmail] = useState<string>('');
@@ -36,9 +35,36 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
   const [message, setMessage] = useState<string>('');
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [artworkSrc, setArtworkSrc] = useState<string>(
     AUTH_CONFIG.artwork?.defaultLoginImage || AUTH_CONFIG.defaultLoginArtwork
   );
+
+  // Re-hydrate the remember-me checkbox from localStorage so the choice
+  // persists across visits when the user previously opted in.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      setRememberMe(localStorage.getItem('remember_me') === '1');
+    } catch {
+      /* localStorage may be disabled */
+    }
+  }, []);
+
+  // If the visitor is already authenticated, send them straight to the
+  // post-login destination so the Login form is never shown to a logged-in
+  // user. We wait for `authLoading` to settle so we never redirect based on
+  // a stale null user before the auth context finishes restoring the
+  // session.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) return;
+    if (typeof window === 'undefined') return;
+    const redirectQuery = router.query.redirect;
+    const redirectUrl =
+      typeof redirectQuery === 'string' && redirectQuery ? redirectQuery : '/';
+    router.replace(redirectUrl);
+  }, [authLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (router.query.registered) {
@@ -62,7 +88,8 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
       const result = await login({
         username: email.trim(),
         email: email.trim(),
-        password
+        password,
+        rememberMe
       });
 
       if (result.success) {
@@ -114,46 +141,6 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
     }
   };
 
-  const handleFacebookSignIn = async (): Promise<void> => {
-    try {
-      setSocialLoading('facebook');
-      setError('');
-      const result = await signInWithFacebook();
-
-      if (result.success) {
-        const fbUser = result.user;
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/facebook-login`, {
-          email: fbUser?.email || `${fbUser?.uid}@facebook.com`,
-          name: fbUser?.displayName,
-          facebookId: fbUser?.uid,
-          picture: fbUser?.photoURL
-        });
-
-        if (response.data && response.data.token) {
-          localStorage.setItem('token', response.data.token);
-          localStorage.setItem('user', JSON.stringify(response.data.user));
-          window.dispatchEvent(new Event('storage'));
-          axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-
-          const redirectQuery = router.query.redirect;
-          const redirectUrl =
-            typeof redirectQuery === 'string' && redirectQuery ? redirectQuery : '/';
-          router.push(redirectUrl);
-        } else {
-          setError(response.data?.error || t.social.facebookFailed);
-        }
-      } else {
-        setError(result.error || t.social.facebookFailed);
-      }
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      console.error('Facebook sign in error:', err);
-      setError(axiosErr.message || t.social.facebookFailed);
-    } finally {
-      setSocialLoading(null);
-    }
-  };
-
   const handleGithubSignIn = async (): Promise<void> => {
     try {
       setSocialLoading('github');
@@ -199,6 +186,29 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
   const handleArtworkError = (): void => {
     if (artworkSrc !== '/img/chantay.jpg') setArtworkSrc('/img/chantay.jpg');
   };
+
+  // Show a short loading state while the auth context finishes restoring
+  // an existing session, or when we are about to redirect a logged-in user
+  // away from this page. This prevents the Login form from flashing on
+  // top of an already-authenticated session.
+  if (authLoading || (isAuthenticated && !!user)) {
+    return (
+      <div className={styles.loginPage}>
+        <Head>
+          <title>{t.meta.title}</title>
+          <meta name="description" content={t.meta.description} />
+        </Head>
+        <div className={styles.formSide}>
+          <div className={styles.formContainer}>
+            <div className={styles.header}>
+              <h1 className={styles.title}>{t.header.title}</h1>
+              <p className={styles.subtitle}>Đang khôi phục phiên đăng nhập…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.loginPage}>
@@ -279,6 +289,18 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
               </div>
             )}
 
+            <label className={styles.rememberRow} htmlFor="login-remember">
+              <input
+                type="checkbox"
+                id="login-remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={isLoading}
+                aria-label={t.remember.ariaLabel}
+              />
+              <span className={styles.rememberLabel}>{t.remember.label}</span>
+            </label>
+
             <button
               type="submit"
               id="login-submit"
@@ -292,7 +314,6 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
           {/* Social buttons preserved for future re-enable */}
           <div style={{ display: 'none' }} aria-hidden>
             <button type="button" onClick={handleGoogleSignIn}>Google</button>
-            <button type="button" onClick={handleFacebookSignIn}>Facebook</button>
             <button type="button" onClick={handleGithubSignIn}>GitHub</button>
             <button type="button" onClick={handleLinkedinSignIn}>LinkedIn</button>
           </div>

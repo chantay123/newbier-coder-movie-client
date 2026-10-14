@@ -3,9 +3,9 @@
  */
 import { useState } from 'react';
 import Head from 'next/head';
-import AuthForm from '../../components/Auth/AuthForm';
+import AuthForm from '@/features/shared/components/Auth/AuthForm';
 import { useRouter } from 'next/router';
-import { useAuth } from '../../utils/auth';
+import { useAuth } from '@/utils/auth';
 
 interface SignupCredentials {
   fullname: string;

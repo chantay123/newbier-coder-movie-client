@@ -1,0 +1,710 @@
+/**
+ * @file auth.tsx
+ * @description Auth context: exposes user, login/register/logout, account-lock
+ * detection via periodic poll and WebSocket, and HOCs for guarding routes.
+ */
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState
+} from 'react';
+import { useRouter } from 'next/router';
+import { useSession, signOut, type SessionProviderProps } from 'next-auth/react';
+import authService from '@/API/services/authService';
+
+export interface AuthUser {
+  _id?: string;
+  fullname?: string;
+  email?: string;
+  username?: string;
+  avatar?: string;
+  role?: string;
+  isAdmin?: boolean;
+  backendToken?: string;
+  isActive?: boolean;
+  [key: string]: unknown;
+}
+
+export interface LoginCredentials {
+  identifier?: string;
+  email?: string;
+  password: string;
+  [key: string]: unknown;
+}
+
+export interface RegisterPayload {
+  fullname: string;
+  username?: string;
+  email: string;
+  password: string;
+  [key: string]: unknown;
+}
+
+export interface AuthResult {
+  success: boolean;
+  data?: unknown;
+  user?: AuthUser;
+  error?: string;
+  isAccountLocked?: boolean;
+}
+
+export interface AuthContextValue {
+  user: AuthUser | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+  isAccountLocked: boolean;
+  showAccountLockedBanner: boolean;
+  status: 'loading' | 'authenticated' | 'unauthenticated';
+  login: (credentials: LoginCredentials) => Promise<AuthResult>;
+  register: (payload: RegisterPayload) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Record<string, unknown>) => Promise<AuthResult>;
+  uploadAvatar: (file: File) => Promise<{ success: boolean; avatarUrl?: string; error?: string; isAccountLocked?: boolean }>;
+  refreshUser: () => Promise<AuthUser | null>;
+  hideAccountLockedBanner: () => void;
+  resetAccountLockStatus: () => void;
+  updateAvatarInUI: (user: AuthUser) => string | null;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+interface AuthProviderProps {
+  children: ReactNode;
+  session?: SessionProviderProps['session'];
+}
+
+const ACCOUNT_LOCKED_ROUTE = '/common/account-locked';
+const LOGIN_ROUTE = '/auth/login';
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isAccountLocked, setIsAccountLocked] = useState<boolean>(false);
+  const [showAccountLockedBanner, setShowAccountLockedBanner] = useState<boolean>(false);
+
+  const router = useRouter();
+  const wsRef = useRef<WebSocket | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const logoutInFlightRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
+
+  // Track NextAuth session
+  const { data: session, status: sessionStatus } = useSession();
+
+  // React Strict Mode safe mount tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Listen to localStorage changes (cross-tab login/logout)
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleStorageChange = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (err) {
+          console.error('Error parsing user from localStorage:', err);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Resolve initial user from session, localStorage, or authService
+  useEffect(() => {
+    const checkLoggedIn = async () => {
+      if (typeof window === 'undefined') {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        if (session?.user) {
+          type SessionWithToken = { backendToken?: string; user: AuthUser };
+          const backendToken = (session as SessionWithToken).backendToken;
+          if (backendToken) {
+            localStorage.setItem('auth_token', backendToken);
+            sessionStorage.setItem('backendToken', backendToken);
+            const userWithToken: AuthUser = {
+              ...(session.user as AuthUser),
+              backendToken
+            };
+            localStorage.setItem('user', JSON.stringify(userWithToken));
+            setUser(userWithToken);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Read remember-me flag once so we know where to look for tokens.
+        const remembered = localStorage.getItem('remember_me') === '1';
+
+        // Access token: remember-me → localStorage, otherwise sessionStorage
+        // (still fall back to localStorage so tab reload keeps user logged in
+        //  within the same session).
+        const accessToken = (() => {
+          if (remembered) {
+            return localStorage.getItem('token') || localStorage.getItem('auth_token');
+          }
+          const fromSession = window.sessionStorage
+            ? window.sessionStorage.getItem('token') || window.sessionStorage.getItem('auth_token')
+            : null;
+          return fromSession || localStorage.getItem('token') || localStorage.getItem('auth_token');
+        })();
+
+        // User payload: remember-me → localStorage, otherwise sessionStorage
+        // (with localStorage fallback for tab reload).
+        const storedUser = (() => {
+          if (remembered) return localStorage.getItem('user');
+          const fromSession = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
+          return fromSession || localStorage.getItem('user');
+        })();
+
+        if (accessToken && storedUser) {
+          try {
+            setUser(JSON.parse(storedUser));
+          } catch (err) {
+            console.error('Error parsing user from localStorage:', err);
+          }
+        } else {
+          const currentUser = authService.getCurrentUser() as AuthUser | null;
+          if (currentUser) setUser(currentUser);
+        }
+      } catch (err) {
+        console.error('Error checking authentication:', err);
+        setError('Could not check authentication status');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkLoggedIn();
+  }, [session, sessionStatus, router.pathname]);
+
+  /**
+   * Polls backend to confirm the user account is still active.
+   * Throttled to once every 30s and disabled for the rest of the session
+   * after the first NOT_IMPLEMENTED response. Lock notifications still
+   * arrive via WebSocket and via 403 isAccountLocked on other calls.
+   */
+  const checkAccountStatus = useCallback(async (): Promise<void> => {
+    if (typeof window === 'undefined') return;
+    if (window.sessionStorage.getItem('accountStatusDisabled') === '1') return;
+
+    const pathname = window.location.pathname;
+    if (pathname === ACCOUNT_LOCKED_ROUTE || pathname === LOGIN_ROUTE) return;
+    if (!user) return;
+
+    if (localStorage.getItem('isAccountLocked') === 'true') {
+      if (pathname !== ACCOUNT_LOCKED_ROUTE) {
+        window.location.href = ACCOUNT_LOCKED_ROUTE;
+      }
+      return;
+    }
+
+    const now = Date.now();
+    const lastCheck = parseInt(localStorage.getItem('lastAccountStatusCheck') || '0', 10);
+    if (now - lastCheck < 30000) return;
+    localStorage.setItem('lastAccountStatusCheck', now.toString());
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    abortControllerRef.current = controller;
+
+    try {
+      const result = await (authService as unknown as { checkAccountStatus: (opts: { signal: AbortSignal }) => Promise<unknown> }).checkAccountStatus({ signal: controller.signal });
+      if (!isMountedRef.current) return;
+      if (result && (result as { isAccountLocked?: boolean }).isAccountLocked && pathname !== ACCOUNT_LOCKED_ROUTE) {
+        localStorage.setItem('isAccountLocked', 'true');
+        window.location.href = ACCOUNT_LOCKED_ROUTE;
+      }
+    } catch (err) {
+      if (!isMountedRef.current) return;
+      const e = err as { name?: string; code?: string; message?: string };
+      if (e?.name === 'AbortError') return;
+      if (e?.code === 'NOT_IMPLEMENTED') {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem('accountStatusDisabled', '1');
+          if (!window.sessionStorage.getItem('accountStatusDisabledLogged')) {
+            window.sessionStorage.setItem('accountStatusDisabledLogged', '1');
+            console.info(
+              '[Auth] checkAccountStatus is disabled (no verified endpoint). ' +
+              'Lock notifications still come from the WebSocket channel and the 403 isAccountLocked signal on other API calls.'
+            );
+          }
+        }
+        return;
+      }
+      console.warn('Account status check skipped:', e?.message || e);
+    } finally {
+      clearTimeout(timeoutId);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user && user._id) {
+      checkAccountStatus();
+    }
+  }, [user, checkAccountStatus]);
+
+  /**
+   * WebSocket connection for real-time account-status notifications.
+   * Honors NEXT_PUBLIC_WS_ENABLED, uses exponential backoff with caps, and
+   * stops reconnecting on hard 4xx close codes.
+   */
+  useEffect(() => {
+    if (!user || !user._id) return;
+    if (process.env.NEXT_PUBLIC_WS_ENABLED === 'false') return;
+
+    let cancelled = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let ws: WebSocket | null = null;
+    let attempts = 0;
+
+    const buildWsUrl = (): string | null => {
+      const explicit = process.env.NEXT_PUBLIC_WS_URL;
+      if (explicit) {
+        if (/^wss?:\/\//i.test(explicit)) return explicit;
+        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        return `${protocol}://${explicit.replace(/^https?:\/\//, '').replace(/\/+$/, '')}/ws`;
+      }
+      const core = process.env.NEXT_PUBLIC_CORE_API_URL;
+      const legacy = process.env.NEXT_PUBLIC_API_URL;
+      const base = (core || legacy || '').replace(/\/+$/, '');
+      if (!base) return null;
+      const host = base.replace(/^https?:\/\//, '');
+      if (!host) return null;
+      if (typeof window !== 'undefined' && host === window.location.host) return null;
+      const protocol = base.startsWith('https://') ? 'wss'
+        : base.startsWith('http://') ? 'ws'
+        : (window.location.protocol === 'https:' ? 'wss' : 'ws');
+      return `${protocol}://${host}/ws`;
+    };
+
+    const wsUrl = buildWsUrl();
+    if (!wsUrl) {
+      console.info(
+        '[WS] disabled (no resolvable host). Real-time lock notifications rely on this channel; verify backend support.'
+      );
+      return undefined;
+    }
+
+    const logScope = '[WS]';
+
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      if (!user || !user._id) return;
+      if (reconnectTimer) return;
+      const delay = Math.min(30000, 2000 * Math.pow(2, Math.min(attempts, 4)));
+      attempts += 1;
+      if (attempts > 8) {
+        console.warn(`${logScope} giving up after ${attempts} attempts.`);
+        return;
+      }
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        if (!cancelled) connect();
+      }, delay);
+    };
+
+    const connect = () => {
+      if (cancelled) return;
+      try {
+        ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+      } catch (err) {
+        console.warn(`${logScope} failed to construct WebSocket:`, (err as Error)?.message);
+        scheduleReconnect();
+        return;
+      }
+
+      ws.onopen = () => {
+        attempts = 0;
+        console.info(`${logScope} connected: ${wsUrl}`);
+        const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
+        if (token && ws && ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(JSON.stringify({ type: 'authenticate', token }));
+          } catch (sendErr) {
+            console.warn(`${logScope} failed to send authenticate:`, (sendErr as Error)?.message);
+          }
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as { type?: string; userId?: string; isActive?: boolean; message?: string };
+          if (data.type === 'account_status_changed' && data.userId === user._id) {
+            if (data.isActive === false) {
+              setIsAccountLocked(true);
+              setShowAccountLockedBanner(true);
+              localStorage.setItem('isAccountLocked', 'true');
+            } else if (data.isActive === true) {
+              setIsAccountLocked(false);
+              setShowAccountLockedBanner(false);
+              localStorage.removeItem('isAccountLocked');
+              alert(data.message || 'Your account has been unlocked.');
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing WebSocket message:', err);
+        }
+      };
+
+      ws.onerror = () => {
+        console.warn(`${logScope} error event received (url=${wsUrl}, readyState=${ws?.readyState})`);
+      };
+
+      ws.onclose = (event) => {
+        console.info(
+          `${logScope} closed (code=${event?.code}, reason="${event?.reason || ''}", wasClean=${event?.wasClean})`
+        );
+        if (cancelled) return;
+        if (!user || !user._id) return;
+        if (document.visibilityState === 'hidden') return;
+        if (event?.code >= 4000 && event?.code < 5000) return;
+        scheduleReconnect();
+      };
+    };
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (ws) {
+        try {
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+            ws.close(1000, 'client cleanup');
+          }
+        } catch {
+          /* ignore */
+        }
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+      }
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
+    };
+  }, [user]);
+
+  const login = async (credentials: LoginCredentials): Promise<AuthResult> => {
+    try {
+      setError(null);
+      setIsAccountLocked(false);
+      const data = await authService.login(credentials);
+      if (data.success && data.user) {
+        localStorage.removeItem('lastAccountStatusCheck');
+        localStorage.removeItem('isAccountLocked');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.removeItem('accountStatusDisabled');
+          window.sessionStorage.removeItem('accountStatusDisabledLogged');
+        }
+        setUser(data.user as AuthUser);
+        return { success: true, data };
+      }
+      throw new Error('Login failed: no user info received');
+    } catch (err) {
+      const error = err as { response?: { data?: { isAccountLocked?: boolean } }; message?: string };
+      // Invalid credentials is an expected user-input failure, not a bug.
+      // Use warn (no stack trace) so the dev console is not spammed every
+      // time someone mistypes a password. Server/network errors still log
+      // as warn below without a stack trace.
+      console.warn('Login failed:', error?.message || err);
+      if (error.response?.data?.isAccountLocked) {
+        setIsAccountLocked(true);
+        const message = 'Your account has been locked. Please contact an administrator.';
+        setError(message);
+        return { success: false, error: message, isAccountLocked: true };
+      }
+      const message = error.message || 'Login failed';
+      setError(message);
+      return { success: false, error: message };
+    }
+  };
+
+  const register = async (userData: RegisterPayload): Promise<AuthResult> => {
+    try {
+      setError(null);
+      if (!userData.fullname) {
+        throw new Error('Full name is required');
+      }
+      const data = await authService.register(userData as unknown as { username: string; email: string; password: string; fullname?: string; [key: string]: unknown });
+      return { success: true, data };
+    } catch (err) {
+      const error = err as { message?: string };
+      console.error('Registration error in auth context:', error);
+      setError(error.message || 'Registration failed');
+      return { success: false, error: error.message || 'Registration failed' };
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    if (logoutInFlightRef.current) return;
+    logoutInFlightRef.current = true;
+    try {
+      if (session) {
+        try {
+          await signOut({ redirect: false });
+        } catch (nextAuthError) {
+          console.warn('NextAuth signOut failed (continuing):', (nextAuthError as Error)?.message);
+        }
+      }
+      try {
+        await authService.logout();
+      } catch (logoutError) {
+        console.warn('authService.logout failed (clearing local state anyway):', (logoutError as Error)?.message);
+      }
+
+      localStorage.removeItem('lastAccountStatusCheck');
+      localStorage.removeItem('isAccountLocked');
+
+      setUser(null);
+      setError(null);
+      setIsAccountLocked(false);
+      setShowAccountLockedBanner(false);
+
+      if (abortControllerRef.current) {
+        try { abortControllerRef.current.abort(); } catch { /* noop */ }
+        abortControllerRef.current = null;
+      }
+
+      // authService.logout already wipes localStorage + sessionStorage and
+      // clears the remember-me flag. Centralized so all logout paths behave
+      // identically.
+      try {
+        await authService.logout();
+      } catch (logoutCleanupError) {
+        console.warn('authService.logout cleanup error:', (logoutCleanupError as Error)?.message);
+      }
+
+      router.push(LOGIN_ROUTE);
+    } catch (err) {
+      console.error('Logout error:', err);
+      setError('Logout failed');
+    } finally {
+      logoutInFlightRef.current = false;
+    }
+  };
+
+  const updateProfile = async (profileData: Record<string, unknown>): Promise<AuthResult> => {
+    try {
+      setError(null);
+      const result = await authService.updateProfile(profileData) as { user: AuthUser };
+      setUser(result.user);
+      return { success: true, user: result.user };
+    } catch (err) {
+      const error = err as { response?: { data?: { isAccountLocked?: boolean } }; message?: string };
+      console.error('Profile update error:', error);
+      if (error.response?.data?.isAccountLocked) {
+        setIsAccountLocked(true);
+        const message = 'Your account has been locked. Please contact an administrator.';
+        setError(message);
+        return { success: false, error: message, isAccountLocked: true };
+      }
+      setError(error.message ?? 'Profile update failed');
+      return { success: false, error: error.message || 'Profile update failed' };
+    }
+  };
+
+  const uploadAvatar = async (file: File): Promise<{ success: boolean; avatarUrl?: string; error?: string; isAccountLocked?: boolean }> => {
+    try {
+      const result = await authService.uploadAvatar(file) as { user: AuthUser; avatarUrl?: string };
+      setUser(result.user);
+      return { success: true, avatarUrl: result.avatarUrl };
+    } catch (err) {
+      const error = err as { response?: { data?: { isAccountLocked?: boolean } }; message?: string };
+      console.error('Avatar upload error:', error);
+      if (error.response?.data?.isAccountLocked) {
+        setIsAccountLocked(true);
+        return {
+          success: false,
+          error: 'Your account has been locked. Please contact an administrator.',
+          isAccountLocked: true
+        };
+      }
+      return { success: false, error: error.message || 'Avatar upload failed' };
+    }
+  };
+
+  const refreshUser = async (): Promise<AuthUser | null> => {
+    try {
+      if (user) {
+        const updatedUser = (await authService.getProfile()) as AuthUser;
+        setUser(updatedUser);
+        return updatedUser;
+      }
+      return null;
+    } catch (err) {
+      const error = err as { response?: { status?: number; data?: { isAccountLocked?: boolean } } };
+      console.error('Error refreshing user data:', error);
+      if (error.response?.status === 403 && error.response?.data?.isAccountLocked) {
+        setIsAccountLocked(true);
+        setError('Your account has been locked. Please contact an administrator.');
+      }
+      return null;
+    }
+  };
+
+  const updateAvatarInUI = (updated: AuthUser): string | null => {
+    if (updated && updated.avatar) {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      let avatarUrl = String(updated.avatar);
+      if (avatarUrl.startsWith('/')) {
+        avatarUrl = `${baseUrl}${avatarUrl}`;
+      }
+      avatarUrl = `${avatarUrl}?t=${new Date().getTime()}`;
+      const currentUser: AuthUser = JSON.parse(localStorage.getItem('user') || '{}');
+      localStorage.setItem('user', JSON.stringify({ ...currentUser, avatar: avatarUrl }));
+      return avatarUrl;
+    }
+    return null;
+  };
+
+  const value: AuthContextValue = {
+    user,
+    loading,
+    error,
+    login,
+    register,
+    logout,
+    updateProfile,
+    uploadAvatar,
+    refreshUser,
+    updateAvatarInUI,
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'admin' || user?.isAdmin === true,
+    isAccountLocked,
+    showAccountLockedBanner,
+    hideAccountLockedBanner: () => setShowAccountLockedBanner(false),
+    resetAccountLockStatus: () => {
+      setIsAccountLocked(false);
+      setShowAccountLockedBanner(false);
+      localStorage.removeItem('isAccountLocked');
+    },
+    status: loading ? 'loading' : user ? 'authenticated' : 'unauthenticated'
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+/** HOC: redirects to /auth/login when no user is loaded. */
+export const withAuth = <P extends Record<string, unknown>>(Component: React.ComponentType<P>) => {
+  const AuthenticatedComponent: React.FC<P> = (props) => {
+    const { user, loading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+      if (!loading && !user) {
+        router.replace(LOGIN_ROUTE);
+      }
+    }, [user, loading, router]);
+
+    if (loading) return <div>Loading...</div>;
+    if (!user) return null;
+    return <Component {...props} />;
+  };
+  return AuthenticatedComponent;
+};
+
+/** HOC: shows a banner + redirect when account is locked. */
+export const withAccountStatus = <P extends Record<string, unknown>>(Component: React.ComponentType<P>) => {
+  const WithAccountStatus: React.FC<P> = (props) => {
+    const { user, loading, isAccountLocked } = useAuth();
+    const router = useRouter();
+    const [showBanner, setShowBanner] = useState<boolean>(false);
+
+    useEffect(() => {
+      if (!loading && user && isAccountLocked) {
+        setShowBanner(true);
+        const timer = setTimeout(() => router.push('/'), 500);
+        return () => clearTimeout(timer);
+      }
+      return undefined;
+    }, [user, loading, isAccountLocked, router]);
+
+    if (showBanner) {
+      return (
+        <div className="account-locked-container">
+          <div className="account-locked-banner">
+            <h2>Account locked</h2>
+            <p>Your account is currently locked. Please contact an administrator for support.</p>
+            <button onClick={() => router.push(LOGIN_ROUTE)}>
+              Back to login
+            </button>
+            <style jsx>{`
+              .account-locked-container {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+              }
+              .account-locked-banner {
+                background: linear-gradient(135deg, #e50914 0%, #8b0000 100%);
+                padding: 2rem;
+                border-radius: 8px;
+                color: white;
+                text-align: center;
+                max-width: 500px;
+                width: 90%;
+              }
+              button {
+                background: white;
+                color: #e50914;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+                margin-top: 15px;
+                cursor: pointer;
+              }
+            `}</style>
+          </div>
+        </div>
+      );
+    }
+
+    return <Component {...props} />;
+  };
+  return WithAccountStatus;
+};
+
+export default useAuth;

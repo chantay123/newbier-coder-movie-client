@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MovieCarouselSection from './MovieCarouselSection';
-import { MOVIE_CONFIG } from '../../config/movieConfig';
-import type { MovieLite } from '@/components/common/MovieCard/MovieCardVertical';
+import { MOVIE_CONFIG } from '@/config/movieConfig';
+import type { MovieLite } from '@/features/shared/components/MovieCard/MovieCardVertical';
 
 type CountryMovie = {
   country?: Array<{ slug?: string; name?: string }>;
@@ -64,7 +64,7 @@ const MovieCountrySection: React.FC<MovieCountrySectionProps> = ({ onPlayTrailer
       <MovieCarouselSection
         title="Phim Hàn Quốc Mới"
         badge="K-DRAMA"
-        viewAllHref="/quoc-gia/han-quoc"
+        viewAllHref="/country/han-quoc"
         movies={koreanMovies as unknown as MovieLite[]}
         loading={loading}
         onPlayTrailer={onPlayTrailer as unknown as (movie: MovieLite) => void}
@@ -73,7 +73,7 @@ const MovieCountrySection: React.FC<MovieCountrySectionProps> = ({ onPlayTrailer
       <MovieCarouselSection
         title="Phim Trung Quốc Mới"
         badge="C-DRAMA"
-        viewAllHref="/quoc-gia/trung-quoc"
+        viewAllHref="/country/trung-quoc"
         movies={chineseMovies as unknown as MovieLite[]}
         loading={loading}
         onPlayTrailer={onPlayTrailer as unknown as (movie: MovieLite) => void}

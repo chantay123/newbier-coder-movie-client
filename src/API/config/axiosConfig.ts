@@ -31,14 +31,34 @@ const axiosInstance = axios.create({
   withCredentials: true
 });
 
-/** Đọc Bearer token hiện có từ localStorage */
+/** Đọc Bearer token hiện có từ localStorage / sessionStorage theo cơ chế
+ * remember-me đã lưu trong authService. Khi remember-me tắt, access token
+ * chỉ tồn tại trong sessionStorage (mất khi đóng tab) và refresh token
+ * không có sẵn. */
+const REMEMBER_ME_KEY = 'remember_me';
+const ACCESS_KEYS = ['auth_token', 'token'];
+
 const readAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  const token =
-    localStorage.getItem('auth_token') ||
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken');
-  if (token && token !== 'undefined' && token !== 'null') return token;
+  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+  if (remembered) {
+    for (const key of ACCESS_KEYS) {
+      const value = localStorage.getItem(key);
+      if (value && value !== 'undefined' && value !== 'null') return value;
+    }
+    return null;
+  }
+  if (window.sessionStorage) {
+    for (const key of ACCESS_KEYS) {
+      const value = window.sessionStorage.getItem(key);
+      if (value && value !== 'undefined' && value !== 'null') return value;
+    }
+  }
+  // Fallback: tab reload trong cùng session — vẫn ưu tiên localStorage nếu có
+  for (const key of ACCESS_KEYS) {
+    const value = localStorage.getItem(key);
+    if (value && value !== 'undefined' && value !== 'null') return value;
+  }
   return null;
 };
 
@@ -58,7 +78,6 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     }
   } else {
     const authRequiredEndpoints = [
-      '/subscription/ad-benefits',
       '/subscription/current',
       '/subscription/history',
       '/user/'
@@ -118,7 +137,7 @@ axiosInstance.interceptors.response.use(
     if (status === 403 && responseData?.isAccountLocked === true) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAccountLocked', 'true');
-        window.location.href = '/account-locked';
+        window.location.href = '/common/account-locked';
       }
       return Promise.reject(error);
     }
@@ -161,9 +180,17 @@ axiosInstance.interceptors.response.use(
     // 401 on auth endpoints, or refresh already failed: hard logout.
     if (status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
+        try { localStorage.removeItem('auth_token'); } catch { /* noop */ }
+        try { localStorage.removeItem('token'); } catch { /* noop */ }
+        try { localStorage.removeItem('refresh_token'); } catch { /* noop */ }
+        try { localStorage.removeItem('user'); } catch { /* noop */ }
+        try { localStorage.removeItem('remember_me'); } catch { /* noop */ }
+        if (window.sessionStorage) {
+          try { window.sessionStorage.removeItem('auth_token'); } catch { /* noop */ }
+          try { window.sessionStorage.removeItem('token'); } catch { /* noop */ }
+          try { window.sessionStorage.removeItem('user'); } catch { /* noop */ }
+          try { window.sessionStorage.removeItem('backendToken'); } catch { /* noop */ }
+        }
         window.location.href = '/auth/login';
       }
     }

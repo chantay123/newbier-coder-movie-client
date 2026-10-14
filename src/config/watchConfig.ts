@@ -34,7 +34,8 @@ export const WATCH_CONFIG = {
     synopsisTitle: 'Tóm tắt nội dung',
     backToMovieDetail: 'Về trang thông tin phim',
     homeCrumb: 'Trang chủ',
-    defaultEpisodePrefix: 'Tập'
+    defaultEpisodePrefix: 'Tập',
+    defaultEpisodeName: 'Tập phim'
   },
 
   // Mặc định SEO & Head

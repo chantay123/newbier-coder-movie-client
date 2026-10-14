@@ -1,14 +1,13 @@
 /**
- * @file index.ts
- * @description Centralized barrel export for the Home feature module.
- * Provides access to all homepage spotlights, rails, and data management hooks.
+ * @file features/home/index.ts
+ * @description Backward-compatible barrel re-export from new location.
+ * All home feature exports are now in features/client/components/home/.
  */
-
-export { default as HeroBanner } from './components/HeroBanner';
-export { default as FeaturedCarousel3D } from './components/FeaturedCarousel3D';
-export { BigSlideBanner } from './components/BigSlideBanner';
-export { CommunityCommentSection } from './components/CommunityCommentSection';
-export { default as TrendingRadarSection } from './components/TrendingRadarSection';
+export { default as HeroBanner } from '@/features/client/components/home/components/HeroBanner';
+export { default as FeaturedCarousel3D } from '@/features/client/components/home/components/FeaturedCarousel3D';
+export { default as BigSlideBanner } from '@/features/client/components/home/components/BigSlideBanner';
+export { default as CommunityCommentSection } from '@/features/client/components/home/components/CommunityCommentSection';
+export { default as TrendingRadarSection } from '@/features/client/components/home/components/TrendingRadarSection';
 
 export {
   TopRecommendedSection,
@@ -17,6 +16,6 @@ export {
   CountryMoviesSection,
   LatestMoviesGridSection,
   AnimationMoviesSection
-} from './components/HomeRails';
+} from '@/features/client/components/home/components/HomeRails';
 
-export { useHomeData, default as useHomeDataDefault } from './hooks/useHomeData';
+export { useHomeData } from '@/features/client/components/home/hooks/useHomeData';

@@ -5,8 +5,8 @@
  */
 
 // Common Shared Base Components
-export { MovieSection, SectionHeader } from '@/components/common/MovieSection';
-export { MovieCardVertical, MovieCardHorizontal } from '@/components/common/MovieCard';
+export { MovieSection, SectionHeader } from '@/features/shared/components/MovieSection';
+export { MovieCardVertical, MovieCardHorizontal } from '@/features/shared/components/MovieCard';
 
 // Home Feature Components & Rails
 export {
@@ -29,7 +29,15 @@ export {
   UserRatingDetails
 } from '@/features/movie-detail';
 
-// Legacy Compatibility components
+// Search & Browse Filter (lives in src/components/Movie — self-contained)
+export {
+  default as MovieFilter,
+  INITIAL_MOVIE_FILTER_STATE,
+  filterStateToQueryParams
+} from './MovieFilter';
+export type { MovieFilterState } from './MovieFilter';
+
+// Legacy Compatibility components (self-contained rails/grid implementations)
 export { default as MovieCarouselSection } from './MovieCarouselSection';
 export { default as MovieGridSection } from './MovieGridSection';
 export { default as MovieCountrySection } from './MovieCountrySection';

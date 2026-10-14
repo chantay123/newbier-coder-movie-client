@@ -8,10 +8,10 @@
  */
 export const ROUTES = {
   HOME: '/',
-  MOVIES: '/movies',
-  SERIES: '/series',
+  MOVIES: '/browse/movies',
+  SERIES: '/browse/series',
   SEARCH: '/search',
-  PREMIUM: '/premium',
+  PREMIUM: '/user/premium',
   PROFILE: '/profile',
   NO_ACCESS: '/noaccess',
   NOT_FOUND: '/404',

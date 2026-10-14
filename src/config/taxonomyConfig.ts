@@ -16,8 +16,8 @@
  * @param params.nameEn Nhãn tiếng Anh
  * @param [params.badge='CINEMA'] Nhãn badge ngắn cho header card và nhãn
  * @param [params.searchKeyword] Từ khoá tìm kiếm dự phòng cho endpoint search
- * @param [params.baseRoute='/'] Đường dẫn gốc (ví dụ '/quoc-gia', '/the-loai')
- * @returns Entity phân loại đã chuẩn hoá
+ * @param [params.baseRoute='/'] Base route (e.g. '/country', '/genre')
+ * @returns Normalized taxonomy entity
  */
 export function createTaxonomyItem({
   slug,
@@ -61,7 +61,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'South Korea',
     badge: 'K-DRAMA',
     searchKeyword: 'han',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'trung-quoc': createTaxonomyItem({
     slug: 'trung-quoc',
@@ -70,7 +70,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'China',
     badge: 'C-DRAMA',
     searchKeyword: 'trung',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'nhat-ban': createTaxonomyItem({
     slug: 'nhat-ban',
@@ -79,7 +79,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'Japan',
     badge: 'J-DRAMA',
     searchKeyword: 'nhat',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'au-my': createTaxonomyItem({
     slug: 'au-my',
@@ -88,7 +88,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'Western / Hollywood',
     badge: 'HOLLYWOOD',
     searchKeyword: 'my',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'thai-lan': createTaxonomyItem({
     slug: 'thai-lan',
@@ -97,7 +97,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'Thailand',
     badge: 'T-DRAMA',
     searchKeyword: 'thai',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'viet-nam': createTaxonomyItem({
     slug: 'viet-nam',
@@ -106,7 +106,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'Vietnam',
     badge: 'V-CINEMA',
     searchKeyword: 'viet',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'hong-kong': createTaxonomyItem({
     slug: 'hong-kong',
@@ -115,7 +115,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'Hong Kong',
     badge: 'HK-CINEMA',
     searchKeyword: 'hong kong',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'dai-loan': createTaxonomyItem({
     slug: 'dai-loan',
@@ -124,7 +124,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'Taiwan',
     badge: 'TW-DRAMA',
     searchKeyword: 'dai loan',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   }),
   'anh': createTaxonomyItem({
     slug: 'anh',
@@ -133,7 +133,7 @@ export const TAXONOMY_COUNTRIES = {
     nameEn: 'United Kingdom',
     badge: 'UK',
     searchKeyword: 'anh',
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   })
 } as const;
 
@@ -148,7 +148,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Animation & Anime',
     badge: 'ANIME & CARTOON',
     searchKeyword: 'hoat',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'hanh-dong': createTaxonomyItem({
     slug: 'hanh-dong',
@@ -157,7 +157,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Action',
     badge: 'ACTION',
     searchKeyword: 'hanh dong',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'tinh-cam': createTaxonomyItem({
     slug: 'tinh-cam',
@@ -166,7 +166,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Romance',
     badge: 'ROMANCE',
     searchKeyword: 'tinh cam',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'kinh-di': createTaxonomyItem({
     slug: 'kinh-di',
@@ -175,7 +175,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Horror',
     badge: 'HORROR',
     searchKeyword: 'kinh di',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'co-trang': createTaxonomyItem({
     slug: 'co-trang',
@@ -184,7 +184,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Period Drama',
     badge: 'PERIOD',
     searchKeyword: 'co trang',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'hai-huoc': createTaxonomyItem({
     slug: 'hai-huoc',
@@ -193,7 +193,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Comedy',
     badge: 'COMEDY',
     searchKeyword: 'hai',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'khoa-hoc-vien-tuong': createTaxonomyItem({
     slug: 'khoa-hoc-vien-tuong',
@@ -202,7 +202,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Sci-Fi',
     badge: 'SCI-FI',
     searchKeyword: 'vien tuong',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   }),
   'tam-ly': createTaxonomyItem({
     slug: 'tam-ly',
@@ -211,7 +211,7 @@ export const TAXONOMY_CATEGORIES = {
     nameEn: 'Drama',
     badge: 'DRAMA',
     searchKeyword: 'tam ly',
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   })
 } as const;
 
@@ -271,7 +271,7 @@ export function resolveCountryTaxonomy(slug: string | null | undefined) {
     backendSlugs: [normalized],
     nameVi: slug,
     nameEn: slug,
-    baseRoute: '/quoc-gia'
+    baseRoute: '/country'
   });
 }
 
@@ -301,7 +301,7 @@ export function resolveCategoryTaxonomy(slug: string | null | undefined) {
     backendSlugs: [normalized],
     nameVi: slug,
     nameEn: slug,
-    baseRoute: '/the-loai'
+    baseRoute: '/genre'
   });
 }
 

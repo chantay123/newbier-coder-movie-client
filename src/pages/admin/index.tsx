@@ -22,10 +22,10 @@ import {
   getDashboardStats,
   getAnalyticsData,
   getFeedbackStats
-} from '@/API/services/admin/dashboardService';
-import { getReportStats } from '@/API/services/admin/reportService';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import AdminRoute from '@/components/ProtectedRoute/AdminRoute';
+} from '@/features/admin/services/dashboardService';
+import { getReportStats } from '@/features/admin/services/reportService';
+import AdminLayout from '@/layouts/AdminLayout';
+import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import dynamic from 'next/dynamic';
 import ApexCharts from 'apexcharts';
 import { NextPageWithLayout } from '@/types/next';

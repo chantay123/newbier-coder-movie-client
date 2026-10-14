@@ -39,7 +39,7 @@ export default function Document() {
         <script
           dangerouslySetInnerHTML={{
             __html: `
-            if (typeof window !== 'undefined' && localStorage.getItem('isAccountLocked') === 'true' && window.location.pathname !== '/account-locked') {
+            if (typeof window !== 'undefined' && localStorage.getItem('isAccountLocked') === 'true' && window.location.pathname !== '/common/account-locked') {
               const originalFetch = window.fetch;
               window.fetch = function(url, options) {
                 if (typeof url === 'string' && url.includes('/_next/data')) {
@@ -51,8 +51,8 @@ export default function Document() {
                 return originalFetch(url, options);
               };
 
-              if (window.location.pathname !== '/account-locked') {
-                window.location.href = '/account-locked';
+              if (window.location.pathname !== '/common/account-locked') {
+                window.location.href = '/common/account-locked';
               }
             }
           `

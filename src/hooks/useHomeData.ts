@@ -4,4 +4,4 @@
  * với các import path cũ `@/hooks/useHomeData`.
  */
 
-export { useHomeData, default } from '@/features/home/hooks/useHomeData';
+export { useHomeData, default } from '@/features/client/components/home/hooks/useHomeData';

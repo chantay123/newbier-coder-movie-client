@@ -12,7 +12,12 @@ const publicPaths = [
   '/auth/register',
   '/auth/forgot-password',
   '/auth/reset-password',
-  '/account-locked',
+  '/common/account-locked',
+  '/common/404',
+  '/common/503',
+  '/common/error',
+  '/common/noaccess',
+  '/common/offline',
   '/404',
   '/500',
   '/_next',
@@ -32,14 +37,16 @@ export function middleware(request: NextRequest) {
 
   const isAccountLocked = request.cookies.get('isAccountLocked')?.value === 'true';
 
-  if (isAccountLocked && !isPublicPath(pathname) && pathname !== '/account-locked') {
-    const url = new URL('/account-locked', request.url);
+  if (isAccountLocked && !isPublicPath(pathname) && pathname !== '/common/account-locked') {
+    const url = new URL('/common/account-locked', request.url);
     return NextResponse.redirect(url);
   }
 
   // Only apply rate limiting to _next/data routes which are causing the spam
   if (pathname.includes('/_next/data/')) {
-    const ip = request.ip || 'unknown';
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const realIp = request.headers.get('x-real-ip');
+    const ip = (forwardedFor?.split(',')[0]?.trim()) || realIp || 'unknown';
     const url = pathname;
     const key = `${ip}:${url}`;
     const now = Date.now();

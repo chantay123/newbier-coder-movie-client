@@ -67,6 +67,10 @@ export const AUTH_CONFIG = {
       submit: 'SignIn',
       submitting: 'Processing...'
     },
+    remember: {
+      label: 'Ghi nhớ đăng nhập',
+      ariaLabel: 'Ghi nhớ đăng nhập trên thiết bị này'
+    },
     links: {
       forgotPassword: 'Forgot password?',
       signupNow: 'Signup Now'

@@ -4,17 +4,64 @@
  * Gom login, register, refresh token, logout, profile, watchlist, user stats.
  */
 
-import { AUTH_CONFIG } from '../../config/authConfig';
+import { AUTH_CONFIG } from '@/config/authConfig';
 
 const API_URL = process.env.NEXT_PUBLIC_CORE_API_URL
-  || process.env.NEXT_PUBLIC_API_URL
+    || process.env.NEXT_PUBLIC_API_URL
   || 'http://localhost:5000/api';
+
+/** Storage key constants — kept in sync between `login`, `refreshToken`,
+ * `isLoggedIn`, `getAuthHeader`, and `_clearLocalSession`. */
+const STORAGE_KEYS = {
+  accessToken: 'auth_token',
+  accessTokenAlt: 'token',
+  refreshToken: 'refresh_token',
+  user: 'user',
+  isAccountLocked: 'isAccountLocked',
+  sessionBackendToken: 'backendToken',
+  sessionUser: 'user'
+} as const;
+
+/** Persisted remember-me flag stored in localStorage so subsequent page
+ * loads can re-hydrate the checkbox state. The flag itself is not
+ * security-sensitive (it does not grant access on its own). */
+const REMEMBER_ME_KEY = 'remember_me';
+
+/** Read the access token from the right storage depending on the
+ * remember-me flag set during login. */
+const readAccessToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+  if (remembered) {
+    return (
+      localStorage.getItem(STORAGE_KEYS.accessToken) ||
+      localStorage.getItem(STORAGE_KEYS.accessTokenAlt) ||
+      null
+    );
+  }
+  // Session-only: prefer sessionStorage; fall back to localStorage so
+  // the active tab stays logged in during reloads within the same tab.
+  return (
+    (window.sessionStorage && window.sessionStorage.getItem(STORAGE_KEYS.accessToken)) ||
+    localStorage.getItem(STORAGE_KEYS.accessToken) ||
+    localStorage.getItem(STORAGE_KEYS.accessTokenAlt) ||
+    null
+  );
+};
+
+const readRefreshToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+  if (!remembered) return null; // session-only login does not keep refresh token
+  return localStorage.getItem(STORAGE_KEYS.refreshToken);
+};
 
 /** Thông tin đăng nhập từ form */
 export interface LoginCredentials {
   username?: string;
   email?: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 /** Payload user trả về từ backend */
@@ -39,6 +86,7 @@ export interface LoginResult {
   user: UserPayload & { token: string };
   token: string;
   data?: unknown;
+  rememberMe?: boolean;
 }
 
 /** Thông tin đăng ký */
@@ -107,17 +155,20 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
 const clearLocalSession = (): void => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('isAccountLocked');
+    localStorage.removeItem(STORAGE_KEYS.accessToken);
+    localStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
+    localStorage.removeItem(STORAGE_KEYS.refreshToken);
+    localStorage.removeItem(STORAGE_KEYS.user);
+    localStorage.removeItem(STORAGE_KEYS.isAccountLocked);
+    localStorage.removeItem(REMEMBER_ME_KEY);
   } catch {
     /* localStorage có thể bị disable (private mode) */
   }
   try {
-    window.sessionStorage.removeItem('backendToken');
-    window.sessionStorage.removeItem('user');
+    window.sessionStorage.removeItem(STORAGE_KEYS.sessionBackendToken);
+    window.sessionStorage.removeItem(STORAGE_KEYS.sessionUser);
+    window.sessionStorage.removeItem(STORAGE_KEYS.accessToken);
+    window.sessionStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
   } catch {
     /* sessionStorage có thể bị disable */
   }
@@ -126,12 +177,15 @@ const clearLocalSession = (): void => {
 const authService = {
   login: async (credentials: LoginCredentials): Promise<LoginResult> => {
     const username = credentials.username || credentials.email || '';
+    const rememberMe = credentials.rememberMe === true;
     const payload = {
       username: typeof username === 'string' ? username.trim() : '',
       password: credentials.password
     };
 
     const loginEndpoint = AUTH_CONFIG?.api?.endpoint || `${API_URL}/auth/login`;
+
+    console.debug('[authService] POST', loginEndpoint, { body: { username: payload.username, hasPassword: !!payload.password } });
 
     const response = await fetch(loginEndpoint, {
       method: 'POST',
@@ -149,81 +203,173 @@ const authService = {
       responseText = await response.text();
       if (responseText) {
         data = JSON.parse(responseText);
+        console.debug('[authService] Response status:', response.status, '| Body:', JSON.stringify(data));
       }
     } catch {
       // silent parse handling
     }
 
-    // Chuẩn v1: responseStatus + responseData
-    if (data && data.responseStatus) {
-      if (
-        data.responseStatus.responseCode === AUTH_CONFIG.api.successCode
-        && data.responseData?.access_token
-      ) {
-        const accessToken: string = data.responseData.access_token;
-        const refreshToken: string | undefined = data.responseData.refresh_token;
-        const userPayload: UserPayload | null = data.responseData.user || null;
+    if (!response.ok) {
+      console.debug('[authService] HTTP error', response.status, responseText.slice(0, 200));
+    }
 
-        // Persist tokens (do NOT log token values)
-        localStorage.setItem('auth_token', accessToken);
-        localStorage.setItem('token', accessToken);
-        if (refreshToken) {
-          localStorage.setItem('refresh_token', refreshToken);
+    // Diagnostic helper: deep-search for an access token anywhere in the
+    // response object so we handle every shape the backend may return.
+    const findAccessToken = (obj: unknown, depth = 0): string | null => {
+      if (depth > 4 || !obj || typeof obj !== 'object') return null;
+      const o = obj as Record<string, unknown>;
+      for (const key of Object.keys(o)) {
+        const v = o[key];
+        // Stop recursion at non-object leaf values (we only want to descend
+        // into plain objects/arrays).
+        if (typeof v === 'string' && v.split('.').length === 3) {
+          // Likely a JWT: three dot-separated base64 segments.
+          return v;
         }
-
-        let user: UserPayload & { token: string };
-        if (userPayload && typeof userPayload === 'object') {
-          user = {
-            ...userPayload,
-            _id: userPayload._id || userPayload.id || userPayload.sub,
-            id: userPayload._id || userPayload.id || userPayload.sub,
-            fullname: userPayload.fullname || userPayload.username || '',
-            username: userPayload.username || userPayload.email || payload.username,
-            role: userPayload.role || 'USER',
-            token: accessToken
-          };
-        } else {
-          const decoded = decodeJwtPayload(accessToken) || {};
-          user = {
-            _id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
-            id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
-            username: (decoded.username as string) || payload.username,
-            fullname: (decoded.fullname as string) || (decoded.username as string) || '',
-            role: (decoded.role as string) || 'USER',
-            permissions: (decoded.permissions as string[]) || [],
-            sessionId: (decoded.sessionId as string) || '',
-            accountType: (decoded.accountType as string) || 'Normal',
-            token: accessToken
-          };
+        if (typeof v === 'object' && v !== null) {
+          const found = findAccessToken(v, depth + 1);
+          if (found) return found;
         }
+      }
+      return null;
+    };
 
-        localStorage.setItem('user', JSON.stringify(user));
+    // Persist the remember-me flag BEFORE storing tokens so the storage
+    // helpers in this module can read the right location.
+    try {
+      if (rememberMe) localStorage.setItem(REMEMBER_ME_KEY, '1');
+      else localStorage.removeItem(REMEMBER_ME_KEY);
+    } catch {
+      /* localStorage may be disabled */
+    }
+
+    // Helper: write access token to the right storage based on rememberMe
+    const persistAccessToken = (token: string): void => {
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEYS.accessToken, token);
+        localStorage.setItem(STORAGE_KEYS.accessTokenAlt, token);
+      } else {
+        // Session-only: clear any leftover persisted tokens first so a
+        // previous "remember me" login does not leak across sessions.
+        localStorage.removeItem(STORAGE_KEYS.accessToken);
+        localStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
+        localStorage.removeItem(STORAGE_KEYS.refreshToken);
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          window.sessionStorage.setItem(STORAGE_KEYS.accessToken, token);
+          window.sessionStorage.setItem(STORAGE_KEYS.accessTokenAlt, token);
+        }
+      }
+    };
+
+    // Extract access token from any plausible response shape.
+    // Priority: explicit responseData paths first, then deep-search fallback.
+    const rawAccessToken: string | null =
+      data?.responseData?.access_token ||
+      data?.responseData?.accessToken ||
+      data?.data?.access_token ||
+      data?.data?.accessToken ||
+      data?.access_token ||
+      data?.accessToken ||
+      data?.token ||
+      (typeof data === 'object' ? findAccessToken(data) : null) ||
+      null;
+
+    const rawRefreshToken: string | null =
+      data?.responseData?.refresh_token ||
+      data?.responseData?.refreshToken ||
+      data?.data?.refresh_token ||
+      data?.data?.refreshToken ||
+      data?.refresh_token ||
+      data?.refreshToken ||
+      data?.refreshToken ||
+      null;
+
+    // Resolve user payload from explicit path, JWT decode fallback, or null.
+    const resolveUser = (accessToken: string): UserPayload & { token: string } => {
+      const userPayload: UserPayload | null =
+        data?.responseData?.user ||
+        data?.data?.user ||
+        null;
+
+      if (userPayload && typeof userPayload === 'object') {
+        return {
+          ...userPayload,
+          _id: userPayload._id || userPayload.id || userPayload.sub,
+          id: userPayload._id || userPayload.id || userPayload.sub,
+          fullname: userPayload.fullname || userPayload.username || '',
+          username: userPayload.username || userPayload.email || payload.username,
+          role: userPayload.role || 'USER',
+          token: accessToken
+        };
+      }
+
+      const decoded = decodeJwtPayload(accessToken) || {};
+      return {
+        _id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
+        id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
+        username: (decoded.username as string) || payload.username,
+        fullname: (decoded.fullname as string) || (decoded.username as string) || '',
+        role: (decoded.role as string) || 'USER',
+        permissions: (decoded.permissions as string[]) || [],
+        sessionId: (decoded.sessionId as string) || '',
+        accountType: (decoded.accountType as string) || 'Normal',
+        token: accessToken
+      };
+    };
+
+    // Case 1: Backend returns responseStatus + responseData (v1 contract).
+    if (data?.responseStatus) {
+      const code = data.responseStatus.responseCode;
+      const message = data.responseStatus.responseMessage || '';
+      const isSuccess =
+        code === AUTH_CONFIG.api.successCode ||
+        // Accept any 2xx-like code the backend may return.
+        (typeof code === 'string' && code.startsWith('00000'));
+
+      if (isSuccess && rawAccessToken) {
+        persistAccessToken(rawAccessToken);
+        if (rawRefreshToken && rememberMe) {
+          localStorage.setItem(STORAGE_KEYS.refreshToken, rawRefreshToken);
+        } else if (!rememberMe) {
+          localStorage.removeItem(STORAGE_KEYS.refreshToken);
+        }
+        const user = resolveUser(rawAccessToken);
+        if (rememberMe) {
+          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+        } else if (typeof window !== 'undefined' && window.sessionStorage) {
+          window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, JSON.stringify(user));
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('storage'));
         }
-
-        return {
-          success: true,
-          user,
-          token: accessToken,
-          data: data.responseData
-        };
-      } else {
-        // Non-success code (e.g. 00000204 Invalid credentials)
-        const code = data.responseStatus.responseCode || 'unknown';
-        const apiMessage = data.responseStatus.responseMessage || 'Invalid credentials';
-        const message = code === AUTH_CONFIG.api.invalidCredentialsCode
-          ? 'Invalid username or password'
-          : apiMessage;
-        throw new Error(message);
+        return { success: true, user, token: rawAccessToken, data, rememberMe };
       }
+
+      // Non-success responseStatus (e.g. 00000204 Invalid credentials,
+      // 00000500 Internal server error). Use the backend's responseCode
+      // whitelist to decide which messages are "invalid credentials"
+      // specifically. Anything else is passed through verbatim so that
+      // server errors (5xx) are not mis-reported as a user typo.
+      console.debug('[authService] Non-success responseStatus:', data.responseStatus);
+      const isInvalidCreds =
+        code === AUTH_CONFIG.api.invalidCredentialsCode ||
+        response.status === 401 ||
+        response.status === 403;
+      throw new Error(isInvalidCreds
+        ? 'Invalid username or password'
+        : (message || 'Authentication failed'));
     }
 
-    // Legacy fallback (token directly in response)
+    // Case 2: Legacy flat shape — HTTP ok + raw token at the top level.
     if (!response.ok) {
-      let errorMessage = 'Invalid username or password';
+      // Use the server's HTTP status to decide the user-facing message.
+      // 4xx (except 401/403) → not necessarily "invalid credentials".
+      // 5xx → server-side failure, surface that to the user.
+      let errorMessage = `HTTP ${response.status}`;
       if (response.status === 401 || response.status === 403) {
         errorMessage = 'Invalid username or password';
+      } else if (response.status >= 500) {
+        errorMessage = 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau ít phút.';
       } else if (data && (data.error || data.message)) {
         errorMessage = data.error || data.message;
       } else if (responseText.includes('<!DOCTYPE')) {
@@ -232,36 +378,28 @@ const authService = {
       throw new Error(errorMessage);
     }
 
-    if (data && data.token) {
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('token', data.token);
-      if (data.refreshToken) {
-        localStorage.setItem('refresh_token', data.refreshToken);
+    // Case 3: response.ok && no responseStatus — legacy token-at-root.
+    if (rawAccessToken) {
+      persistAccessToken(rawAccessToken);
+      if (rawRefreshToken && rememberMe) {
+        localStorage.setItem(STORAGE_KEYS.refreshToken, rawRefreshToken);
+      } else if (!rememberMe) {
+        localStorage.removeItem(STORAGE_KEYS.refreshToken);
       }
-
-      const decoded = decodeJwtPayload(data.token) || {};
-      const user: UserPayload & { token: string } = {
-        _id: (decoded.userId as string) || (decoded.sub as string),
-        id: (decoded.userId as string) || (decoded.sub as string),
-        email: (decoded.email as string) || payload.username,
-        username: (decoded.username as string) || payload.username,
-        role: (decoded.role as string) || 'USER',
-        accountType: (decoded.accountType as string) || 'Normal',
-        token: data.token
-      };
-
-      localStorage.setItem('user', JSON.stringify(user));
+      const user = resolveUser(rawAccessToken);
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+      } else if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, JSON.stringify(user));
+      }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('storage'));
       }
-
-      return {
-        success: true,
-        user,
-        token: data.token
-      };
+      return { success: true, user, token: rawAccessToken, data, rememberMe };
     }
 
+    // Case 4: 200 but token not found anywhere — unexpected server response.
+    console.warn('[authService] Token not found in response. Status:', response.status, '| Keys:', data ? Object.keys(data) : 'null');
     throw new Error('Không nhận được token từ máy chủ.');
   },
 
@@ -319,8 +457,8 @@ const authService = {
         return;
       }
 
-      const accessToken = localStorage.getItem('auth_token');
-      const refreshToken = localStorage.getItem('refresh_token');
+      const accessToken = readAccessToken();
+      const refreshToken = readRefreshToken();
 
       // Build URL the same way as login
       const endpoint = `${API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/logout`;
@@ -366,9 +504,7 @@ const authService = {
       return authService._refreshInFlight;
     }
 
-    const refreshToken = (typeof window !== 'undefined')
-      ? localStorage.getItem('refresh_token')
-      : null;
+    const refreshToken = readRefreshToken();
 
     if (!refreshToken) {
       const err: ServiceError = new Error('No refresh token available');
@@ -440,10 +576,16 @@ const authService = {
       }
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_token', newAccessToken);
-        localStorage.setItem('token', newAccessToken);
-        if (newRefreshToken) {
-          localStorage.setItem('refresh_token', newRefreshToken);
+        const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
+        if (remembered) {
+          localStorage.setItem(STORAGE_KEYS.accessToken, newAccessToken);
+          localStorage.setItem(STORAGE_KEYS.accessTokenAlt, newAccessToken);
+        } else if (window.sessionStorage) {
+          window.sessionStorage.setItem(STORAGE_KEYS.accessToken, newAccessToken);
+          window.sessionStorage.setItem(STORAGE_KEYS.accessTokenAlt, newAccessToken);
+        }
+        if (newRefreshToken && remembered) {
+          localStorage.setItem(STORAGE_KEYS.refreshToken, newRefreshToken);
         }
       }
 
@@ -459,14 +601,17 @@ const authService = {
 
   getAuthHeader: async (): Promise<Record<string, string>> => {
     try {
-      let token: string | null = localStorage.getItem('auth_token');
+      let token: string | null = readAccessToken();
 
       if (!token && typeof window !== 'undefined' && window.sessionStorage) {
-        token = sessionStorage.getItem('backendToken');
+        token = window.sessionStorage.getItem(STORAGE_KEYS.sessionBackendToken);
       }
 
       if (!token) {
-        const userStr = localStorage.getItem('user');
+        const userStr =
+          (typeof window !== 'undefined' && window.sessionStorage
+            ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
+            : null) || localStorage.getItem(STORAGE_KEYS.user);
         if (userStr) {
           try {
             const user = JSON.parse(userStr) as { backendToken?: string };
@@ -512,24 +657,30 @@ const authService = {
   },
 
   isLoggedIn: (): boolean => {
-    const token =
-      localStorage.getItem('auth_token') ||
-      (typeof window !== 'undefined' && window.sessionStorage && window.sessionStorage.getItem('backendToken')) ||
-      (() => {
-        try {
-          const user = JSON.parse(localStorage.getItem('user') || '{}') as { backendToken?: string };
-          return user?.backendToken || null;
-        } catch {
-          return null;
-        }
-      })();
-    return !!token;
+    if (readAccessToken()) return true;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      if (window.sessionStorage.getItem(STORAGE_KEYS.sessionBackendToken)) return true;
+    }
+    try {
+      const userJson =
+        (typeof window !== 'undefined' && window.sessionStorage
+          ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
+          : null) || localStorage.getItem(STORAGE_KEYS.user);
+      if (!userJson) return false;
+      const user = JSON.parse(userJson) as { backendToken?: string };
+      return !!user?.backendToken;
+    } catch {
+      return false;
+    }
   },
 
   getCurrentUser: (): UserPayload | null => {
     try {
-      const user = localStorage.getItem('user');
-      return user ? (JSON.parse(user) as UserPayload) : null;
+      const userJson =
+        (typeof window !== 'undefined' && window.sessionStorage
+          ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
+          : null) || localStorage.getItem(STORAGE_KEYS.user);
+      return userJson ? (JSON.parse(userJson) as UserPayload) : null;
     } catch (e) {
       console.error('Error parsing user from localStorage:', e);
       return null;

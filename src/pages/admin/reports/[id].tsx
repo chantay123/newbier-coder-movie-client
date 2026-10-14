@@ -3,13 +3,13 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import styles from '@/styles/AdminReportDetail.module.css';
-import AdminLayout from '@/components/Layout/AdminLayout';
+import AdminLayout from '@/layouts/AdminLayout';
 import { 
   FaArrowLeft, FaCheck, FaTimes, FaClock, FaExclamationTriangle, 
   FaUser, FaFilm, FaExclamationCircle, FaEdit, FaTrash, 
   FaEnvelope, FaLink, FaCommentAlt, FaPlayCircle
 } from 'react-icons/fa';
-import { getReportById, updateReport } from '@/API/services/admin/reportService';
+import { getReportById, updateReport } from '@/features/admin/services/reportService';
 
 // Report interface
 interface Report {

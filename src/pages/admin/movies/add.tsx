@@ -2,8 +2,8 @@ import React, { useState, useMemo } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import AdminRoute from '@/components/ProtectedRoute/AdminRoute';
+import AdminLayout from '@/layouts/AdminLayout';
+import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from '@/API/config/axiosConfig';
 import {
   FaFilm, FaArrowLeft, FaSave, FaMagic,
@@ -12,10 +12,10 @@ import {
   FaTv, FaStar, FaChevronRight, FaChevronLeft, FaSearch, FaTimes, FaLayerGroup, FaSlidersH
 } from 'react-icons/fa';
 import styles from '@/styles/AdminAddMovie.module.css';
-import CinemaSelect from '@/components/Admin/Movies/CinemaSelect';
-import TagAutocompletePicker from '@/components/Admin/Movies/TagAutocompletePicker';
-import BackToTop from '@/components/UI/BackToTop';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import CinemaSelect from '@/features/admin/components/Movies/FormFields/CinemaSelect';
+import TagAutocompletePicker from '@/features/admin/components/Movies/FormFields/TagAutocompletePicker';
+import BackToTop from '@/features/shared/components/UI/BackToTop';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 import {
   YEAR_STEPPER_CONFIG,
   FORM_VALIDATION_CONFIG,

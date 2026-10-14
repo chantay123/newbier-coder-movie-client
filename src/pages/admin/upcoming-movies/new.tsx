@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import UpcomingMovieForm from '@/components/Admin/UpcomingMovies/UpcomingMovieForm';
-import { createUpcomingMovie, UpcomingMovie } from '@/services/admin/upcomingMovieService';
+import AdminLayout from '@/layouts/AdminLayout';
+import UpcomingMovieForm from '@/features/admin/components/UpcomingMovies/UpcomingMovieForm';
+import { createUpcomingMovie } from '@/features/admin/services/upcomingMovieAdminService';
+import type { UpcomingMovie } from '@/features/admin/services/upcomingMovieAdminService';
 import { Alert } from 'react-bootstrap';
 import { FaArrowLeft } from 'react-icons/fa';
 import styles from '@/styles/AdminUpcomingMovies.module.css';

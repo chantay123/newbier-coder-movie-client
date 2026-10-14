@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import AdminLayout from '../../../../components/Layout/AdminLayout';
+import AdminLayout from '@/layouts/AdminLayout';
 import { toast } from 'react-toastify';
 import {
   FaArrowLeft,
@@ -12,14 +12,12 @@ import {
   FaTrash,
   FaPlus,
   FaFilm,
-
   FaServer,
-
   FaArrowUp
 } from 'react-icons/fa';
-import axiosInstance from '../../../../API/config/axiosConfig';
-import { endpoints } from '../../../../config/API';
-import styles from '../../../../styles/MovieEditPage.module.css';
+import axiosInstance from '@/API/config/axiosConfig';
+import { endpoints } from '@/config/API';
+import styles from '@/styles/MovieEditPage.module.css';
 
 interface Episode {
   name: string;

@@ -4,9 +4,10 @@ import { useRouter } from 'next/router';
 import { Spinner, Modal, Button } from 'react-bootstrap';
 import Link from 'next/link';
 import { FaEdit, FaTrash, FaArrowLeft, FaCalendarCheck, FaFilm } from 'react-icons/fa';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import { getUpcomingMovieById, releaseUpcomingMovie, deleteUpcomingMovie, UpcomingMovie } from '@/services/admin/upcomingMovieService';
-import ReleasedMovieLink from '@/components/Admin/UpcomingMovies/ReleasedMovieLink';
+import AdminLayout from '@/layouts/AdminLayout';
+import { getUpcomingMovieById, releaseUpcomingMovie, deleteUpcomingMovie } from '@/features/admin/services/upcomingMovieAdminService';
+import type { UpcomingMovie } from '@/features/admin/services/upcomingMovieAdminService';
+import ReleasedMovieLink from '@/features/admin/components/UpcomingMovies/ReleasedMovieLink';
 import styles from '@/styles/AdminUpcomingMovies.module.css';
 
 const UpcomingMovieDetail: React.FC = () => {

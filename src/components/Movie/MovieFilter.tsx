@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { FaFilter, FaSearch, FaArrowRight, FaCaretDown, FaCaretUp, FaThLarge, FaSlidersH } from 'react-icons/fa';
 import styles from '@/styles/MovieFilter.module.css';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 export interface MovieFilterState {
   status: string;           // 'all' | 'Sắp chiếu' | 'Đang chiếu' | 'Trọn bộ'

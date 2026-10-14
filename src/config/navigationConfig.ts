@@ -74,7 +74,7 @@ export const COUNTRY_NAV_ITEMS: TaxonomyNavItem[] = Object.values(TAXONOMY_COUNT
  * Các mục điều hướng chính của Navbar, đúng theo spec sản phẩm:
  * 1. Chủ Đề (Dropdown)  2. Duyệt tìm (/search)
  * 3. Phim Lẻ (/movies)  4. Phim Bộ (/series)
- * 5. Quốc gia (Dropdown)  6. Diễn Viên (/performer)  7. Lịch Chiếu (/lich-chieu)
+ * 5. Quốc gia (Dropdown)  6. Diễn Viên (/performer)  7. Lịch Chiếu (/schedule)
  */
 export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
   {
@@ -83,7 +83,7 @@ export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
     type: 'dropdown',
     dropdownType: 'genres',
     items: GENRE_NAV_ITEMS,
-    matchPrefix: '/the-loai'
+    matchPrefix: '/genre'
   },
   {
     id: 'duyet-tim',
@@ -107,12 +107,12 @@ export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
     matchPrefix: '/series'
   },
   {
-    id: 'quoc-gia',
+    id: 'country',
     label: 'Quốc gia',
     type: 'dropdown',
     dropdownType: 'countries',
     items: COUNTRY_NAV_ITEMS,
-    matchPrefix: '/quoc-gia'
+    matchPrefix: '/country'
   },
   {
     id: 'dien-vien',
@@ -125,7 +125,7 @@ export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
     id: 'lich-chieu',
     label: 'Lịch Chiếu',
     type: 'link',
-    href: '/lich-chieu',
+    href: '/schedule',
     matchExact: true
   }
 ];
@@ -144,21 +144,21 @@ export const USER_NAV_ITEMS: UserNavItem[] = [
   {
     id: 'favorites',
     label: 'Phim yêu thích',
-    href: '/favorites',
+    href: '/user/favorites',
     iconType: 'heart',
     iconColor: 'danger'
   },
   {
     id: 'watchlater',
     label: 'Danh sách xem sau',
-    href: '/watchlater',
+    href: '/user/watch-later',
     iconType: 'bookmark',
     iconColor: 'warning'
   },
   {
     id: 'history',
     label: 'Lịch sử xem',
-    href: '/history',
+    href: '/user/history',
     iconType: 'history',
     iconColor: 'info'
   }

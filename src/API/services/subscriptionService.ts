@@ -1,0 +1,359 @@
+/**
+ * @file subscriptionService.ts
+ * @description Subscription management: packages, payment, lifecycle,
+ * admin-side approval/rejection, ad-benefits.
+ */
+import api from '@/API/config/axiosConfig';
+
+export interface SubscriptionPackage {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  duration: number;
+  features?: string[];
+  [key: string]: unknown;
+}
+
+export interface Subscription {
+  _id: string;
+  userId: string;
+  packageId: string;
+  status: 'pending' | 'approved' | 'rejected' | 'active' | 'cancelled' | 'expired';
+  startDate?: string;
+  endDate?: string;
+  paymentMethod?: string;
+  [key: string]: unknown;
+}
+
+export interface SubscriptionCurrentPayload {
+  hasActiveSubscription: boolean;
+  subscription: Subscription | null;
+  daysLeft: number;
+  isExpired: boolean;
+}
+
+export interface AdBenefits {
+  hideHomepageAds: boolean;
+  hideVideoAds: boolean;
+  packageType: string | null;
+  hasActiveSubscription: boolean;
+  isPremium15k?: boolean;
+  authError?: boolean;
+}
+
+export interface SubscriptionPagination {
+  page: number;
+  pages: number;
+  total: number;
+}
+
+export interface AdminPendingResult {
+  success: boolean;
+  message?: string;
+  pendingSubscriptions: Subscription[];
+  pagination: SubscriptionPagination;
+}
+
+const PREMIUM_PACKAGE_ID = '682f7d849c310399aa715c9d';
+
+const emptyCurrent = (): SubscriptionCurrentPayload => ({
+  hasActiveSubscription: false,
+  subscription: null,
+  daysLeft: 0,
+  isExpired: false
+});
+
+const emptyAdBenefits = (authError = false): AdBenefits => ({
+  hideHomepageAds: false,
+  hideVideoAds: false,
+  packageType: null,
+  hasActiveSubscription: false,
+  authError
+});
+
+const subscriptionService = {
+  getAllPackages: async (): Promise<SubscriptionPackage[]> => {
+    try {
+      const response = await api.get('/subscription/packages');
+      return (response.data as { data: SubscriptionPackage[] }).data;
+    } catch (error) {
+      console.error('Error fetching subscription packages:', error);
+      throw error;
+    }
+  },
+
+  getPackageById: async (packageId: string): Promise<SubscriptionPackage> => {
+    try {
+      const response = await api.get(`/subscription/packages/${packageId}`);
+      return (response.data as { data: SubscriptionPackage }).data;
+    } catch (error) {
+      console.error('Error fetching package details:', error);
+      throw error;
+    }
+  },
+
+  subscribePackage: async (data: { packageId: string; paymentMethod?: string }): Promise<Record<string, unknown>> => {
+    try {
+      const subscriptionData = {
+        packageId: data.packageId,
+        paymentMethod: data.paymentMethod || 'bank_transfer'
+      };
+      const response = await api.post('/subscription/subscribe', subscriptionData);
+      return { ...(response.data as object), success: true, _originalSuccess: (response.data as { success?: boolean }).success, _formatted: true };
+    } catch (error) {
+      const err = error as { response?: { status?: number; data?: { error?: string; details?: unknown } }; message?: string };
+      console.error('Error subscribing package:', err);
+      if (err.response && err.response.status === 200 && err.response.data) {
+        return { ...(err.response.data as object), success: true, _errorButSuccess: true, _formatted: true };
+      }
+      return {
+        success: false,
+        message: err.response?.data?.error || 'Subscription request failed',
+        details: err.response?.data?.details || [],
+        error: err.message
+      };
+    }
+  },
+
+  confirmPayment: async (paymentId: string): Promise<Record<string, unknown>> => {
+    try {
+      const response = await api.post('/subscription/confirm-payment', { paymentId });
+      return response.data as Record<string, unknown>;
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error('Error confirming payment:', err);
+      return {
+        success: false,
+        message: err.response?.data?.message || 'Could not confirm payment, but the subscription was created.',
+        error: err.response?.data
+      };
+    }
+  },
+
+  cancelSubscription: async (): Promise<unknown> => {
+    try {
+      const response = await api.post('/subscription/cancel');
+      return response.data;
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      throw error;
+    }
+  },
+
+  getCurrentSubscription: async (): Promise<SubscriptionCurrentPayload> => {
+    try {
+      const response = await api.get('/subscription/current');
+      const data = (response.data as { data?: Partial<SubscriptionCurrentPayload> }).data || {};
+      return {
+        hasActiveSubscription: data.hasActiveSubscription || false,
+        subscription: data.subscription || null,
+        daysLeft: data.daysLeft || 0,
+        isExpired: data.isExpired || false
+      };
+    } catch (error) {
+      console.error('Error fetching current subscription:', error);
+      return emptyCurrent();
+    }
+  },
+
+  getUserAdBenefits: async (): Promise<AdBenefits> => {
+    const token = typeof window !== 'undefined'
+      ? (localStorage.getItem('auth_token') || localStorage.getItem('token') || localStorage.getItem('authToken'))
+      : null;
+
+    if (!token) {
+      return { ...emptyAdBenefits(true) };
+    }
+
+    try {
+      // The backend exposes subscription state under `/subscription/current`.
+      // It returns `{ hasActiveSubscription, subscription, daysLeft, isExpired }`.
+      // We derive ad-block benefits locally from the package id so we never
+      // hit a non-existent endpoint.
+      const response = await api.get('/subscription/current', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const payload = (response.data as { data?: Partial<SubscriptionCurrentPayload> }).data || {};
+      const subscription = (payload.subscription || null) as Subscription | null;
+      const packageType = subscription?.packageId
+        ? (typeof subscription.packageId === 'string' ? subscription.packageId : (subscription.packageId as { _id?: string })?._id ?? null)
+        : null;
+      const isPremiumPackage = packageType === PREMIUM_PACKAGE_ID;
+      const hasActiveSubscription = Boolean(payload.hasActiveSubscription) && !payload.isExpired;
+      return {
+        hideHomepageAds: hasActiveSubscription && isPremiumPackage,
+        hideVideoAds: hasActiveSubscription && isPremiumPackage,
+        packageType,
+        hasActiveSubscription,
+        isPremium15k: isPremiumPackage
+      };
+    } catch (error) {
+      const err = error as { response?: { status?: number } };
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        console.warn('[AdBenefits] Authentication error detected');
+        return { ...emptyAdBenefits(true) };
+      }
+      return { ...emptyAdBenefits(false) };
+    }
+  },
+
+  getSubscriptionHistory: async (): Promise<unknown> => {
+    try {
+      const response = await api.get('/subscription/history');
+      return (response.data as { data: unknown }).data;
+    } catch (error) {
+      console.error('Error fetching subscription history:', error);
+      throw error;
+    }
+  },
+
+  updateAutoRenewal: async (autoRenewal: boolean): Promise<unknown> => {
+    try {
+      const response = await api.put('/subscription/auto-renewal', { autoRenewal });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating auto renewal:', error);
+      throw error;
+    }
+  },
+
+  getPendingSubscription: async (): Promise<unknown> => {
+    try {
+      const response = await api.get('/subscription/pending');
+      return (response.data as { data: unknown }).data;
+    } catch (error) {
+      console.error('Error fetching pending subscription:', error);
+      throw error;
+    }
+  },
+
+  getAdminPendingSubscriptions: async (): Promise<AdminPendingResult> => {
+    const token = typeof window !== 'undefined'
+      ? (localStorage.getItem('auth_token') || localStorage.getItem('authToken'))
+      : null;
+    if (!token) {
+      return {
+        success: false,
+        message: 'No authentication token found',
+        pendingSubscriptions: [],
+        pagination: { page: 1, pages: 1, total: 0 }
+      };
+    }
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${baseUrl}/subscription/admin/pending-subscriptions`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`API request failed with status ${res.status}: ${res.statusText}`);
+
+      const responseData = await res.json() as {
+        success?: boolean;
+        data?: { subscriptions?: Subscription[] } | Subscription[];
+        subscriptions?: Subscription[];
+        pagination?: SubscriptionPagination;
+        message?: string;
+      };
+
+      if (responseData.success) {
+        let subscriptionsData: Subscription[] = [];
+        if (responseData.data && typeof responseData.data === 'object' && 'subscriptions' in responseData.data) {
+          subscriptionsData = responseData.data.subscriptions || [];
+        } else if (Array.isArray(responseData.data)) {
+          subscriptionsData = responseData.data;
+        } else if (Array.isArray(responseData.subscriptions)) {
+          subscriptionsData = responseData.subscriptions;
+        }
+        const pagination = (responseData.data && typeof responseData.data === 'object' && 'pagination' in responseData.data)
+          ? (responseData.data.pagination as SubscriptionPagination | undefined)
+          : (responseData.pagination as SubscriptionPagination | undefined);
+        return {
+          success: true,
+          pendingSubscriptions: subscriptionsData,
+          pagination: pagination ?? { page: 1, pages: 1, total: subscriptionsData.length }
+        };
+      }
+      return {
+        success: false,
+        message: responseData.message || 'Failed to fetch pending subscriptions',
+        pendingSubscriptions: [],
+        pagination: { page: 1, pages: 1, total: 0 }
+      };
+    } catch (error) {
+      const err = error as Error;
+      console.error('Error fetching pending subscriptions for admin:', err);
+      return {
+        success: false,
+        message: err.message,
+        pendingSubscriptions: [],
+        pagination: { page: 1, pages: 1, total: 0 }
+      };
+    }
+  },
+
+  getAdminPendingSubscriptionsCount: async (): Promise<number> => {
+    const token = typeof window !== 'undefined'
+      ? (localStorage.getItem('auth_token') || localStorage.getItem('authToken'))
+      : null;
+    if (!token) {
+      console.error('No authentication token found');
+      return 0;
+    }
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const res = await fetch(`${baseUrl}/subscription/admin/pending-count`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`API request failed with status ${res.status}`);
+      const data = await res.json() as { success?: boolean; data?: { count?: number } };
+      return data.success ? (data.data?.count || 0) : 0;
+    } catch (error) {
+      console.error('Error fetching pending subscriptions count:', error);
+      return 0;
+    }
+  },
+
+  getAdminApprovedSubscriptions: async (): Promise<Subscription[]> => {
+    try {
+      const response = await api.get('/subscription/admin/subscriptions');
+      const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
+      return all.filter((s) => s.status === 'approved' || s.status === 'active');
+    } catch (error) {
+      console.error('Error fetching approved subscriptions for admin:', error);
+      throw error;
+    }
+  },
+
+  getAdminRejectedSubscriptions: async (): Promise<Subscription[]> => {
+    try {
+      const response = await api.get('/subscription/admin/subscriptions');
+      const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
+      return all.filter((s) => s.status === 'rejected');
+    } catch (error) {
+      console.error('Error fetching rejected subscriptions for admin:', error);
+      throw error;
+    }
+  },
+
+  approveSubscription: async (subscriptionId: string): Promise<unknown> => {
+    try {
+      const response = await api.post(`/subscription/admin/approve/${subscriptionId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error approving subscription:', error);
+      throw error;
+    }
+  },
+
+  rejectSubscription: async (subscriptionId: string, reason?: string): Promise<unknown> => {
+    try {
+      const response = await api.post(`/subscription/admin/reject/${subscriptionId}`, { reason });
+      return response.data;
+    } catch (error) {
+      console.error('Error rejecting subscription:', error);
+      throw error;
+    }
+  }
+};
+
+export default subscriptionService;

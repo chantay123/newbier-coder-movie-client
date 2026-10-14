@@ -242,7 +242,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
         limit: 20,
         title: t('koreanRailTitle'),
         badge: t('koreanRailBadge'),
-        viewAllHref: '/quoc-gia/han-quoc',
+        viewAllHref: '/country/han-quoc',
         load: (fallback = []) => fetchFirstAvailable([
           () => movieService.getMoviesByCountry('han-quoc', 20)
         ], fallback)
@@ -253,7 +253,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
         limit: 20,
         title: t('chineseRailTitle'),
         badge: t('chineseRailBadge'),
-        viewAllHref: '/quoc-gia/trung-quoc',
+        viewAllHref: '/country/trung-quoc',
         load: (fallback = []) => fetchFirstAvailable([
           () => movieService.getMoviesByCountry('trung-quoc', 20)
         ], fallback)
@@ -269,7 +269,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     categorySlug: 'hoat-hinh',
     limit: 6,
     autoPlayInterval: 7000,
-    viewAllHref: '/the-loai/hoat-hinh',
+    viewAllHref: '/genre/hoat-hinh',
     loadAfterScroll: false,
     load: (mock = []) => fetchFirstAvailable([
       () => movieService.getMoviesByCategory('hoat-hinh', 6),
@@ -284,7 +284,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     badge: t('animationBadge'),
     categorySlug: 'hoat-hinh',
     limit: 20,
-    viewAllHref: '/the-loai/hoat-hinh',
+    viewAllHref: '/genre/hoat-hinh',
     loadAfterScroll: false,
     load: (mock = []) => fetchFirstAvailable([
       () => movieService.getMoviesByCategory('hoat-hinh', 20)

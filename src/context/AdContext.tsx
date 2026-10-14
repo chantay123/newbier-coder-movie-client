@@ -6,7 +6,7 @@
 
 import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { useRouter } from 'next/router';
-import subscriptionService from '../API/services/subscriptionService';
+import subscriptionService from '@/API/services/subscriptionService';
 
 /** Default ad settings */
 export interface AdSettings {
@@ -49,16 +49,33 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authResolved, setAuthResolved] = useState<boolean>(false);
   const isFetchingRef = useRef<boolean>(false);
   const benefitsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endpointDisabledLogRef = useRef<boolean>(false);
 
   const isNoAccessPage = router.pathname === '/noaccess';
 
   useEffect(() => {
     const checkAuth = (): void => {
-      const token = localStorage.getItem('auth_token')
-        || localStorage.getItem('token')
-        || localStorage.getItem('authToken');
+      const token = (() => {
+        if (typeof window === 'undefined') return null;
+        const remembered = localStorage.getItem('remember_me') === '1';
+        if (remembered) {
+          return localStorage.getItem('auth_token')
+            || localStorage.getItem('token')
+            || localStorage.getItem('authToken');
+        }
+        if (window.sessionStorage) {
+          const fromSession = window.sessionStorage.getItem('auth_token')
+            || window.sessionStorage.getItem('token')
+            || window.sessionStorage.getItem('authToken');
+          if (fromSession) return fromSession;
+        }
+        return localStorage.getItem('auth_token')
+          || localStorage.getItem('token')
+          || localStorage.getItem('authToken');
+      })();
       const isNowAuthenticated = !!token;
 
       setIsAuthenticated((prevState) => {
@@ -67,12 +84,13 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
         }
         return prevState;
       });
+      setAuthResolved(true);
     };
 
     checkAuth();
 
     const handleStorageChange = (e: StorageEvent): void => {
-      if (e.key === 'auth_token' || e.key === 'token' || e.key === 'authToken') {
+      if (e.key === 'auth_token' || e.key === 'token' || e.key === 'authToken' || e.key === 'remember_me') {
         checkAuth();
       }
     };
@@ -96,6 +114,12 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
     let isComponentMounted = true;
 
     const fetchSubscriptionBenefits = async (): Promise<void> => {
+      // Wait until the auth check on mount has finished — otherwise
+      // we'll spam the backend with one unauthenticated call before
+      // realising there's no token in storage.
+      if (!authResolved) {
+        return;
+      }
       // If a previous attempt proved the endpoint is unavailable, do not
       // keep hammering the backend.
       if (isEndpointDisabled) {
@@ -146,12 +170,17 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
         // The service reports a 401/403 via `authError`. We still allow
         // a few retries in case the token is being refreshed.
         if (benefits.authError) {
-          console.warn('[AdContext] Authentication error detected');
+          // Don't spam the console when the user isn't logged in —
+          // that's the expected steady state.
+          if (isAuthenticated && retryCount === 0) {
+            console.warn('[AdContext] Authentication error detected, retrying…');
+          }
           if (retryCount < MAX_RETRIES) {
             retryCount++;
             benefitsTimeoutRef.current = setTimeout(fetchSubscriptionBenefits, 2000);
             return;
-          } else {
+          } else if (isAuthenticated) {
+            // Only log when we actually expected to be authenticated.
             console.error('[AdContext] Max auth-error retries reached, giving up');
           }
         }
@@ -186,10 +215,15 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
 
         if (isPermanent) {
           isEndpointDisabled = true;
-          console.warn(
-            `[AdContext] Endpoint reported ${status} — stopping further attempts ` +
-            'until the page is reloaded. Ads remain visible by default.'
-          );
+          // Log the "endpoint disabled" notice exactly once per mount so
+          // we don't keep repeating ourselves on every interval tick.
+          if (!endpointDisabledLogRef.current) {
+            endpointDisabledLogRef.current = true;
+            console.warn(
+              `[AdContext] Endpoint reported ${status} — stopping further attempts ` +
+              'until the page is reloaded. Ads remain visible by default.'
+            );
+          }
           if (isComponentMounted) {
             setAdSettings((prev) => ({ ...prev, isLoading: false }));
           }
@@ -226,7 +260,7 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
         clearTimeout(benefitsTimeoutRef.current);
       }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authResolved]);
 
   const finalAdSettings: AdSettings = {
     ...adSettings,

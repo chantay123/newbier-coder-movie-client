@@ -1,9 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import SectionHeader from './SectionHeader';
-import MovieCardVertical from './MovieCardVertical';
-import MovieCardHorizontal from './MovieCardHorizontal';
-import Skeleton from '../UI/Skeleton';
-import type { MovieLite } from '@/components/common/MovieCard/MovieCardVertical';
+import SectionHeader from '@/features/shared/components/MovieSection/SectionHeader';
+import MovieCardVertical from '@/features/shared/components/MovieCard/MovieCardVertical';
+import MovieCardHorizontal from '@/features/shared/components/MovieCard/MovieCardHorizontal';
+import Skeleton from '@/features/shared/components/UI/Skeleton';
+import type { MovieLite } from '@/features/shared/components/MovieCard/MovieCardVertical';
 
 /**
  * @file MovieCarouselSection.tsx
