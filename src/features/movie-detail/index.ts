@@ -1,5 +1,5 @@
 /**
- * @file index.js
+ * @file index.ts
  * @description Centralized barrel export for the Movie Detail and Player feature module.
  */
 
@@ -24,5 +24,3 @@ export { default as MovieCommentsSection } from './components/MovieCommentsSecti
 
 // Hooks
 export { useMovieDetail } from './hooks/useMovieDetail';
-
-

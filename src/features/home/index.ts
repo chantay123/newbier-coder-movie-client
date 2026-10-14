@@ -1,5 +1,5 @@
 /**
- * @file index.js
+ * @file index.ts
  * @description Centralized barrel export for the Home feature module.
  * Provides access to all homepage spotlights, rails, and data management hooks.
  */
