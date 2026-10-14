@@ -1,40 +1,67 @@
-import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+/**
+ * @file AdContext.tsx
+ * @description Cung cấp ad-block settings cho toàn bộ app, dựa trên
+ * subscription benefits của user hiện tại.
+ */
+
+import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import subscriptionService from '../API/services/subscriptionService';
 
-const AdContext = createContext({
+/** Default ad settings */
+export interface AdSettings {
+  hideHomepageAds: boolean;
+  hideVideoAds: boolean;
+  isLoading: boolean;
+  packageType: string | null;
+  hasActiveSubscription: boolean;
+  lastUpdated?: string;
+}
+
+/** Default values for context */
+const defaultAdSettings: AdSettings = {
   hideHomepageAds: false,
   hideVideoAds: false,
   isLoading: true,
   packageType: null,
-  hasActiveSubscription: false,
-});
+  hasActiveSubscription: false
+};
 
-export const useAdContext = () => useContext(AdContext);
+const AdContext = createContext<AdSettings>(defaultAdSettings);
 
-export const AdContextProvider = ({ children }) => {
+/** Hook consumer-side */
+export const useAdContext = (): AdSettings => useContext(AdContext);
+
+interface AdContextProviderProps {
+  children: ReactNode;
+}
+
+/** Provider bao bọc app */
+export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }) => {
   const router = useRouter();
 
-  const [adSettings, setAdSettings] = useState({
+  const [adSettings, setAdSettings] = useState<AdSettings>({
     hideHomepageAds: false,
     hideVideoAds: false,
     isLoading: true,
     packageType: null,
-    hasActiveSubscription: false,
+    hasActiveSubscription: false
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const isFetchingRef = useRef(false);
-  const benefitsTimeoutRef = useRef(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const isFetchingRef = useRef<boolean>(false);
+  const benefitsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isNoAccessPage = router.pathname === '/noaccess';
 
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('token') || localStorage.getItem('authToken');
+    const checkAuth = (): void => {
+      const token = localStorage.getItem('auth_token')
+        || localStorage.getItem('token')
+        || localStorage.getItem('authToken');
       const isNowAuthenticated = !!token;
 
-      setIsAuthenticated(prevState => {
+      setIsAuthenticated((prevState) => {
         if (prevState !== isNowAuthenticated) {
           return isNowAuthenticated;
         }
@@ -44,7 +71,7 @@ export const AdContextProvider = ({ children }) => {
 
     checkAuth();
 
-    const handleStorageChange = (e) => {
+    const handleStorageChange = (e: StorageEvent): void => {
       if (e.key === 'auth_token' || e.key === 'token' || e.key === 'authToken') {
         checkAuth();
       }
@@ -68,12 +95,12 @@ export const AdContextProvider = ({ children }) => {
     const MAX_RETRIES = 3;
     let isComponentMounted = true;
 
-    const fetchSubscriptionBenefits = async () => {
+    const fetchSubscriptionBenefits = async (): Promise<void> => {
       // If a previous attempt proved the endpoint is unavailable, do not
       // keep hammering the backend.
       if (isEndpointDisabled) {
         if (isComponentMounted) {
-          setAdSettings(prev => ({ ...prev, isLoading: false }));
+          setAdSettings((prev) => ({ ...prev, isLoading: false }));
         }
         return;
       }
@@ -84,13 +111,13 @@ export const AdContextProvider = ({ children }) => {
       isFetchingRef.current = true;
 
       if (isComponentMounted) {
-        setAdSettings(prev => ({ ...prev, isLoading: true }));
+        setAdSettings((prev) => ({ ...prev, isLoading: true }));
       }
 
       try {
         if (!isAuthenticated) {
           if (isComponentMounted) {
-            setAdSettings(prev => ({
+            setAdSettings((prev) => ({
               ...prev,
               hideHomepageAds: false,
               hideVideoAds: false,
@@ -103,7 +130,14 @@ export const AdContextProvider = ({ children }) => {
           return;
         }
 
-        const benefits = await subscriptionService.getUserAdBenefits();
+        const benefits = (await subscriptionService.getUserAdBenefits()) as {
+          authError?: boolean;
+          isPremium15k?: boolean;
+          packageType?: string | null;
+          hideHomepageAds?: boolean;
+          hideVideoAds?: boolean;
+          hasActiveSubscription?: boolean;
+        };
 
         if (!isComponentMounted) {
           isFetchingRef.current = false;
@@ -122,10 +156,8 @@ export const AdContextProvider = ({ children }) => {
           }
         }
 
-        const isPremium15k = benefits.isPremium15k === true || benefits.packageType === '682f7d849c310399aa715c9d';
-
-        if (isPremium15k) {
-        }
+        const isPremium15k = benefits.isPremium15k === true
+          || benefits.packageType === '682f7d849c310399aa715c9d';
 
         const hideHomepageAds = benefits.hideHomepageAds === true || isPremium15k;
         const hideVideoAds = benefits.hideVideoAds === true || isPremium15k;
@@ -133,10 +165,10 @@ export const AdContextProvider = ({ children }) => {
 
         if (isComponentMounted) {
           setAdSettings({
-            hideHomepageAds: hideHomepageAds,
-            hideVideoAds: hideVideoAds,
-            packageType: benefits.packageType,
-            hasActiveSubscription: hasActiveSubscription,
+            hideHomepageAds,
+            hideVideoAds,
+            packageType: benefits.packageType ?? null,
+            hasActiveSubscription,
             isLoading: false,
             lastUpdated: new Date().toISOString()
           });
@@ -146,12 +178,11 @@ export const AdContextProvider = ({ children }) => {
       } catch (error) {
         // Distinguish permanent failures (no point retrying) from
         // transient ones. Axios sets error.response only when the server
-        // replied; absence means Network Error / CORS / timeout — all of
-        // which are treated as transient *if* the host is reachable, and
-        // permanent when we've already seen multiple consecutive failures.
-        const status = error?.response?.status;
+        // replied; absence means Network Error / CORS / timeout.
+        const err = error as { response?: { status?: number }; message?: string };
+        const status = err?.response?.status;
         const isPermanent = status === 404 || status === 400;
-        console.error('[AdContext] Failed to fetch ad benefits:', error?.message || error);
+        console.error('[AdContext] Failed to fetch ad benefits:', err?.message || error);
 
         if (isPermanent) {
           isEndpointDisabled = true;
@@ -160,7 +191,7 @@ export const AdContextProvider = ({ children }) => {
             'until the page is reloaded. Ads remain visible by default.'
           );
           if (isComponentMounted) {
-            setAdSettings(prev => ({ ...prev, isLoading: false }));
+            setAdSettings((prev) => ({ ...prev, isLoading: false }));
           }
         } else if (retryCount < MAX_RETRIES) {
           retryCount++;
@@ -173,7 +204,7 @@ export const AdContextProvider = ({ children }) => {
           // scheduling more until the next interval tick (15 min) to
           // avoid an infinite retry loop.
           if (isComponentMounted) {
-            setAdSettings(prev => ({ ...prev, isLoading: false }));
+            setAdSettings((prev) => ({ ...prev, isLoading: false }));
           }
         }
       } finally {
@@ -184,8 +215,6 @@ export const AdContextProvider = ({ children }) => {
     fetchSubscriptionBenefits();
 
     // Only schedule a periodic refresh if the endpoint appears reachable.
-    // Once disabled, we still update `isLoading` once above; the interval
-    // would just be a no-op and produce noise.
     const refreshInterval = setInterval(() => {
       if (!isEndpointDisabled) fetchSubscriptionBenefits();
     }, 15 * 60 * 1000);
@@ -198,10 +227,11 @@ export const AdContextProvider = ({ children }) => {
       }
     };
   }, [isAuthenticated]);
-  const finalAdSettings = {
+
+  const finalAdSettings: AdSettings = {
     ...adSettings,
     hideHomepageAds: isNoAccessPage ? true : adSettings.hideHomepageAds,
-    hideVideoAds: isNoAccessPage ? true : adSettings.hideVideoAds,
+    hideVideoAds: isNoAccessPage ? true : adSettings.hideVideoAds
   };
 
   return (

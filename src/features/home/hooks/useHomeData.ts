@@ -1,45 +1,94 @@
 /**
- * @file useHomeData.js
+ * @file useHomeData.ts
  * @description Centralized data management hook for the Homepage.
- * Seamlessly integrates with HOME_SECTIONS to provide zero-flicker instant render,
- * clean state updates, and resilient fallbacks.
+ * Tích hợp HOME_SECTIONS để render không nhấp nháy, cập nhật state sạch,
+ * fallback bền bỉ.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   normalizeHeroMovie,
-  resolveMovieBackdrop,
-  resolveImageUrl,
-  LOCAL_DEFAULT_POSTER
+  resolveImageUrl
 } from '@/config/movieConfig';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
 import { HOME_SECTIONS } from '@/config/homeSectionsConfig';
+import {
+  resolveMovieBackdrop,
+  LOCAL_DEFAULT_BACKDROP,
+  LOCAL_DEFAULT_POSTER
+} from '@/config/movieFallbackConfig';
 import movieService from '@/API/services/movieService';
 import upcomingMovieService from '@/API/services/upcomingMovieService';
+
+/** Phim thô từ backend - loose shape, mọi field đều optional */
+export type RawMovie = Record<string, unknown>;
+
+/** Movie sau khi đã normalize về schema chuẩn */
+export interface NormalizedMovie extends RawMovie {
+  _id: string;
+  name: string;
+  poster_url: string;
+  thumb_url: string;
+  backdrop_url: string;
+}
+
+/** Movie với rank cho Top 10 */
+export interface RankedMovie extends NormalizedMovie {
+  rank: number;
+}
+
+/** Initial snapshot từ ISR/SSR */
+export interface HomeDataSnapshot {
+  featuredMovies?: RawMovie[];
+  topMovies?: RawMovie[];
+  mostViewedMovies?: RawMovie[];
+  latestMovies?: RawMovie[];
+  animeSpotlightMovies?: RawMovie[];
+  [key: string]: unknown;
+}
+
+/** Hook return type */
+export interface UseHomeDataReturn {
+  featuredMovies: NormalizedMovie[];
+  topMovies: NormalizedMovie[];
+  mostViewedMovies: RankedMovie[];
+  upcomingMovies: NormalizedMovie[];
+  upcomingLoading: boolean;
+  upcomingLoaded: boolean;
+  loadUpcoming: () => Promise<void>;
+  animeSpotlightMovies: RawMovie[];
+  latestMovies: NormalizedMovie[];
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  page: number;
+  loadMore: () => Promise<void>;
+  fetchHeroMovies: () => Promise<void>;
+  fetchTop10Movies: () => Promise<void>;
+  fetchBigSlideMovies: () => Promise<void>;
+  fetchMostViewed: () => Promise<void>;
+}
 
 // Module-level guard so the diagnostic only fires once per page load,
 // even if the home page re-mounts or re-fetches.
 let didLogHomeDiagnostic = false;
 
 /**
- * Normalizes movie data from various backend API formats into standard schema.
- * All image fields are run through `resolveImageUrl` so relative paths
- * returned by the API (e.g. `/uploads/poster.jpg`) get the proper origin
- * prepended instead of being requested from the current page host.
+ * Chuẩn hoá movie data từ nhiều format backend về schema chuẩn.
+ * Mọi image field đều qua `resolveImageUrl` để relative path từ API
+ * (e.g. `/uploads/poster.jpg`) được gắn origin thay vì host hiện tại.
  *
- * @param {Object} movie - Raw movie object from API.
- * @param {number} [index=0] - Item index for diversified fallback backdrops.
- * @returns {Object} Normalized movie object.
+ * @param movie Raw movie object from API
+ * @param index Item index cho diversified fallback backdrops
+ * @returns Normalized movie object
  */
-const normalizeMovie = (movie, index = 0) => {
+const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): NormalizedMovie | null => {
   if (!movie) return null;
 
-  // Discover all candidate field names the backend might use for posters
-  // and thumbs. We never overwrite a real URL with a placeholder unless
-  // EVERY field is empty — this protects against future schema drift.
-  const resolveFirstUsable = (candidates) => {
+  // Lấy candidate field đầu tiên resolve được
+  const resolveFirstUsable = (candidates: unknown[]): string => {
     for (const c of candidates) {
-      const r = resolveImageUrl(c);
+      const r = resolveImageUrl(c as string | null | undefined);
       if (r) return r;
     }
     return '';
@@ -56,12 +105,11 @@ const normalizeMovie = (movie, index = 0) => {
   const thumbResolved = resolveFirstUsable(thumbCandidates);
   const poster = posterResolved || thumbResolved || LOCAL_DEFAULT_POSTER;
   const thumb = thumbResolved || posterResolved || poster || LOCAL_DEFAULT_POSTER;
-  const backdrop = resolveMovieBackdrop(movie, index) || LOCAL_DEFAULT_BACKDROP;
+  const backdrop = resolveMovieBackdrop(movie as never, index) || LOCAL_DEFAULT_BACKDROP;
 
   // Controlled diagnostic (gated by NEXT_PUBLIC_DEBUG_MOVIES=true).
   // Logs ONLY the FIRST movie's raw fields and the resolved URLs, once
-  // per page load, so we can identify the real cause of broken images
-  // without spamming the console.
+  // per page load.
   if (SYSTEM_CONFIG.debugMovies && index === 0 && !didLogHomeDiagnostic) {
     didLogHomeDiagnostic = true;
     // eslint-disable-next-line no-console
@@ -71,7 +119,6 @@ const normalizeMovie = (movie, index = 0) => {
       poster_url: movie?.poster_url,
       thumb_url: movie?.thumb_url,
       backdrop_url: movie?.backdrop_url,
-      // Common alternative field names so we can spot them in one glance:
       poster: movie?.poster,
       thumb: movie?.thumb,
       backdrop: movie?.backdrop,
@@ -80,9 +127,9 @@ const normalizeMovie = (movie, index = 0) => {
       posterUrl: movie?.posterUrl,
       backdropUrl: movie?.backdropUrl,
       thumbUrl: movie?.thumbUrl,
-      tmdb_poster_path: movie?.tmdb?.poster_path,
-      tmdb_backdrop_path: movie?.tmdb?.backdrop_path,
-      nested: movie?.images && typeof movie.images === 'object' ? Object.keys(movie.images) : null
+      tmdb_poster_path: (movie?.tmdb as Record<string, unknown> | undefined)?.poster_path,
+      tmdb_backdrop_path: (movie?.tmdb as Record<string, unknown> | undefined)?.backdrop_path,
+      nested: movie?.images && typeof movie.images === 'object' ? Object.keys(movie.images as object) : null
     });
     // eslint-disable-next-line no-console
     console.log('[debug-movies] RESOLVED image URLs (movie[0]):', {
@@ -92,54 +139,61 @@ const normalizeMovie = (movie, index = 0) => {
     });
   }
 
+  const id = (movie._id as string) || (movie.id as string) || `movie-${index}`;
+  const name = (movie.name as string) || 'Phim Đang Cập Nhật';
+
   return {
     ...movie,
-    _id: movie._id || movie.id || `movie-${index}`,
-    name: movie.name || 'Phim Đang Cập Nhật',
+    _id: id,
+    name,
     poster_url: poster,
     thumb_url: thumb,
     backdrop_url: backdrop
   };
 };
 
-export const useHomeData = (initialSnapshot = null) => {
+export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): UseHomeDataReturn => {
   const isSnapshotEnabled = process.env.NEXT_PUBLIC_ENABLE_HOMEPAGE_SNAPSHOT === 'true';
-  const effectiveSnapshot = isSnapshotEnabled ? initialSnapshot : null;
+  const effectiveSnapshot: HomeDataSnapshot | null = isSnapshotEnabled ? initialSnapshot : null;
+  const snap = effectiveSnapshot as HomeDataSnapshot | null;
 
   // Pure real API data states initialized from ISR snapshot when available & enabled
-  const [featuredMovies, setFeaturedMovies] = useState(() =>
-    effectiveSnapshot?.featuredMovies?.length > 0
-      ? effectiveSnapshot.featuredMovies.map((m, idx) => normalizeHeroMovie(m, idx))
+  const [featuredMovies, setFeaturedMovies] = useState<NormalizedMovie[]>(() =>
+    snap && (snap.featuredMovies?.length ?? 0) > 0
+      ? (snap.featuredMovies ?? []).map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie)
       : []
   );
-  const [topMovies, setTopMovies] = useState(() =>
-    effectiveSnapshot?.topMovies?.length > 0
-      ? effectiveSnapshot.topMovies.map((m, idx) => normalizeMovie(m, idx))
+  const [topMovies, setTopMovies] = useState<NormalizedMovie[]>(() =>
+    snap && (snap.topMovies?.length ?? 0) > 0
+      ? (snap.topMovies ?? []).map((m, idx) => normalizeMovie(m, idx) as NormalizedMovie)
       : []
   );
-  const [mostViewedMovies, setMostViewedMovies] = useState(() =>
-    effectiveSnapshot?.mostViewedMovies?.length > 0
-      ? effectiveSnapshot.mostViewedMovies.map((m, idx) => ({ ...normalizeMovie(m, idx), rank: m.rank || idx + 1 }))
+  const [mostViewedMovies, setMostViewedMovies] = useState<RankedMovie[]>(() =>
+    snap && (snap.mostViewedMovies?.length ?? 0) > 0
+      ? (snap.mostViewedMovies ?? []).map((m, idx) => ({
+          ...(normalizeMovie(m, idx) as NormalizedMovie),
+          rank: (m.rank as number) || idx + 1
+        }))
       : []
   );
-  const [upcomingMovies, setUpcomingMovies] = useState([]);
-  const [upcomingLoading, setUpcomingLoading] = useState(false);
-  const [upcomingLoaded, setUpcomingLoaded] = useState(false);
-  const [animeSpotlightMovies, setAnimeSpotlightMovies] = useState(() =>
-    effectiveSnapshot?.animeSpotlightMovies || []
+  const [upcomingMovies, setUpcomingMovies] = useState<NormalizedMovie[]>([]);
+  const [upcomingLoading, setUpcomingLoading] = useState<boolean>(false);
+  const [upcomingLoaded, setUpcomingLoaded] = useState<boolean>(false);
+  const [animeSpotlightMovies, setAnimeSpotlightMovies] = useState<RawMovie[]>(
+    () => (snap?.animeSpotlightMovies || []) as RawMovie[]
   );
-  const [latestMovies, setLatestMovies] = useState(() =>
-    effectiveSnapshot?.latestMovies?.length > 0
-      ? effectiveSnapshot.latestMovies.map((m, idx) => normalizeMovie(m, idx))
+  const [latestMovies, setLatestMovies] = useState<NormalizedMovie[]>(() =>
+    snap && (snap.latestMovies?.length ?? 0) > 0
+      ? (snap.latestMovies ?? []).map((m, idx) => normalizeMovie(m, idx) as NormalizedMovie)
       : []
   );
 
-  const [loading, setLoading] = useState(() => !effectiveSnapshot?.featuredMovies?.length);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => !(snap?.featuredMovies?.length ?? 0));
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(true);
 
-  const isMountedRef = useRef(true);
+  const isMountedRef = useRef<boolean>(true);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -151,11 +205,12 @@ export const useHomeData = (initialSnapshot = null) => {
   /**
    * Fetches hero spotlight movies via HOME_SECTIONS bundle.
    */
-  const fetchHeroMovies = useCallback(async () => {
+  const fetchHeroMovies = useCallback(async (): Promise<void> => {
     try {
-      const movies = await HOME_SECTIONS.hero.load([]);
+      const heroSection = HOME_SECTIONS['hero'];
+      const movies = heroSection?.load ? await heroSection.load([]) : [];
       if (isMountedRef.current && movies.length > 0) {
-        setFeaturedMovies(movies.map((m, idx) => normalizeHeroMovie(m, idx)));
+        setFeaturedMovies(movies.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie));
       }
     } catch {
       // Fallback is gracefully handled inside HOME_SECTIONS.hero.load
@@ -165,12 +220,13 @@ export const useHomeData = (initialSnapshot = null) => {
   /**
    * Fetches Top 10 movies via HOME_SECTIONS bundle.
    */
-  const fetchTop10Movies = useCallback(async () => {
+  const fetchTop10Movies = useCallback(async (): Promise<void> => {
     try {
-      const movies = await HOME_SECTIONS.top10.load([]);
+      const top10Section = HOME_SECTIONS['top10'];
+      const movies = top10Section?.load ? await top10Section.load([]) : [];
       if (isMountedRef.current && movies.length > 0) {
-        const normalized = movies.map((m, idx) => ({
-          ...normalizeMovie(m, idx),
+        const normalized: RankedMovie[] = movies.map((m, idx) => ({
+          ...(normalizeMovie(m as RawMovie, idx) as NormalizedMovie),
           rank: idx + 1
         }));
         setMostViewedMovies(normalized);
@@ -184,7 +240,7 @@ export const useHomeData = (initialSnapshot = null) => {
    * Fetches the homepage movie list (page=1, limit=20) on first paint
    * and subsequent pages for infinite scroll.
    */
-  const fetchLatestMovies = useCallback(async (pageNumber = 1, isLoadMore = false) => {
+  const fetchLatestMovies = useCallback(async (pageNumber = 1, isLoadMore = false): Promise<void> => {
     try {
       if (isLoadMore) {
         setLoadingMore(true);
@@ -200,7 +256,7 @@ export const useHomeData = (initialSnapshot = null) => {
         : await movieService.getMoviesPage(pageNumber, 24);
 
       if (rawMovies.length > 0 && isMountedRef.current) {
-        const normalized = rawMovies.map((m, idx) => normalizeMovie(m, idx));
+        const normalized = rawMovies.map((m, idx) => normalizeMovie(m as RawMovie, idx) as NormalizedMovie);
 
         if (pageNumber === 1) {
           setTopMovies(normalized.slice(0, 12));
@@ -222,7 +278,7 @@ export const useHomeData = (initialSnapshot = null) => {
   /**
    * Lazily loads upcoming movies on demand with a deliberate loading buffer.
    */
-  const loadUpcoming = useCallback(async () => {
+  const loadUpcoming = useCallback(async (): Promise<void> => {
     if (upcomingLoaded || upcomingLoading) return;
     setUpcomingLoading(true);
 
@@ -231,23 +287,26 @@ export const useHomeData = (initialSnapshot = null) => {
     const MAX_TIMEOUT = 8000;
 
     let timeoutTriggered = false;
-    const timeoutTimer = setTimeout(() => {
+    const timeoutTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
       timeoutTriggered = true;
     }, MAX_TIMEOUT);
 
     try {
-      const result = await upcomingMovieService.getUpcomingMovies(1, 15);
+      const result = await upcomingMovieService.getUpcomingMovies(1, 15) as {
+        success?: boolean;
+        upcomingMovies?: RawMovie[];
+      };
       clearTimeout(timeoutTimer);
 
       if (timeoutTriggered) return;
 
       const elapsed = Date.now() - startTime;
       if (elapsed < MIN_LOADING_TIME) {
-        await new Promise((resolve) => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
+        await new Promise<void>((resolve) => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
       }
 
-      if (result?.success && result.upcomingMovies?.length > 0 && isMountedRef.current) {
-        setUpcomingMovies(result.upcomingMovies.map(normalizeMovie));
+      if (result?.success && (result.upcomingMovies?.length ?? 0) > 0 && isMountedRef.current) {
+        setUpcomingMovies((result.upcomingMovies || []).map((m) => normalizeMovie(m) as NormalizedMovie));
       } else if (isMountedRef.current) {
         setUpcomingMovies([]);
       }
@@ -255,7 +314,7 @@ export const useHomeData = (initialSnapshot = null) => {
       clearTimeout(timeoutTimer);
       const elapsed = Date.now() - startTime;
       if (elapsed < MIN_LOADING_TIME) {
-        await new Promise((resolve) => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
+        await new Promise<void>((resolve) => setTimeout(resolve, MIN_LOADING_TIME - elapsed));
       }
 
       if (!timeoutTriggered && isMountedRef.current) {
@@ -272,9 +331,12 @@ export const useHomeData = (initialSnapshot = null) => {
   /**
    * Fetches Anime Spotlight movies via HOME_SECTIONS bundle.
    */
-  const fetchBigSlideMovies = useCallback(async () => {
+  const fetchBigSlideMovies = useCallback(async (): Promise<void> => {
     try {
-      const movies = await HOME_SECTIONS.big_slide?.load([]);
+      const bigSlideSection = HOME_SECTIONS['big_slide'];
+      const movies = bigSlideSection?.load
+        ? ((await bigSlideSection.load([])) as unknown as RawMovie[])
+        : undefined;
       if (isMountedRef.current && Array.isArray(movies) && movies.length > 0) {
         setAnimeSpotlightMovies(movies);
       }
@@ -283,7 +345,7 @@ export const useHomeData = (initialSnapshot = null) => {
     }
   }, []);
 
-  // Initial fetch on mount: ONLY triggered if initialSnapshot is not provided or empty (saves 100% initial queries)
+  // Initial fetch on mount: ONLY triggered if initialSnapshot is not provided or empty
   useEffect(() => {
     if (!initialSnapshot?.featuredMovies?.length) {
       fetchHeroMovies();
@@ -296,7 +358,7 @@ export const useHomeData = (initialSnapshot = null) => {
   /**
    * Loads the next batch of movies for infinite scrolling.
    */
-  const loadMore = useCallback(async () => {
+  const loadMore = useCallback(async (): Promise<void> => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
 
@@ -305,7 +367,7 @@ export const useHomeData = (initialSnapshot = null) => {
       const rawMovies = await movieService.getMoviesPage(nextPage, 24);
 
       if (rawMovies && rawMovies.length > 0 && isMountedRef.current) {
-        const normalized = rawMovies.map((m, idx) => normalizeMovie(m, idx));
+        const normalized = rawMovies.map((m, idx) => normalizeMovie(m as RawMovie, idx) as NormalizedMovie);
         setLatestMovies((prev) => [...prev, ...normalized]);
         setPage(nextPage);
       } else if (isMountedRef.current) {
