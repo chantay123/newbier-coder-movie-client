@@ -1,39 +1,48 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { getWatchProgress } from '@/utils/watchProgress';
+import type { WatchServer, WatchEpisode } from '../WatchSidebarPlaylist/WatchSidebarPlaylist';
 import styles from './EpisodeDirectory.module.css';
 
 const GROUP_SIZE = 25;
 
 /**
- * @file EpisodeDirectory.js
- * @description Compact, high-density episode directory modeled after Asian streaming
- * platforms (AnimeVietSub, RoPhim). Displays a clean grid of compact episode chips
- * grouped by server with zero bloat, resume banner, and instant navigation.
- *
- * @param {Object} props
- * @param {string} props.movieSlug - Movie slug for navigation.
- * @param {Array<Object>} [props.servers=[]] - Episode servers list.
- * @param {string} [props.movieType='single'] - 'series' or 'single'.
+ * @file EpisodeDirectory.tsx
+ * @description Compact, high-density episode directory modeled after Asian streaming platforms.
  */
-export default function EpisodeDirectory({
+
+export interface EpisodeDirectoryProps {
+  movieSlug?: string;
+  servers?: WatchServer[];
+  movieType?: 'series' | 'single' | string;
+}
+
+/** Watch progress shape (partial) */
+interface WatchProgressPayload {
+  epSlug?: string;
+  serverIndex?: number;
+  episodeIndex?: number;
+  epName?: string;
+}
+
+const EpisodeDirectory: React.FC<EpisodeDirectoryProps> = ({
   movieSlug,
   servers = [],
   movieType = 'single'
-}) {
-  const [activeServerIndex, setActiveServerIndex] = useState(0);
-  const [activeGroupIndex, setActiveGroupIndex] = useState(0);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [savedProgress, setSavedProgress] = useState(null);
+}) => {
+  const [activeServerIndex, setActiveServerIndex] = useState<number>(0);
+  const [activeGroupIndex, setActiveGroupIndex] = useState<number>(0);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [savedProgress, setSavedProgress] = useState<WatchProgressPayload | null>(null);
 
-  const currentServer = servers[activeServerIndex] || servers[0] || null;
-  const rawEpisodes = currentServer?.server_data || [];
+  const currentServer: WatchServer | null = servers[activeServerIndex] || servers[0] || null;
+  const rawEpisodes: WatchEpisode[] = currentServer?.server_data || [];
   const totalEpisodes = rawEpisodes.length;
 
   // Check saved progress from localStorage on client mount
   useEffect(() => {
     if (!movieSlug) return;
-    const progress = getWatchProgress(movieSlug);
+    const progress = getWatchProgress(movieSlug) as WatchProgressPayload | null;
     if (progress) {
       setSavedProgress(progress);
       if (typeof progress.serverIndex === 'number' && progress.serverIndex < servers.length) {
@@ -45,11 +54,11 @@ export default function EpisodeDirectory({
     }
   }, [movieSlug, servers.length]);
 
-  // Single movie check: If single movie with only 1 episode, render a clean compact single-source row
+  // Single movie check
   const isSeries = movieType === 'series' || totalEpisodes > 1;
 
   // Filter episodes by search term
-  const filteredEpisodes = useMemo(() => {
+  const filteredEpisodes = useMemo((): WatchEpisode[] => {
     if (!searchTerm.trim()) return rawEpisodes;
     const clean = searchTerm.trim().toLowerCase();
     return rawEpisodes.filter(
@@ -62,7 +71,7 @@ export default function EpisodeDirectory({
   const totalGroups = Math.ceil(filteredEpisodes.length / GROUP_SIZE);
 
   // Sliced episodes for current group
-  const displayedEpisodes = useMemo(() => {
+  const displayedEpisodes = useMemo((): WatchEpisode[] => {
     if (searchTerm.trim()) return filteredEpisodes.slice(0, 100);
     const start = activeGroupIndex * GROUP_SIZE;
     return filteredEpisodes.slice(start, start + GROUP_SIZE);
@@ -91,7 +100,7 @@ export default function EpisodeDirectory({
   }
 
   // Target resume episode link
-  const resumeHref = savedProgress?.epSlug
+  const resumeHref: string = savedProgress?.epSlug
     ? `/movie/${movieSlug}/watch?ep=${encodeURIComponent(savedProgress.epSlug)}&server=${savedProgress.serverIndex || 0}`
     : `/movie/${movieSlug}/watch`;
 
@@ -109,7 +118,7 @@ export default function EpisodeDirectory({
           <div className={styles.serverTabs}>
             {servers.map((srv, idx) => (
               <button
-                key={srv.server_name || idx}
+                key={srv.server_name || String(idx)}
                 type="button"
                 className={`${styles.serverTab} ${activeServerIndex === idx ? styles.serverTabActive : ''}`}
                 onClick={() => {
@@ -125,7 +134,7 @@ export default function EpisodeDirectory({
         )}
       </div>
 
-      {/* Resume Watch Banner if user has watched before */}
+      {/* Resume Watch Banner */}
       {savedProgress && savedProgress.epName && (
         <div className={styles.resumeBanner}>
           <div className={styles.resumeInfo}>
@@ -143,7 +152,7 @@ export default function EpisodeDirectory({
         </div>
       )}
 
-      {/* Filter toolbar if more than 25 episodes */}
+      {/* Filter toolbar */}
       {totalEpisodes > 25 && (
         <div className={styles.filterBar}>
           {totalGroups > 1 && !searchTerm.trim() && (
@@ -194,7 +203,7 @@ export default function EpisodeDirectory({
 
           return (
             <Link
-              key={ep.slug || idx}
+              key={ep.slug || String(idx)}
               href={href}
               className={`${styles.chip} ${isResumeEp ? styles.chipResume : ''}`}
               title={isResumeEp ? `Tiếp tục xem ${displayName}` : `Xem ${displayName}`}
@@ -212,4 +221,6 @@ export default function EpisodeDirectory({
       )}
     </section>
   );
-}
+};
+
+export default EpisodeDirectory;

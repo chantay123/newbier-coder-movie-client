@@ -4,27 +4,35 @@ import styles from './EpisodeSelector.module.css';
 const GROUP_SIZE = 50;
 
 /**
- * @file EpisodeSelector.js
- * @description Smart episode list selector with search and pagination grouping (1-50, 51-100),
- * perfectly supporting series with hundreds of episodes without browser lag.
- *
- * @param {Object} props
- * @param {Array<Object>} [props.episodes=[]] - List of episodes for current server.
- * @param {number} [props.currentIndex=0] - Active episode index.
- * @param {Function} props.onSelectEpisode - Callback when user chooses an episode.
+ * @file EpisodeSelector.tsx
+ * @description Smart episode list selector with search and pagination grouping (1-50, 51-100).
  */
-export default function EpisodeSelector({
+
+export interface EpisodeEntry {
+  _id?: string;
+  name?: string;
+  slug?: string;
+  [key: string]: unknown;
+}
+
+export interface EpisodeSelectorProps {
+  episodes?: EpisodeEntry[];
+  currentIndex?: number;
+  onSelectEpisode?: (index: number) => void;
+}
+
+const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   episodes = [],
   currentIndex = 0,
   onSelectEpisode
-}) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeGroupIndex, setActiveGroupIndex] = useState(0);
+}) => {
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [activeGroupIndex, setActiveGroupIndex] = useState<number>(0);
 
   const total = episodes.length;
 
   // Filter episodes if search term is provided
-  const filteredEpisodes = useMemo(() => {
+  const filteredEpisodes = useMemo((): EpisodeEntry[] => {
     if (!searchTerm.trim()) return episodes;
     const clean = searchTerm.trim().toLowerCase();
     return episodes.filter(
@@ -34,11 +42,10 @@ export default function EpisodeSelector({
     );
   }, [episodes, searchTerm]);
 
-  // Total groups for pagination tabs
   const totalGroups = Math.ceil(filteredEpisodes.length / GROUP_SIZE);
 
   // Episodes for active group
-  const currentGroupEpisodes = useMemo(() => {
+  const currentGroupEpisodes = useMemo((): EpisodeEntry[] => {
     if (searchTerm.trim()) return filteredEpisodes;
     const start = activeGroupIndex * GROUP_SIZE;
     return filteredEpisodes.slice(start, start + GROUP_SIZE);
@@ -67,7 +74,7 @@ export default function EpisodeSelector({
         )}
       </div>
 
-      {/* Group Range Tabs (1-50, 51-100) if more than 50 episodes and not searching */}
+      {/* Group Range Tabs */}
       {totalGroups > 1 && !searchTerm.trim() && (
         <div className={styles.rangeTabs} role="tablist">
           {Array.from({ length: totalGroups }, (_, i) => {
@@ -95,7 +102,7 @@ export default function EpisodeSelector({
       <div className={styles.episodeGrid}>
         {currentGroupEpisodes.map((ep, localIdx) => {
           // Calculate global index in original episodes array
-          const globalIdx = searchTerm.trim()
+          const globalIdx: number = searchTerm.trim()
             ? episodes.findIndex((item) => item.slug === ep.slug)
             : activeGroupIndex * GROUP_SIZE + localIdx;
 
@@ -106,7 +113,7 @@ export default function EpisodeSelector({
               key={ep.slug || ep._id || globalIdx}
               type="button"
               className={`${styles.epBtn} ${isCurrent ? styles.epBtnActive : ''}`}
-              onClick={() => onSelectEpisode(globalIdx)}
+              onClick={() => onSelectEpisode && onSelectEpisode(globalIdx)}
               title={`Xem ${ep.name || `Tập ${globalIdx + 1}`}`}
             >
               <span className={styles.epLabel}>
@@ -119,4 +126,6 @@ export default function EpisodeSelector({
       </div>
     </div>
   );
-}
+};
+
+export default EpisodeSelector;

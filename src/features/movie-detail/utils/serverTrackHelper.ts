@@ -1,14 +1,50 @@
 /**
- * @file serverTrackHelper.js
- * @description Helper to parse, classify, and group server / audio stream tracks (Vietsub, Thuyết Minh, Lồng Tiếng).
- * Eliminates duplicate buttons and enables hover-to-select multiple sources (Nguồn 1, Nguồn 2).
+ * @file serverTrackHelper.ts
+ * @description Helper to parse, classify, and group server / audio stream tracks
+ * (Vietsub, Thuyết Minh, Lồng Tiếng). Eliminates duplicate buttons and enables
+ * hover-to-select multiple sources (Nguồn 1, Nguồn 2).
  */
 
-export function parseServerTrack(serverName = '', index = 0) {
+export type TrackType = 'voice' | 'dub' | 'sub' | 'server';
+
+export interface ParsedTrack {
+  type: TrackType;
+  title: string;
+  badge: string;
+  icon: string;
+  displayName: string;
+  rawName: string;
+}
+
+/** Raw server entry từ API */
+export interface ServerEntry {
+  server_name?: string;
+  server_data?: unknown[];
+  [key: string]: unknown;
+}
+
+/** Source within a group (Nguồn 1, Nguồn 2...) */
+export interface GroupSource {
+  originalIndex: number;
+  serverName: string;
+  sourceLabel: string;
+  shortLabel: string;
+  sourceNumber: number;
+}
+
+/** Group of sources sharing the same audio type */
+export interface TrackGroup {
+  key: string;
+  label: string;
+  icon: string;
+  sources: GroupSource[];
+}
+
+export function parseServerTrack(serverName: string = '', index: number = 0): ParsedTrack {
   const raw = String(serverName || '').trim();
   const lower = raw.toLowerCase();
 
-  let type = 'server';
+  let type: TrackType = 'server';
   let title = 'Bản Chuẩn';
   let icon = 'fas fa-play-circle';
   let badge = '';
@@ -53,14 +89,11 @@ export function parseServerTrack(serverName = '', index = 0) {
 /**
  * Groups an array of raw servers by audio version (Vietsub, Thuyết Minh, Lồng Tiếng).
  * Each group has 1 or more sources (Nguồn 1, Nguồn 2) to prevent duplicate buttons.
- *
- * @param {Array<Object>} [servers=[]]
- * @returns {Array<Object>} Grouped track list
  */
-export function groupServersByTrack(servers = []) {
+export function groupServersByTrack(servers: ServerEntry[] = []): TrackGroup[] {
   if (!Array.isArray(servers) || servers.length === 0) return [];
 
-  const groupMap = new Map();
+  const groupMap = new Map<string, TrackGroup>();
 
   servers.forEach((srv, index) => {
     const raw = String(srv?.server_name || '').trim();
@@ -103,7 +136,7 @@ export function groupServersByTrack(servers = []) {
       });
     }
 
-    const group = groupMap.get(key);
+    const group = groupMap.get(key)!;
     const sourceCount = group.sources.length + 1;
     const sourceLabel = sourceCount === 1 ? `Nguồn 1 (Chính)` : `Nguồn ${sourceCount} (Dự phòng)`;
 

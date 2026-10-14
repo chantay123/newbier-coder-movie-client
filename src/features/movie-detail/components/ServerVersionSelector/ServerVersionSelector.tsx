@@ -1,26 +1,27 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { groupServersByTrack } from '@/features/movie-detail/utils/serverTrackHelper';
+import { groupServersByTrack, type ServerEntry } from '@/features/movie-detail/utils/serverTrackHelper';
 import styles from './ServerVersionSelector.module.css';
 
 /**
- * @file ServerVersionSelector.js
+ * @file ServerVersionSelector.tsx
  * @description Sleek audio version selector (Vietsub, Thuyết Minh, Lồng Tiếng).
- * Eliminates duplicate buttons and provides an elegant hover dropdown for multiple sources (Nguồn 1, Nguồn 2).
- *
- * @param {Object} props
- * @param {Array<Object>} [props.servers=[]] - Raw server list from movie data.
- * @param {number} [props.currentServerIndex=0] - Active server index.
- * @param {Function} props.onSelectServer - Callback when server is switched.
- * @param {string} [props.label] - Optional header label (e.g. "Bản chiếu:").
  */
-export default function ServerVersionSelector({
+
+export interface ServerVersionSelectorProps {
+  servers?: ServerEntry[];
+  currentServerIndex?: number;
+  onSelectServer?: (index: number) => void;
+  label?: string;
+}
+
+const ServerVersionSelector: React.FC<ServerVersionSelectorProps> = ({
   servers = [],
   currentServerIndex = 0,
   onSelectServer,
   label
-}) {
-  const [openDropdownKey, setOpenDropdownKey] = useState(null);
-  const leaveTimerRef = useRef(null);
+}) => {
+  const [openDropdownKey, setOpenDropdownKey] = useState<string | null>(null);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear timer on unmount
   useEffect(() => {
@@ -29,15 +30,15 @@ export default function ServerVersionSelector({
     };
   }, []);
 
-  // Group raw servers by audio type (Vietsub, Thuyết Minh, Lồng Tiếng)
+  // Group raw servers by audio type
   const groups = useMemo(() => groupServersByTrack(servers), [servers]);
 
-  // If there is only 1 server total across all groups, don't show selector (zero clutter)
+  // If there is only 1 server total, don't show selector
   if (!servers || servers.length <= 1) {
     return null;
   }
 
-  const handleMouseEnter = (key, hasMultiple) => {
+  const handleMouseEnter = (key: string, hasMultiple: boolean): void => {
     if (leaveTimerRef.current) {
       clearTimeout(leaveTimerRef.current);
       leaveTimerRef.current = null;
@@ -47,37 +48,34 @@ export default function ServerVersionSelector({
     }
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (): void => {
     if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
     leaveTimerRef.current = setTimeout(() => {
       setOpenDropdownKey(null);
     }, 280);
   };
 
-  const handleButtonClick = (group) => {
+  const handleButtonClick = (group: typeof groups[number]): void => {
     const hasMultiple = group.sources.length > 1;
     const isCurrentlyActiveGroup = group.sources.some(
       (s) => s.originalIndex === currentServerIndex
     );
 
     if (!hasMultiple) {
-      // Single source: direct select
-      onSelectServer(group.sources[0].originalIndex);
+      if (onSelectServer) onSelectServer(group.sources[0].originalIndex);
       setOpenDropdownKey(null);
     } else {
       if (isCurrentlyActiveGroup) {
-        // Toggle dropdown on click
         setOpenDropdownKey((prev) => (prev === group.key ? null : group.key));
       } else {
-        // Switch to the first source of this group and open dropdown
-        onSelectServer(group.sources[0].originalIndex);
+        if (onSelectServer) onSelectServer(group.sources[0].originalIndex);
         setOpenDropdownKey(group.key);
       }
     }
   };
 
-  const handleSelectSource = (index) => {
-    onSelectServer(index);
+  const handleSelectSource = (index: number): void => {
+    if (onSelectServer) onSelectServer(index);
     setOpenDropdownKey(null);
   };
 
@@ -164,4 +162,6 @@ export default function ServerVersionSelector({
       </div>
     </div>
   );
-}
+};
+
+export default ServerVersionSelector;

@@ -1,23 +1,40 @@
 import React, { useState } from 'react';
-import ServerVersionSelector from '@/features/movie-detail/components/ServerVersionSelector/ServerVersionSelector';
+// ServerVersionSelector is still .js, cast for strict TS
+import ServerVersionSelectorRaw from '@/features/movie-detail/components/ServerVersionSelector/ServerVersionSelector';
+const ServerVersionSelector = ServerVersionSelectorRaw as unknown as React.FC<Record<string, unknown>>;
 import { WATCH_CONFIG } from '@/config/watchConfig';
+import type { WatchServer, WatchEpisode } from '../WatchSidebarPlaylist/WatchSidebarPlaylist';
 import styles from './MoviePlayerSection.module.css';
 
 /**
- * @file MoviePlayerSection.js
+ * @file MoviePlayerSection.tsx
  * @description 16:9 Cinema streaming player with server selection tabs,
  * next/prev episode controls, and theater mode (lights off).
- *
- * @param {Object} props
- * @param {Object} props.movie - Normalized movie object.
- * @param {Array<Object>} [props.servers=[]] - Array of episode servers.
- * @param {number} [props.currentServerIndex=0] - Active server index.
- * @param {Function} props.onSelectServer - Callback when changing server.
- * @param {Object} [props.activeEpisode] - Active episode object with stream URLs.
- * @param {number} [props.currentEpisodeIndex=0] - Active episode index.
- * @param {Function} props.onSelectEpisode - Callback to change episode.
  */
-export default function MoviePlayerSection({
+
+interface MovieLite {
+  name?: string;
+}
+
+export interface ActiveEpisode {
+  name?: string;
+  link_m3u8?: string;
+  link_embed?: string;
+}
+
+export interface MoviePlayerSectionProps {
+  movie?: MovieLite | null;
+  servers?: WatchServer[];
+  currentServerIndex?: number;
+  onSelectServer?: (index: number) => void;
+  activeEpisode?: ActiveEpisode | null;
+  currentEpisodeIndex?: number;
+  onSelectEpisode?: (index: number) => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+}
+
+const MoviePlayerSection: React.FC<MoviePlayerSectionProps> = ({
   movie,
   servers = [],
   currentServerIndex = 0,
@@ -27,29 +44,29 @@ export default function MoviePlayerSection({
   onSelectEpisode,
   isPinned = false,
   onTogglePin
-}) {
-  const currentServer = servers[currentServerIndex] || null;
-  const currentEpisodes = currentServer?.server_data || [];
+}) => {
+  const currentServer: WatchServer | null = servers[currentServerIndex] || null;
+  const currentEpisodes: WatchEpisode[] = currentServer?.server_data || [];
   const totalEpisodes = currentEpisodes.length;
 
-  // Prioritize self-hosted cinema player with pixel-perfect timeline and seek buttons
-  const streamEmbedUrl = activeEpisode?.link_m3u8
+  // Prioritize self-hosted cinema player with pixel-perfect timeline
+  const streamEmbedUrl: string = activeEpisode?.link_m3u8
     ? `/player.html?url=${encodeURIComponent(activeEpisode.link_m3u8)}&title=${encodeURIComponent(movie?.name || '')}&ep=${encodeURIComponent(activeEpisode?.name || '')}`
     : (activeEpisode?.link_embed || '');
 
-  const handlePrevEpisode = () => {
-    if (currentEpisodeIndex > 0) {
+  const handlePrevEpisode = (): void => {
+    if (currentEpisodeIndex > 0 && onSelectEpisode) {
       onSelectEpisode(currentEpisodeIndex - 1);
     }
   };
 
-  const handleNextEpisode = () => {
-    if (currentEpisodeIndex < totalEpisodes - 1) {
+  const handleNextEpisode = (): void => {
+    if (currentEpisodeIndex < totalEpisodes - 1 && onSelectEpisode) {
       onSelectEpisode(currentEpisodeIndex + 1);
     }
   };
 
-  const handlePinClick = () => {
+  const handlePinClick = (): void => {
     if (onTogglePin) {
       onTogglePin();
     }
@@ -83,13 +100,12 @@ export default function MoviePlayerSection({
 
         {/* Player Bottom Control Bar */}
         <div className={styles.playerControlBar}>
-          {/* Audio Version Switcher (Vietsub, Thuyết Minh with hover dropdown for multi-source) */}
-          {/* <ServerVersionSelector
+          <ServerVersionSelector
             servers={servers}
             currentServerIndex={currentServerIndex}
             onSelectServer={onSelectServer}
             label={WATCH_CONFIG.labels.versionLabel}
-          /> */}
+          />
 
           {/* Episode Nav & Ghim tập Actions */}
           <div className={styles.playbackActions}>
@@ -133,4 +149,6 @@ export default function MoviePlayerSection({
       </div>
     </section>
   );
-}
+};
+
+export default MoviePlayerSection;

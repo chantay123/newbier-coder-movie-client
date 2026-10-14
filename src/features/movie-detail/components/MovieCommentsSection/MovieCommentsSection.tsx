@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styles from './MovieCommentsSection.module.css';
 
-const QUICK_TAGS = [
+const QUICK_TAGS: string[] = [
   '#PhimHay',
   '#KỹXảoĐỉnh',
   '#CốtTruyệnCuốn',
@@ -9,7 +9,7 @@ const QUICK_TAGS = [
   '#ĐángXem'
 ];
 
-const STAR_LABELS = {
+const STAR_LABELS: Record<number, string> = {
   1: '1★ - Rất dở',
   2: '2★ - Dở',
   3: '3★ - Dưới trung bình',
@@ -22,7 +22,17 @@ const STAR_LABELS = {
   10: '10★ - Tuyệt phẩm'
 };
 
-const SEED_COMMENTS = [
+interface SeedComment {
+  id: string;
+  user: string;
+  avatarLetter: string;
+  time: string;
+  rating: number;
+  content: string;
+  likes: number;
+}
+
+const SEED_COMMENTS: SeedComment[] = [
   {
     id: 'seed-1',
     user: 'MinhKhang_Cinema',
@@ -43,53 +53,64 @@ const SEED_COMMENTS = [
   }
 ];
 
-/**
- * @file MovieCommentsSection.js
- * @description Rich cinema community reviews and interactive star rating section.
- *
- * @param {Object} props
- * @param {Array<Object>} [props.comments=[]] - Existing comments from backend.
- * @param {boolean} [props.loading=false] - Comments loading state.
- * @param {Function} props.onAddComment - Callback to add a comment.
- */
-export default function MovieCommentsSection({
+/** Comment shape - compatible với cả seed và API */
+export interface CommentItem {
+  id?: string;
+  _id?: string;
+  user?: string;
+  avatarLetter?: string;
+  time?: string;
+  rating?: number;
+  content?: string;
+  likes?: number;
+}
+
+export interface MovieCommentsSectionProps {
+  comments?: CommentItem[];
+  loading?: boolean;
+  onAddComment?: (content: string) => Promise<boolean | void> | boolean | void;
+}
+
+const MovieCommentsSection: React.FC<MovieCommentsSectionProps> = ({
   comments = [],
   loading = false,
   onAddComment
-}) {
-  const [inputText, setInputText] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [hoverStar, setHoverStar] = useState(0);
-  const [selectedStar, setSelectedStar] = useState(10);
-  const [hasRated, setHasRated] = useState(false);
-  const [localComments, setLocalComments] = useState([]);
-  const [likedIds, setLikedIds] = useState({});
+}) => {
+  const [inputText, setInputText] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [hoverStar, setHoverStar] = useState<number>(0);
+  const [selectedStar, setSelectedStar] = useState<number>(10);
+  const [hasRated, setHasRated] = useState<boolean>(false);
+  const [localComments, setLocalComments] = useState<CommentItem[]>([]);
+  const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
 
   // Merge seed comments if comments from API is empty
-  const displayComments = [
+  const displayComments: CommentItem[] = [
     ...localComments,
     ...(comments.length > 0 ? comments : SEED_COMMENTS)
   ];
 
-  const handleRate = (star) => {
+  const handleRate = (star: number): void => {
     setSelectedStar(star);
     setHasRated(true);
   };
 
-  const handleQuickTagClick = (tag) => {
+  const handleQuickTagClick = (tag: string): void => {
     setInputText((prev) => (prev ? `${prev} ${tag}` : tag));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     if (!inputText.trim() || submitting) return;
 
     setSubmitting(true);
     const content = inputText.trim();
-    const success = await onAddComment(content);
+    if (onAddComment) {
+      await onAddComment(content);
+    }
 
     // Optimistically add to local comments
-    const newComment = {
+    const newComment: CommentItem = {
       id: `local-${Date.now()}`,
       user: 'Bạn',
       avatarLetter: 'B',
@@ -103,7 +124,7 @@ export default function MovieCommentsSection({
     setSubmitting(false);
   };
 
-  const handleToggleLike = (id) => {
+  const handleToggleLike = (id: string): void => {
     setLikedIds((prev) => ({
       ...prev,
       [id]: !prev[id]
@@ -212,11 +233,12 @@ export default function MovieCommentsSection({
       {/* Community Comments List */}
       <div className={styles.commentsList}>
         {displayComments.map((item, index) => {
-          const isLiked = !!likedIds[item.id || index];
+          const key = item.id || item._id || String(index);
+          const isLiked = !!likedIds[key];
           const likesCount = (item.likes || 0) + (isLiked ? 1 : 0);
 
           return (
-            <div key={item.id || index} className={styles.commentItem}>
+            <div key={key} className={styles.commentItem}>
               <div className={styles.commentAvatar}>
                 {item.avatarLetter || (item.user ? item.user.charAt(0).toUpperCase() : 'U')}
               </div>
@@ -238,7 +260,7 @@ export default function MovieCommentsSection({
                   <button
                     type="button"
                     className={`${styles.btnLike} ${isLiked ? styles.btnLikeActive : ''}`}
-                    onClick={() => handleToggleLike(item.id || index)}
+                    onClick={() => handleToggleLike(key)}
                   >
                     <i className={isLiked ? 'fas fa-thumbs-up' : 'far fa-thumbs-up'} />
                     <span>Thích ({likesCount})</span>
@@ -251,4 +273,6 @@ export default function MovieCommentsSection({
       </div>
     </section>
   );
-}
+};
+
+export default MovieCommentsSection;
