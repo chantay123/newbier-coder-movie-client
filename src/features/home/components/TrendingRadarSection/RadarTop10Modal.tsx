@@ -2,34 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import radarService from '@/API/services/radarService';
 import styles from './RadarTop10Modal.module.css';
+import type { RadarMovie, DeltaType } from './TrendingRadarSection';
 
 /**
- * @file RadarTop10Modal.js
+ * @file RadarTop10Modal.tsx
  * @description Compact, Single-Screen Top 10 Leaderboard Modal.
- * Features:
  * - 2-column layout (5 + 5) perfectly fitting in a single screen without scrolling.
- * - Minimalist, uncluttered rows without redundant buttons.
  * - Confirmation prompt on movie click asking "Bạn có muốn xem phim này không?".
  */
-export default function RadarTop10Modal({
+
+export interface RadarTop10ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialCategory?: string;
+  initialPeriod?: string;
+  onPlayTrailer?: (movie: RadarMovie) => void;
+}
+
+const RadarTop10Modal: React.FC<RadarTop10ModalProps> = ({
   isOpen,
   onClose,
   initialCategory = 'views',
   initialPeriod = 'week',
   onPlayTrailer
-}) {
+}) => {
   const router = useRouter();
-  const [category, setCategory] = useState(initialCategory);
-  const [period, setPeriod] = useState(initialPeriod);
-  const [movieList, setMovieList] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [confirmMovie, setConfirmMovie] = useState(null); // Movie selected for "Muốn xem phim không?"
+  const [category, setCategory] = useState<string>(initialCategory);
+  const [period, setPeriod] = useState<'week' | 'month'>(initialPeriod as 'week' | 'month');
+  const [movieList, setMovieList] = useState<RadarMovie[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [confirmMovie, setConfirmMovie] = useState<RadarMovie | null>(null);
 
   // Sync initial props when modal opens
   useEffect(() => {
     if (isOpen) {
       setCategory(initialCategory);
-      setPeriod(initialPeriod);
+      setPeriod((initialPeriod as 'week' | 'month'));
       setConfirmMovie(null);
     }
   }, [isOpen, initialCategory, initialPeriod]);
@@ -38,7 +46,7 @@ export default function RadarTop10Modal({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         if (confirmMovie) {
           setConfirmMovie(null);
@@ -63,12 +71,12 @@ export default function RadarTop10Modal({
     if (!isOpen) return;
 
     let isSubscribed = true;
-    const loadTop10 = async () => {
+    const loadTop10 = async (): Promise<void> => {
       setLoading(true);
       try {
-        const radar = await radarService.getTrendingRadar({ period });
+        const radar = (await radarService.getTrendingRadar({ period })) as unknown as Record<string, unknown> | null;
         if (isSubscribed) {
-          const list = (radar && radar[category]) || [];
+          const list = (radar?.[category] as RadarMovie[] | undefined) || [];
           setMovieList(list.slice(0, 10));
         }
       } catch {
@@ -88,7 +96,7 @@ export default function RadarTop10Modal({
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (e.target === e.currentTarget) {
       if (confirmMovie) {
         setConfirmMovie(null);
@@ -98,17 +106,17 @@ export default function RadarTop10Modal({
     }
   };
 
-  const handleNavigateToGrid = () => {
+  const handleNavigateToGrid = (): void => {
     onClose();
     router.push(`/rankings?category=${category}&period=${period}`);
   };
 
-  const handleWatchMovie = (movie) => {
+  const handleWatchMovie = (movie: RadarMovie): void => {
     onClose();
     router.push(`/movie/${movie.slug}`);
   };
 
-  const renderDelta = (deltaType, deltaVal) => {
+  const renderDelta = (deltaType: DeltaType, deltaVal: number | string | undefined): React.ReactNode => {
     if (deltaType === 'up') {
       return <span className={`${styles.deltaBadge} ${styles.deltaUp}`}>▲ {deltaVal}</span>;
     }
@@ -122,11 +130,11 @@ export default function RadarTop10Modal({
   };
 
   // Split into two columns of 5 items for single-screen view
-  const colLeft = movieList.slice(0, 5);
-  const colRight = movieList.slice(5, 10);
+  const colLeft: RadarMovie[] = movieList.slice(0, 5);
+  const colRight: RadarMovie[] = movieList.slice(5, 10);
 
-  const renderMovieRow = (movie, idx, offset = 0) => {
-    const rankNum = movie.rank || offset + idx + 1;
+  const renderMovieRow = (movie: RadarMovie, idx: number, offset = 0): React.ReactNode => {
+    const rankNum: number = movie.rank || offset + idx + 1;
     const formattedRank = String(rankNum).padStart(2, '0');
     const rankClass =
       rankNum === 1
@@ -283,7 +291,7 @@ export default function RadarTop10Modal({
           </button>
         </div>
 
-        {/* Confirmation Modal Overlay: "Bạn có muốn xem phim không?" */}
+        {/* Confirmation Modal Overlay */}
         {confirmMovie && (
           <div className={styles.confirmOverlay} onClick={() => setConfirmMovie(null)}>
             <div className={styles.confirmCard} onClick={(e) => e.stopPropagation()}>
@@ -351,4 +359,6 @@ export default function RadarTop10Modal({
       </div>
     </div>
   );
-}
+};
+
+export default RadarTop10Modal;

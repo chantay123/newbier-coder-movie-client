@@ -1,40 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { MovieSection } from '@/components/common/MovieSection';
+// MovieSection is currently a .js module, so we cast it to a typed component
+// to satisfy strict TypeScript checks until the component itself is migrated.
+import { MovieSection as MovieSectionRaw } from '@/components/common/MovieSection';
+const MovieSection = MovieSectionRaw as unknown as React.FC<Record<string, unknown>>;
 
 /**
- * @file AnimationMoviesSection.js
+ * @file AnimationMoviesSection.tsx
  * @description Preset rail component for Anime & Animation blockbusters.
  * Completely config-driven via section props from homeSectionsConfig.
- *
- * @param {Object} props
- * @param {'sm'|'md'|'lg'} [props.cardSize='md'] - Card size preset.
- * @param {string} [props.title] - Section title
- * @param {string} [props.badge] - Badge label
- * @param {string} [props.viewAllHref] - Target URL for view all link
- * @param {Function} [props.load] - Custom loader function from config
- * @param {Function} [props.onPlayTrailer] - Trailer playback callback.
  */
-export default function AnimationMoviesSection({
+
+export interface AnimationMoviesSectionProps {
+  cardSize?: 'sm' | 'md' | 'lg';
+  title?: string;
+  badge?: string;
+  viewAllHref?: string;
+  load?: (fallback?: unknown[]) => Promise<unknown[]>;
+  onPlayTrailer?: (movie: Record<string, unknown>) => void;
+}
+
+const AnimationMoviesSection: React.FC<AnimationMoviesSectionProps> = ({
   cardSize = 'md',
   title = 'Phim Hoạt Hình & Anime Đỉnh Cao',
   badge = 'ANIME & CARTOON',
   viewAllHref = '/the-loai/hoat-hinh',
   load,
   onPlayTrailer
-}) {
-  const [animationMovies, setAnimationMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
+}) => {
+  const [animationMovies, setAnimationMovies] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isSubscribed = true;
 
-    const fetchAnimationMovies = async () => {
+    const fetchAnimationMovies = async (): Promise<void> => {
       try {
         setLoading(true);
         const movies = typeof load === 'function' ? await load([]) : [];
 
         if (Array.isArray(movies) && isSubscribed) {
-          setAnimationMovies(movies);
+          setAnimationMovies(movies as Record<string, unknown>[]);
         }
       } catch {
         if (isSubscribed) setAnimationMovies([]);
@@ -63,4 +68,6 @@ export default function AnimationMoviesSection({
       onPlayTrailer={onPlayTrailer}
     />
   );
-}
+};
+
+export default AnimationMoviesSection;

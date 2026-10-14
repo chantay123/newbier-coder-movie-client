@@ -6,7 +6,70 @@ import radarService from '@/API/services/radarService';
 import RadarTop10Modal from './RadarTop10Modal';
 import styles from './TrendingRadarSection.module.css';
 
-export const TrendingRadarSkeleton = ({ title = "Radar Xu Hướng Thể Loại", badge = "CHỈ SỐ ĐIỆN ẢNH" }) => (
+/** Delta indicator type */
+export type DeltaType = 'up' | 'down' | 'new' | 'same' | string | undefined;
+
+/** Radar movie entry (loose shape từ service) */
+export interface RadarMovie {
+  _id?: string;
+  slug?: string;
+  title?: string;
+  name?: string;
+  year?: number | string;
+  rating?: number | string;
+  poster_url?: string;
+  backdrop_url?: string;
+  genres?: string[];
+  rank?: number;
+  metric_value?: number | string;
+  metric_label?: string;
+  delta_type?: DeltaType;
+  delta_val?: number | string;
+  trailer_url?: string;
+}
+
+/** Trending genre entry */
+export interface TrendingGenre {
+  _id: string;
+  slug: string;
+  name: string;
+  rank: number;
+  leading_movie?: string;
+  delta_type?: DeltaType;
+  delta_val?: number | string;
+}
+
+/** Radar data shape */
+export interface RadarData {
+  views?: RadarMovie[];
+  favorite?: RadarMovie[];
+  discussed?: RadarMovie[];
+  breakthrough?: RadarMovie[];
+  genres?: TrendingGenre[];
+  [key: string]: unknown;
+}
+
+/** Skeleton props */
+interface TrendingRadarSkeletonProps {
+  title?: string;
+  badge?: string;
+}
+
+/** Section props */
+export interface TrendingRadarSectionProps {
+  onPlayTrailer?: (movie: RadarMovie) => void;
+  enabled?: boolean;
+  title?: string;
+  badge?: string;
+  defaultPeriod?: 'week' | 'month' | string;
+  defaultCategory?: string;
+}
+
+/** Skeleton */
+export const TrendingRadarSkeleton: React.FC<TrendingRadarSkeletonProps> = ({
+  title = 'Radar Xu Hướng Thể Loại',
+  badge = 'CHỈ SỐ ĐIỆN ẢNH'
+}) => (
   <section className={styles.radarSection} id="cinema-trending-radar" aria-label="Đang tải radar">
     <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
       <SectionHeader title={title} badge={badge} />
@@ -34,7 +97,7 @@ export const TrendingRadarSkeleton = ({ title = "Radar Xu Hướng Thể Loại"
                   <Skeleton width="48px" height="64px" borderRadius="4px" />
                   <div className="flex-grow-1">
                     <Skeleton width="70%" height="16px" />
-                    <Skeleton width="40%" height="12px" className="mt-1" />
+                    <Skeleton width="40%" height="12px" />
                   </div>
                 </div>
               ))}
@@ -44,7 +107,7 @@ export const TrendingRadarSkeleton = ({ title = "Radar Xu Hướng Thể Loại"
       </div>
       <div className="col-12 col-xl-4">
         <div className="card bg-dark border-0 p-3 rounded-3" style={{ minHeight: '380px' }}>
-          <Skeleton width="140px" height="22px" borderRadius="4px" className="mb-3" />
+          <Skeleton width="140px" height="22px" borderRadius="4px" />
           <div className="d-flex flex-column gap-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={`genre-skel-${i}`}>
@@ -62,41 +125,28 @@ export const TrendingRadarSkeleton = ({ title = "Radar Xu Hướng Thể Loại"
   </section>
 );
 
-/**
- * @file TrendingRadarSection.js
- * @description Professional Cinema Analytics & Trending Radar dashboard.
- * Features:
- * - Timeframe Toggle: Weekly / Monthly
- * - Category Switcher: Most Discussed / Top Favorited / Views
- * - Bento Layout: Champion #1 Spotlight + Metric Rows #2-#5 + Genre Growth Pulse
- * - Clean, professional metrics without excessive icons/emojis.
- *
- * @param {Object} props
- * @param {Function} [props.onPlayTrailer] - Callback to play trailer modal
- * @param {boolean} [props.enabled=true] - Toggle visibility
- */
-export default function TrendingRadarSection({
+const TrendingRadarSection: React.FC<TrendingRadarSectionProps> = ({
   onPlayTrailer,
   enabled = true,
-  title = "Radar Xu Hướng Thể Loại",
-  badge = "CHỈ SỐ ĐIỆN ẢNH",
+  title = 'Radar Xu Hướng Thể Loại',
+  badge = 'CHỈ SỐ ĐIỆN ẢNH',
   defaultPeriod = 'week',
   defaultCategory = 'views'
-}) {
+}) => {
   if (!enabled) return null;
 
-  const [period, setPeriod] = useState(defaultPeriod);
-  const [activeCategory, setActiveCategory] = useState(defaultCategory);
-  const [isTop10Open, setIsTop10Open] = useState(false);
-  const [radarData, setRadarData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<'week' | 'month'>(defaultPeriod as 'week' | 'month');
+  const [activeCategory, setActiveCategory] = useState<string>(defaultCategory);
+  const [isTop10Open, setIsTop10Open] = useState<boolean>(false);
+  const [radarData, setRadarData] = useState<RadarData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isSubscribed = true;
-    const fetchRadar = async () => {
+    const fetchRadar = async (): Promise<void> => {
       setLoading(true);
       try {
-        const data = await radarService.getTrendingRadar({ period });
+        const data = (await radarService.getTrendingRadar({ period })) as unknown as RadarData | null;
         if (isSubscribed) {
           setRadarData(data);
         }
@@ -115,17 +165,19 @@ export default function TrendingRadarSection({
 
   // Current active movie list based on selected category
   const currentCategoryKey = activeCategory === 'breakthrough' ? 'views' : activeCategory;
-  const activeMovies = radarData
-    ? radarData[currentCategoryKey] || radarData[activeCategory] || []
+  const activeMovies: RadarMovie[] = radarData
+    ? (radarData[currentCategoryKey] as RadarMovie[] | undefined)
+      || (radarData[activeCategory] as RadarMovie[] | undefined)
+      || []
     : [];
-  const championMovie = activeMovies[0] || null;
-  const runnerUpMovies = activeMovies.slice(1, 5);
-  const trendingGenres = radarData?.genres || [];
+  const championMovie: RadarMovie | null = activeMovies[0] || null;
+  const runnerUpMovies: RadarMovie[] = activeMovies.slice(1, 5);
+  const trendingGenres: TrendingGenre[] = radarData?.genres || [];
 
   // Helper for rendering delta rank indicator
-  const renderDelta = (deltaType, deltaVal) => {
+  const renderDelta = (deltaType: DeltaType, deltaVal: number | string | undefined): React.ReactNode => {
     let badgeClass = styles.deltaSame;
-    let symbol = '—';
+    let symbol: string = '—';
 
     if (deltaType === 'up') {
       badgeClass = styles.deltaUp;
@@ -177,7 +229,7 @@ export default function TrendingRadarSection({
         </div>
       </div>
 
-      {/* Main Bento Grid: Left (col-xl-8) + Right (col-xl-4) */}
+      {/* Main Bento Grid */}
       <div className="row g-3 g-lg-4 align-items-stretch">
         {/* Left Column: Multidimensional Movie Radar */}
         <div className="col-12 col-xl-8">
@@ -215,7 +267,7 @@ export default function TrendingRadarSection({
               </button>
             </div>
 
-            {/* Radar Content Grid: Champion Spotlight + Runner-up Rows */}
+            {/* Radar Content Grid */}
             <div className={styles.radarContentGrid}>
               {/* Champion #1 Spotlight Card */}
               {championMovie && (
@@ -238,7 +290,6 @@ export default function TrendingRadarSection({
                     </div>
 
                     <div className={styles.championBottomInfo}>
-                      {/* Metric info directly ABOVE movie title */}
                       <div className={styles.championHighlightRow}>
                         <span className={styles.championScoreHighlight}>
                           {championMovie.metric_value} {championMovie.metric_label}
@@ -258,7 +309,7 @@ export default function TrendingRadarSection({
                       </div>
                     </div>
 
-                    {/* Bottom-right red play button for trailer (only visible on hover) */}
+                    {/* Bottom-right red play button for trailer */}
                     {onPlayTrailer && (
                       <button
                         type="button"
@@ -286,12 +337,12 @@ export default function TrendingRadarSection({
               <div className={styles.rowsContainer}>
                 {runnerUpMovies.map((movie) => (
                   <Link
-                    key={movie._id}
+                    key={movie._id || movie.slug}
                     href={`/movie/${movie.slug}`}
                     className={styles.metricRow}
                   >
                     <span className={styles.rankNumber}>
-                      {movie.rank < 10 ? `0${movie.rank}` : movie.rank}
+                      {(movie.rank ?? 0) < 10 ? `0${movie.rank}` : movie.rank}
                     </span>
 
                     <img
@@ -374,4 +425,6 @@ export default function TrendingRadarSection({
       />
     </section>
   );
-}
+};
+
+export default TrendingRadarSection;

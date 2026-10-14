@@ -1,29 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { MovieSection } from '@/components/common/MovieSection';
+// MovieSection is currently a .js module, so we cast it to a typed component
+// to satisfy strict TypeScript checks until the component itself is migrated.
+import { MovieSection as MovieSectionRaw } from '@/components/common/MovieSection';
+const MovieSection = MovieSectionRaw as unknown as React.FC<Record<string, unknown>>;
 
 /**
- * @file CountryMoviesSection.js
+ * @file CountryMoviesSection.tsx
  * @description Dynamic, config-driven component for Country Drama rails.
  * Completely decoupled: rail titles, badges, links, and data loaders are defined in homeSectionsConfig.
- * Pure real API data handling with zero mock dependency.
- *
- * @param {Object} props
- * @param {'sm'|'md'|'lg'} [props.cardSize='md'] - Card size preset.
- * @param {Array<Object>} [props.rails] - Custom rails definition array from config.
- * @param {Function} [props.onPlayTrailer] - Trailer playback callback.
  */
-export default function CountryMoviesSection({
+
+/** Rail entry từ config */
+export interface RailConfig {
+  id: string;
+  title?: string;
+  badge?: string;
+  viewAllHref?: string;
+  load?: (fallback?: unknown[]) => Promise<unknown[]>;
+}
+
+export interface CountryMoviesSectionProps {
+  cardSize?: 'sm' | 'md' | 'lg';
+  rails?: RailConfig[];
+  onPlayTrailer?: (movie: Record<string, unknown>) => void;
+}
+
+const CountryMoviesSection: React.FC<CountryMoviesSectionProps> = ({
   cardSize = 'md',
   rails = [],
   onPlayTrailer
-}) {
-  const [railData, setRailData] = useState({});
-  const [loading, setLoading] = useState(true);
+}) => {
+  const [railData, setRailData] = useState<Record<string, unknown[]>>({});
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let isSubscribed = true;
 
-    const fetchAllRails = async () => {
+    const fetchAllRails = async (): Promise<void> => {
       try {
         setLoading(true);
 
@@ -38,7 +51,7 @@ export default function CountryMoviesSection({
         );
 
         if (isSubscribed) {
-          const updated = {};
+          const updated: Record<string, unknown[]> = {};
           results.forEach(({ id, data }) => {
             updated[id] = data;
           });
@@ -78,4 +91,6 @@ export default function CountryMoviesSection({
       ))}
     </div>
   );
-}
+};
+
+export default CountryMoviesSection;

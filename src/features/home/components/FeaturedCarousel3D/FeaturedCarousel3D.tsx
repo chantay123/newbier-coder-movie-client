@@ -2,36 +2,57 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Skeleton from '@/components/UI/Skeleton';
 
 /**
- * @file FeaturedCarousel3D.js
+ * @file FeaturedCarousel3D.tsx
  * @description Pure CSS 3D rotating carousel showcasing top spotlight movies with hardware-accelerated depth.
  * Implemented 100% with Pure CSS 3D transforms & transitions (no external slider/carousel libraries).
- *
- * @param {Object} props
- * @param {Array<Object>} props.movies - Featured movies list (typically 5 items).
- * @param {boolean} [props.loading=false] - Skeleton loading state.
  */
-export default function FeaturedCarousel3D({ movies = [], loading = false, onPlayTrailer }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [prevActiveIndex, setPrevActiveIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(1200);
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-  const transitionTimeoutRef = useRef(null);
 
-  const candidateMovies = movies && movies.length > 0 ? movies.slice(0, 5) : [];
+/** Movie thô từ API - loose shape */
+export type FeaturedMovie = Record<string, unknown> & {
+  _id?: string;
+  id?: string;
+  slug?: string;
+  name?: string;
+  origin_name?: string;
+  quality?: string;
+  year?: number | string;
+  episode_current?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+};
+
+/** Props */
+export interface FeaturedCarousel3DProps {
+  movies?: FeaturedMovie[];
+  loading?: boolean;
+  onPlayTrailer?: (movie: FeaturedMovie) => void;
+}
+
+const PLACEHOLDER_POSTER = '/img/placeholder-poster.svg';
+
+const FeaturedCarousel3D: React.FC<FeaturedCarousel3DProps> = ({ movies = [], loading = false, onPlayTrailer }) => {
+  const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [prevActiveIndex, setPrevActiveIndex] = useState<number>(0);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+  const [windowWidth, setWindowWidth] = useState<number>(1200);
+  const [touchStart, setTouchStart] = useState<number>(0);
+  const [touchEnd, setTouchEnd] = useState<number>(0);
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const candidateMovies: FeaturedMovie[] = movies && movies.length > 0 ? movies.slice(0, 5) : [];
   const totalItems = candidateMovies.length;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const handleResize = () => setWindowWidth(window.innerWidth);
+      const handleResize = (): void => setWindowWidth(window.innerWidth);
       handleResize();
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
     }
   }, []);
 
-  const changeSlide = useCallback((newIndex) => {
+  const changeSlide = useCallback((newIndex: number): void => {
     if (isTransitioning || totalItems <= 1 || newIndex === activeIndex) return;
 
     setIsTransitioning(true);
@@ -46,13 +67,13 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
     }, 480);
   }, [isTransitioning, totalItems, activeIndex]);
 
-  const handlePrev = useCallback(() => {
+  const handlePrev = useCallback((): void => {
     if (totalItems <= 1) return;
     const nextIdx = activeIndex === 0 ? totalItems - 1 : activeIndex - 1;
     changeSlide(nextIdx);
   }, [activeIndex, totalItems, changeSlide]);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback((): void => {
     if (totalItems <= 1) return;
     const nextIdx = activeIndex === totalItems - 1 ? 0 : activeIndex + 1;
     changeSlide(nextIdx);
@@ -77,15 +98,15 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
     };
   }, []);
 
-  const handleTouchStart = (e) => {
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>): void => {
     setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handleTouchMove = (e) => {
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>): void => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (): void => {
     if (!isTransitioning && touchStart && touchEnd) {
       const diff = touchStart - touchEnd;
       if (diff > 60) {
@@ -124,7 +145,7 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
         {currentMovie && (
           <div className="backdrop-stage">
             <div
-              key={currentMovie._id || currentMovie.slug || activeIndex}
+              key={currentMovie._id || currentMovie.slug || String(activeIndex)}
               className="backdrop-blur-layer"
               style={{
                 backgroundImage: `url(${currentMovie.backdrop_url || currentMovie.poster_url || currentMovie.thumb_url})`
@@ -184,19 +205,19 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
             const opacity = isWrapping ? 0 : isCenter ? 1 : isMid ? 0.82 : 0.45;
 
             const visibility =
-              windowWidth < 480 ? (Math.abs(position) <= 0 ? 'visible' : 'hidden') :
-              windowWidth < 768 ? (Math.abs(position) <= 1 ? 'visible' : 'hidden') :
-              'visible';
+              windowWidth < 480 ? (Math.abs(position) <= 0 ? 'visible' as const : 'hidden' as const) :
+              windowWidth < 768 ? (Math.abs(position) <= 1 ? 'visible' as const : 'hidden' as const) :
+              'visible' as const;
 
             const cardWidth = windowWidth < 480 ? 220 : windowWidth < 768 ? 270 : 360;
             const cardHeight = windowWidth < 480 ? 320 : windowWidth < 768 ? 400 : 510;
 
             // Always prioritize high-resolution poster_url over low-res thumb_url
-            const posterSrc = movie.poster_url || movie.thumb_url || '/img/placeholder-poster.svg';
+            const posterSrc = movie.poster_url || movie.thumb_url || PLACEHOLDER_POSTER;
 
             return (
               <div
-                key={movie._id || movie.slug || index}
+                key={movie._id || movie.slug || String(index)}
                 className={`position-absolute card-3d-item ${isCenter ? 'active-card' : ''}`}
                 style={{
                   width: `${cardWidth}px`,
@@ -231,15 +252,16 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
                     className="poster-card-img"
                     loading={isCenter ? 'eager' : 'lazy'}
                     onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = '/img/placeholder-poster.svg';
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.onerror = null;
+                      img.src = PLACEHOLDER_POSTER;
                     }}
                   />
 
                   {/* 100% Full-Coverage Vignette Overlay */}
                   <div className="poster-vignette-overlay" />
 
-                  {/* Sharp, High-Definition Play Button (No fuzzy pale ring) */}
+                  {/* Sharp, High-Definition Play Button */}
                   {isCenter && (
                     <button
                       type="button"
@@ -259,7 +281,7 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
                     </button>
                   )}
 
-                  {/* Card Title & Meta Info at Bottom with Dedicated Solid Vignette */}
+                  {/* Card Title & Meta Info at Bottom */}
                   <div className="poster-info-content">
                     <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
                       <span className="badge-cinema-hot">SPOTLIGHT</span>
@@ -337,7 +359,7 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
           }
         }
 
-        /* Ambient Backdrop Stage - Richly reflects active movie colors */
+        /* Ambient Backdrop Stage */
         .backdrop-stage {
           position: absolute;
           inset: 0;
@@ -426,7 +448,7 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
           -webkit-backface-visibility: hidden;
         }
 
-        /* Poster Box - Mature Cinema Design, Crisp Resolution & Zero Bleed */
+        /* Poster Box */
         .poster-card-box {
           position: relative;
           width: 100%;
@@ -457,7 +479,6 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
           pointer-events: none;
         }
 
-        /* Full Coverage Vignette Overlay */
         .poster-vignette-overlay {
           position: absolute;
           inset: 0;
@@ -474,7 +495,6 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
           );
         }
 
-        /* Sharp, High-Definition Play Button (Zero fuzzy pale ring) */
         .center-play-button {
           position: absolute;
           top: 46%;
@@ -504,7 +524,6 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
           box-shadow: 0 6px 24px rgba(0, 0, 0, 0.75), 0 0 16px rgba(229, 9, 20, 0.7);
         }
 
-        /* Content Meta & Dedicated Solid Bottom Vignette */
         .poster-info-content {
           position: absolute;
           bottom: 0;
@@ -592,7 +611,6 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
           text-overflow: ellipsis;
         }
 
-        /* Minimalist, Clean Cinema Dots Row (Uncluttered) */
         .carousel-dots-row {
           position: absolute;
           bottom: 20px;
@@ -628,4 +646,6 @@ export default function FeaturedCarousel3D({ movies = [], loading = false, onPla
       `}</style>
     </section>
   );
-}
+};
+
+export default FeaturedCarousel3D;

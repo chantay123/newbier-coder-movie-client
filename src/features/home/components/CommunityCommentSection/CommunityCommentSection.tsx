@@ -6,39 +6,91 @@ import { LOCAL_DEFAULT_BACKDROP } from '@/config/movieConfig';
 import styles from './CommunityCommentSection.module.css';
 
 /**
- * @file CommunityCommentSection.js
+ * @file CommunityCommentSection.tsx
  * @description Unified, space-efficient community discussion section.
- * - Left (col-xl-9): Two horizontal rails for Top Weekly and Top Monthly/All-time comments,
- *   featuring impressive movie backdrop cards with 2-line preview and fixed cadence.
+ * - Left (col-xl-9): Two horizontal rails for Top Weekly and Top Monthly/All-time comments.
  * - Right (col-xl-3): Vertical Live Chat stream with scroll loader and pulsating dot.
- *
- * @param {Object} props
- * @param {boolean} [props.enabled=true] - Switch to toggle the section on/off.
  */
-export default function CommunityCommentSection({
+
+/** Movie thô (loose shape) */
+interface CommentMovie {
+  name?: string;
+  slug?: string;
+  rating?: number | string;
+  thumb_url?: string;
+  poster_url?: string;
+}
+
+/** User thô */
+interface CommentUser {
+  name?: string;
+  badge?: string;
+}
+
+/** Parent comment snippet */
+interface ParentComment {
+  user_name?: string;
+}
+
+/** Comment entity (top comment) */
+export interface Comment {
+  _id: string;
+  content: string;
+  created_at: string;
+  likes_count?: number;
+  replies_count?: number;
+  movie?: CommentMovie;
+  user?: CommentUser;
+  parent_comment?: ParentComment;
+}
+
+/** Live buzz message (snippet) */
+export interface LiveBuzzMessage {
+  _id: string;
+  user_name?: string;
+  movie_name?: string;
+  movie_slug?: string;
+  time_ago?: string;
+  snippet?: string;
+}
+
+/** Liked state per comment */
+interface LikedState {
+  liked: boolean;
+  count: number;
+}
+
+/** Props */
+export interface CommunityCommentSectionProps {
+  enabled?: boolean;
+  title?: string;
+  limit?: number;
+}
+
+const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
   enabled = true,
-  title = "Cộng Đồng Thảo Luận",
+  title = 'Cộng Đồng Thảo Luận',
   limit = 10
-}) {
+}) => {
   if (!enabled) return null;
 
-  const [weekComments, setWeekComments] = useState([]);
-  const [monthComments, setMonthComments] = useState([]);
-  const [monthPeriod, setMonthPeriod] = useState('month'); // 'month' or 'all'
-  const [liveMessages, setLiveMessages] = useState([]);
-  const [loadingMoreLive, setLoadingMoreLive] = useState(false);
-  const [showReturnToLatest, setShowReturnToLatest] = useState(false);
-  const [isReloadingLive, setIsReloadingLive] = useState(false);
-  const [likedMap, setLikedMap] = useState({});
+  const [weekComments, setWeekComments] = useState<Comment[]>([]);
+  const [monthComments, setMonthComments] = useState<Comment[]>([]);
+  const [monthPeriod, setMonthPeriod] = useState<'month' | 'all'>('month');
+  const [liveMessages, setLiveMessages] = useState<LiveBuzzMessage[]>([]);
+  const [loadingMoreLive] = useState<boolean>(false);
+  const [showReturnToLatest, setShowReturnToLatest] = useState<boolean>(false);
+  const [isReloadingLive, setIsReloadingLive] = useState<boolean>(false);
+  const [likedMap, setLikedMap] = useState<Record<string, LikedState>>({});
 
-  const feedRef = useRef(null);
+  const feedRef = useRef<HTMLDivElement | null>(null);
 
   // Fetch Top Weekly Comments (Rail 1)
   useEffect(() => {
     let isSubscribed = true;
-    const fetchWeek = async () => {
+    const fetchWeek = async (): Promise<void> => {
       try {
-        const data = await commentService.getTopComments({ period: 'week', limit });
+        const data = (await commentService.getTopComments({ period: 'week', limit })) as unknown as { comments?: Comment[] };
         if (isSubscribed && data?.comments) {
           setWeekComments(data.comments);
         }
@@ -55,9 +107,9 @@ export default function CommunityCommentSection({
   // Fetch Top Monthly or All-time Comments (Rail 2)
   useEffect(() => {
     let isSubscribed = true;
-    const fetchMonth = async () => {
+    const fetchMonth = async (): Promise<void> => {
       try {
-        const data = await commentService.getTopComments({ period: monthPeriod, limit: 10 });
+        const data = (await commentService.getTopComments({ period: monthPeriod, limit: 10 })) as unknown as { comments?: Comment[] };
         if (isSubscribed && data?.comments) {
           setMonthComments(data.comments);
         }
@@ -74,9 +126,9 @@ export default function CommunityCommentSection({
   // Fetch Live Buzz Comments
   useEffect(() => {
     let isSubscribed = true;
-    const fetchLive = async () => {
+    const fetchLive = async (): Promise<void> => {
       try {
-        const data = await commentService.getLiveBuzzComments({ limit: 12 });
+        const data = (await commentService.getLiveBuzzComments({ limit: 12 })) as { comments?: LiveBuzzMessage[] };
         if (isSubscribed && data?.comments) {
           setLiveMessages(data.comments);
         }
@@ -91,9 +143,9 @@ export default function CommunityCommentSection({
   }, []);
 
   // Handle Scroll in Live Chat: show return-to-latest button when scrolled down
-  const handleLiveScroll = (e) => {
-    const { scrollTop } = e.target;
-    if (scrollTop > 50) {
+  const handleLiveScroll = (e: React.UIEvent<HTMLDivElement>): void => {
+    const target = e.currentTarget;
+    if (target.scrollTop > 50) {
       setShowReturnToLatest(true);
     } else {
       setShowReturnToLatest(false);
@@ -101,7 +153,7 @@ export default function CommunityCommentSection({
   };
 
   // Scroll to top and reload live messages
-  const handleReturnToLatestAndReload = async () => {
+  const handleReturnToLatestAndReload = async (): Promise<void> => {
     if (feedRef.current) {
       feedRef.current.scrollTo({
         top: 0,
@@ -112,7 +164,7 @@ export default function CommunityCommentSection({
 
     setIsReloadingLive(true);
     try {
-      const data = await commentService.getLiveBuzzComments({ limit: 12 });
+      const data = (await commentService.getLiveBuzzComments({ limit: 12 })) as unknown as { comments?: LiveBuzzMessage[] };
       if (data?.comments) {
         setLiveMessages(data.comments);
       }
@@ -125,7 +177,7 @@ export default function CommunityCommentSection({
     }
   };
 
-  const handleToggleLike = (e, id, baseCount) => {
+  const handleToggleLike = (e: React.MouseEvent<HTMLButtonElement>, id: string, baseCount: number): void => {
     e.preventDefault();
     e.stopPropagation();
     setLikedMap((prev) => {
@@ -141,7 +193,7 @@ export default function CommunityCommentSection({
   };
 
   // Helper renderer for a single movie backdrop comment card
-  const renderCommentCard = (comm) => {
+  const renderCommentCard = (comm: Comment): React.ReactNode => {
     const userLikedState = likedMap[comm._id];
     const currentLikes = userLikedState ? userLikedState.count : comm.likes_count;
     const isLiked = userLikedState ? userLikedState.liked : false;
@@ -162,8 +214,9 @@ export default function CommunityCommentSection({
           className={styles.cardBackdropImg}
           loading="lazy"
           onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = LOCAL_DEFAULT_BACKDROP;
+            const img = e.currentTarget as HTMLImageElement;
+            img.onerror = null;
+            img.src = LOCAL_DEFAULT_BACKDROP;
           }}
         />
 
@@ -185,7 +238,7 @@ export default function CommunityCommentSection({
             )}
           </div>
 
-          {/* Author Line: Crisp avatar, name, badge and optional reply */}
+          {/* Author Line */}
           <div className={styles.authorLine}>
             <div className={styles.authorLeft}>
               <div className={styles.userAvatar}>
@@ -223,7 +276,7 @@ export default function CommunityCommentSection({
               <button
                 type="button"
                 className={`${styles.btnLike} ${isLiked ? styles.btnLikeActive : ''}`}
-                onClick={(e) => handleToggleLike(e, comm._id, comm.likes_count)}
+                onClick={(e) => handleToggleLike(e, comm._id, comm.likes_count || 0)}
                 title="Thích bình luận này"
               >
                 <i className={`fas fa-heart ${isLiked ? 'text-danger' : ''}`} />
@@ -259,7 +312,7 @@ export default function CommunityCommentSection({
 
       {/* Main Grid: Left Rails (col-xl-9) + Right YouTube Live Chat (col-xl-3) */}
       <div className="row g-3 g-lg-4">
-        {/* Left Column: 2 Horizontal Rails (Top Week & Top Month/All) */}
+        {/* Left Column: 2 Horizontal Rails */}
         <div className="col-12 col-xl-9">
           <div className={styles.railsColumn}>
             {/* Rail 1: Top Comments of the Week */}
@@ -357,7 +410,7 @@ export default function CommunityCommentSection({
               )}
             </div>
 
-            {/* Floating Return to Latest Button (Appears when scrolled down, scrolls up to top and reloads) */}
+            {/* Floating Return to Latest Button */}
             {showReturnToLatest && (
               <button
                 type="button"
@@ -374,4 +427,6 @@ export default function CommunityCommentSection({
       </div>
     </section>
   );
-}
+};
+
+export default CommunityCommentSection;
