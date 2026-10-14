@@ -1,17 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Slider from 'react-slick';
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
+import 'slick-carousel/slick/slick.css';
+import 'slick-carousel/slick/slick-theme.css';
+type SliderSettings = import('react-slick').SliderSettings;
 import SectionHeader from './SectionHeader';
 import MovieCardVertical from '../MovieCard/MovieCardVertical';
 import MovieCardHorizontal from '../MovieCard/MovieCardHorizontal';
 import Skeleton from '@/components/UI/Skeleton';
+import type { MovieLite } from '../MovieCard/MovieCardVertical';
 import styles from '@/styles/MovieCategory.module.css';
 
 /**
- * Custom Next Arrow for Slider
+ * @file MovieSection.tsx
+ * @description Master Base Component supporting both original slick Carousel and Responsive Grid.
  */
-const NextArrow = ({ className, onClick }) => {
+
+type LayoutMode = 'rail' | 'grid';
+type CardVariant = 'vertical' | 'horizontal';
+
+interface SlickArrowProps {
+  className?: string;
+  onClick?: () => void;
+}
+
+const NextArrow: React.FC<SlickArrowProps> = ({ className, onClick }) => {
   const isDisabled = className?.includes('slick-disabled');
   return (
     <button
@@ -65,10 +77,7 @@ const NextArrow = ({ className, onClick }) => {
   );
 };
 
-/**
- * Custom Prev Arrow for Slider
- */
-const PrevArrow = ({ className, onClick }) => {
+const PrevArrow: React.FC<SlickArrowProps> = ({ className, onClick }) => {
   const isDisabled = className?.includes('slick-disabled');
   return (
     <button
@@ -122,28 +131,25 @@ const PrevArrow = ({ className, onClick }) => {
   );
 };
 
-/**
- * @file MovieSection.js
- * @description Master Base Component supporting both original slick Carousel and Responsive Grid.
- * Preserves 100% original card typography, badges, gradients, and carousel sliding physics.
- *
- * @param {Object} props
- * @param {'rail'|'grid'} [props.layout='rail'] - Display layout ('rail' for Carousel, 'grid' for Catalogue).
- * @param {'vertical'|'horizontal'} [props.variant='vertical'] - Card presentation style.
- * @param {number} [props.columns=5] - Columns for grid layout.
- * @param {string} props.title - Section title.
- * @param {string} [props.badge] - Category accent badge.
- * @param {React.ReactNode} [props.icon] - Optional heading icon.
- * @param {string} [props.viewAllHref] - URL for "Xem tất cả".
- * @param {string} [props.viewAllText='Xem tất cả'] - Label for view all link.
- * @param {Array<Object>} props.movies - Array of movie objects.
- * @param {boolean} [props.loading=false] - Initial loading state.
- * @param {boolean} [props.loadingMore=false] - Load more state.
- * @param {boolean} [props.hasMore=false] - Whether more items exist to load.
- * @param {Function} [props.onLoadMore] - Callback to load more items.
- * @param {string} [props.className=""] - Additional class name.
- */
-export default function MovieSection({
+export interface MovieSectionProps {
+  layout?: LayoutMode;
+  variant?: CardVariant;
+  columns?: number;
+  title?: string;
+  badge?: string;
+  icon?: React.ReactNode;
+  viewAllHref?: string;
+  viewAllText?: string;
+  movies?: MovieLite[];
+  loading?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  onPlayTrailer?: (movie: MovieLite) => void;
+  className?: string;
+}
+
+const MovieSection: React.FC<MovieSectionProps> = ({
   layout = 'rail',
   variant = 'vertical',
   columns = 5,
@@ -158,16 +164,16 @@ export default function MovieSection({
   hasMore = false,
   onLoadMore,
   onPlayTrailer,
-  className = ""
-}) {
-  const [mounted, setMounted] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const sliderRef = React.useRef(null);
+  className = ''
+}) => {
+  const [mounted, setMounted] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const sliderRef = useRef<React.ComponentType<SliderSettings> | null>(null);
 
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
-      const handleResize = () => {
+      const handleResize = (): void => {
         setIsMobile(window.innerWidth < 768);
       };
       handleResize();
@@ -176,10 +182,10 @@ export default function MovieSection({
     }
   }, []);
 
-  const isGrid = layout === 'grid';
-  const isHorizontal = variant === 'horizontal';
+  const isGrid: boolean = layout === 'grid';
+  const isHorizontal: boolean = variant === 'horizontal';
 
-  // Vertical Card Carousel Settings: Fixed 5 cards per pack/page on desktop
+  // Vertical Card Carousel Settings
   const verticalSettings = {
     dots: false,
     infinite: false,
@@ -214,7 +220,7 @@ export default function MovieSection({
     ]
   };
 
-  // Horizontal Card Carousel Settings (Top 10 - Giữ nguyên trải nghiệm như cũ)
+  // Horizontal Card Carousel Settings
   const horizontalSettings = {
     dots: false,
     infinite: false,
@@ -289,7 +295,7 @@ export default function MovieSection({
             ) : (
               movies.map((movie, index) => (
                 <div
-                  key={movie._id || movie.slug || index}
+                  key={movie._id || movie.slug || String(index)}
                   className={`col-item col-cols-${columns} mb-3`}
                 >
                   <MovieCardVertical movie={movie} onPlayTrailer={onPlayTrailer} />
@@ -320,7 +326,7 @@ export default function MovieSection({
           )}
         </div>
       ) : (
-        /* 2. CAROUSEL SLIDER MODE (Original react-slick with Preserved Skeleton Rail) */
+        /* 2. CAROUSEL SLIDER MODE */
         loading && (!movies || movies.length === 0) ? (
           <div className="movie-rail-skeleton-track d-flex gap-2 gap-sm-3 overflow-hidden py-1">
             {[...Array(mounted && isMobile ? 2 : (isHorizontal ? 4 : 5))].map((_, i) => (
@@ -370,7 +376,7 @@ export default function MovieSection({
             >
               {movies.map((movie, index) => (
                 <div
-                  key={movie._id || movie.slug || index}
+                  key={movie._id || movie.slug || String(index)}
                   className={styles.sliderItem}
                 >
                   {isHorizontal ? (
@@ -449,4 +455,6 @@ export default function MovieSection({
       `}</style>
     </section>
   );
-}
+};
+
+export default MovieSection;

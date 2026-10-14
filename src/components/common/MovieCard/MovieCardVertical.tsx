@@ -3,37 +3,60 @@ import Link from 'next/link';
 import styles from '@/styles/MovieCards.module.css';
 
 /**
- * @file MovieCardVertical.js
+ * @file MovieCardVertical.tsx
  * @description Classic 2:3 Hollywood cinema vertical poster card with floating micro-badges,
  * smooth hover elevation, and responsive meta details.
- * 
- * @param {Object} props
- * @param {Object} props.movie - Movie data object
- * @param {Function} [props.onMouseEnter] - Optional hover handler
- * @param {Function} [props.onMouseLeave] - Optional unhover handler
- * @param {string} [props.className=""] - Additional class name
- * @returns {JSX.Element}
  */
-const MovieCardVertical = ({
+
+/** Minimal movie shape (compatible across project) */
+export interface MovieLite {
+  _id?: string;
+  slug?: string;
+  name?: string;
+  origin_name?: string;
+  year?: number | string;
+  type?: 'series' | 'single' | 'movie' | string;
+  quality?: string;
+  lang?: string;
+  episode_current?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+  vote_average?: number;
+  rating?: number;
+  tmdb?: { vote_average?: number };
+  episodes?: Array<{ server_data?: Array<{ name?: string }> }>;
+  [key: string]: unknown;
+}
+
+export interface MovieCardVerticalProps {
+  movie?: MovieLite | null;
+  onMouseEnter?: (movie: MovieLite) => void;
+  onMouseLeave?: (movie: MovieLite) => void;
+  onPlayTrailer?: (movie: MovieLite) => void;
+  className?: string;
+}
+
+const MovieCardVertical: React.FC<MovieCardVerticalProps> = ({
   movie,
   onMouseEnter,
   onMouseLeave,
   onPlayTrailer,
-  className = ""
+  className = ''
 }) => {
-  const [imgSrc, setImgSrc] = useState(
+  const [imgSrc, setImgSrc] = useState<string>(
     movie?.poster_url || movie?.thumb_url || '/img/placeholder-poster.svg'
   );
 
   if (!movie) return null;
 
   // Extract rating with graceful fallback
-  const rawRating = movie?.vote_average || movie?.rating || movie?.tmdb?.vote_average;
-  const ratingText = rawRating ? Number(rawRating).toFixed(1) : '8.6';
+  const rawRating: number | string | undefined = movie?.vote_average || movie?.rating || movie?.tmdb?.vote_average;
+  const ratingText: string = rawRating ? Number(rawRating).toFixed(1) : '8.6';
 
   // Extract episode or language tag
-  const episodeCount = movie?.episodes?.[0]?.server_data?.length;
-  const bottomTag = movie?.episode_current
+  const episodeCount: number | undefined = movie?.episodes?.[0]?.server_data?.length;
+  const bottomTag: string | null = movie?.episode_current
     || (episodeCount ? `Tập ${episodeCount}` : null)
     || movie?.lang
     || (movie?.type === 'series' ? 'Phim bộ' : 'Thuyết minh');

@@ -1,42 +1,44 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import styles from '@/styles/MovieCards.module.css';
+import type { MovieLite } from './MovieCardVertical';
 
 /**
- * @file MovieCardHorizontal.js
- * @description Avant-garde 16:9 Cinema Wide Panorama Card with giant typographic outline rank,
- * shimmer light sheen reflection on hover, radar-pulse play button, and ambient bottom glow.
- * 
- * @param {Object} props
- * @param {Object} props.movie - Movie data object
- * @param {number} [props.rank] - Ranking index (1, 2, 3...) for giant outline number
- * @param {string} [props.badge] - Optional custom badge (e.g. "TOP 1", "MỚI", countdown)
- * @param {Function} [props.onMouseEnter] - Optional hover handler
- * @param {Function} [props.onMouseLeave] - Optional unhover handler
- * @param {string} [props.className=""] - Additional class name
- * @returns {JSX.Element}
+ * @file MovieCardHorizontal.tsx
+ * @description Avant-garde 16:9 Cinema Wide Panorama Card with giant typographic outline rank.
  */
-const MovieCardHorizontal = ({
+
+export interface MovieCardHorizontalProps {
+  movie?: MovieLite | null;
+  rank?: number;
+  badge?: string;
+  onMouseEnter?: (movie: MovieLite) => void;
+  onMouseLeave?: (movie: MovieLite) => void;
+  onPlayTrailer?: (movie: MovieLite) => void;
+  className?: string;
+}
+
+const MovieCardHorizontal: React.FC<MovieCardHorizontalProps> = ({
   movie,
   rank,
   badge,
   onMouseEnter,
   onMouseLeave,
   onPlayTrailer,
-  className = ""
+  className = ''
 }) => {
-  const [imgSrc, setImgSrc] = useState(
+  const [imgSrc, setImgSrc] = useState<string>(
     movie?.backdrop_url || movie?.poster_url || movie?.thumb_url || '/img/placeholder-backdrop.svg'
   );
 
   if (!movie) return null;
 
   // Format rank number with leading zero: "01", "02", ...
-  const formattedRank = typeof rank === 'number' ? String(rank).padStart(2, '0') : null;
+  const formattedRank: string | null = typeof rank === 'number' ? String(rank).padStart(2, '0') : null;
 
   // Extract rating
-  const rawRating = movie?.vote_average || movie?.rating || movie?.tmdb?.vote_average;
-  const ratingText = rawRating ? Number(rawRating).toFixed(1) : null;
+  const rawRating: number | string | undefined = movie?.vote_average || movie?.rating || movie?.tmdb?.vote_average;
+  const ratingText: string | null = rawRating ? Number(rawRating).toFixed(1) : null;
 
   return (
     <Link
@@ -69,7 +71,7 @@ const MovieCardHorizontal = ({
         {/* Bottom Ambient Vignette Gradient */}
         <div className={styles.wideBottomFade} aria-hidden="true" />
 
-        {/* Radar Pulse Play Button (Trailer Trigger on Hover) */}
+        {/* Radar Pulse Play Button */}
         <button
           type="button"
           className={styles.radarPulseBtn}

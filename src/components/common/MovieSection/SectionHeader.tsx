@@ -3,25 +3,26 @@ import Link from 'next/link';
 import styles from '@/styles/MovieCards.module.css';
 
 /**
- * @file SectionHeader.js
+ * @file SectionHeader.tsx
  * @description Cinematic section heading with gradient accent bar, typography, and interactive link.
- * 
- * @param {Object} props
- * @param {string} props.title - Title of the section (e.g. "Phim Đề Xuất")
- * @param {React.ReactNode} [props.icon] - Optional icon element
- * @param {string} [props.badge] - Optional badge tag (e.g. "HOT", "MỚI")
- * @param {string} [props.viewAllHref] - Target URL for "Xem tất cả" link
- * @param {string} [props.viewAllText="Xem tất cả"] - Label for view all link
- * @param {string} [props.className=""] - Additional class name
- * @returns {JSX.Element}
  */
-const SectionHeader = ({
+
+export interface SectionHeaderProps {
+  title: string;
+  icon?: React.ReactNode;
+  badge?: string;
+  viewAllHref?: string;
+  viewAllText?: string;
+  className?: string;
+}
+
+const SectionHeader: React.FC<SectionHeaderProps> = ({
   title,
   icon,
   badge,
   viewAllHref,
-  viewAllText = "Xem tất cả",
-  className = ""
+  viewAllText = 'Xem tất cả',
+  className = ''
 }) => {
   return (
     <header className={`${styles.sectionHeader} ${className}`}>
