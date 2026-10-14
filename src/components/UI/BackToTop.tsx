@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
 /**
- * @file BackToTop.js
+ * @file BackToTop.tsx
  * @description Floating back to top button with smooth scroll behavior and fade animation.
  */
-export default function BackToTop() {
-  const [visible, setVisible] = useState(false);
+const BackToTop: React.FC = () => {
+  const [visible, setVisible] = useState<boolean>(false);
 
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = (): void => {
       if (window.pageYOffset > 300) {
         setVisible(true);
       } else {
@@ -20,7 +20,7 @@ export default function BackToTop() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const scrollToTop = () => {
+  const scrollToTop = (): void => {
     window.scrollTo({
       top: 0,
       behavior: 'smooth'
@@ -96,4 +96,6 @@ export default function BackToTop() {
       `}</style>
     </button>
   );
-}
+};
+
+export default BackToTop;

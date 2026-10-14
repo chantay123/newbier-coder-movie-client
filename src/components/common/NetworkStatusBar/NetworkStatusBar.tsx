@@ -1,22 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { useNetworkStatus } from '@/utils/networkStatus';
+// useNetworkStatus is still .js, cast for strict TS
+import useNetworkStatusRaw from '@/utils/networkStatus';
+const useNetworkStatus = useNetworkStatusRaw as unknown as () => boolean;
 import styles from './NetworkStatusBar.module.css';
 
-const NetworkStatusBar = () => {
+const NetworkStatusBar: React.FC = () => {
   const isOnline = useNetworkStatus();
-  const [visible, setVisible] = useState(false);
-  const [reconnected, setReconnected] = useState(false);
+  const [visible, setVisible] = useState<boolean>(false);
+  const [reconnected, setReconnected] = useState<boolean>(false);
 
   useEffect(() => {
-    let timeout;
-    
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
     if (isOnline) {
-      // If we were showing the offline message and now we're online, 
+      // If we were showing the offline message and now we're online,
       // show the reconnected message
       if (visible && !reconnected) {
         setReconnected(true);
         setVisible(true);
-        
+
         // Hide after 3 seconds
         timeout = setTimeout(() => {
           setVisible(false);
@@ -28,27 +30,27 @@ const NetworkStatusBar = () => {
       setVisible(true);
       setReconnected(false);
     }
-    
+
     return () => {
       if (timeout) clearTimeout(timeout);
     };
   }, [isOnline, visible, reconnected]);
-  
+
   if (!visible) return null;
-  
-  const statusText = reconnected ? 'Đã kết nối lại' : 'Mất kết nối internet';
-  const statusClass = reconnected ? styles.online : styles.offline;
-  
+
+  const statusText: string = reconnected ? 'Đã kết nối lại' : 'Mất kết nối internet';
+  const statusClass: string = reconnected ? styles.online : styles.offline;
+
   return (
     <div className={`${styles.statusBar} ${statusClass}`}>
       <div className={styles.statusIcon}>
         {reconnected ? (
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
@@ -58,12 +60,12 @@ const NetworkStatusBar = () => {
             <polyline points="22 4 12 14.01 9 11.01"></polyline>
           </svg>
         ) : (
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"

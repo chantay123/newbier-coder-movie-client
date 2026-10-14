@@ -1,27 +1,39 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
-import { 
-  FaExclamationTriangle, 
-  FaCheckCircle, 
-  FaInfoCircle, 
-  FaTimesCircle, 
-  FaFilm, 
-  FaHeart 
+import {
+  FaExclamationTriangle,
+  FaCheckCircle,
+  FaInfoCircle,
+  FaTimesCircle,
+  FaHeart
 } from 'react-icons/fa';
 
 // Tên CustomEvent để hỗ trợ gọi alert từ bất kỳ đâu không cần hook/props
 const CINEMA_ALERT_EVENT = 'cinema_alert_event';
 
+export type CinemaAlertType = 'cinema' | 'warning' | 'success' | 'error' | 'info' | 'heart';
+
+export interface CinemaAlertDetail {
+  message: string;
+  type: CinemaAlertType;
+  duration: number;
+  timestamp: number;
+}
+
+export interface CinemaAlertEvent extends CustomEvent {
+  detail: CinemaAlertDetail;
+}
+
 /**
- * Hàm gọi alert dùng chung toàn ứng dụng (Dễ gọi ở bất kỳ file nào).
- * @param {string} message - Nội dung thông báo
- * @param {'cinema' | 'warning' | 'success' | 'error' | 'info' | 'heart'} [type='cinema'] - Loại alert
- * @param {number} [duration=2800] - Thời gian hiển thị (ms)
- * 
+ * Hàm gọi alert dùng chung toàn ứng dụng.
  * Ví dụ:
- *   showCinemaAlert('Bạn đã thích bộ phim này trước đó !', 'warning');
- *   showCinemaAlert('Đã thêm vào danh sách yêu thích !', 'cinema');
+ *   showCinemaAlert('Bạn đã thích bộ phim này trước đó!', 'warning');
+ *   showCinemaAlert('Đã thêm vào danh sách yêu thích!', 'cinema');
  */
-export function showCinemaAlert(message, type = 'cinema', duration = 2800) {
+export function showCinemaAlert(
+  message: string,
+  type: CinemaAlertType = 'cinema',
+  duration: number = 2800
+): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent(CINEMA_ALERT_EVENT, {
@@ -31,24 +43,27 @@ export function showCinemaAlert(message, type = 'cinema', duration = 2800) {
   }
 }
 
-// React Context dành cho component muốn dùng qua hook
-const CinemaAlertContext = createContext({
+interface CinemaAlertContextValue {
+  showAlert: typeof showCinemaAlert;
+}
+
+const CinemaAlertContext = createContext<CinemaAlertContextValue>({
   showAlert: showCinemaAlert
 });
 
-export const useCinemaAlert = () => useContext(CinemaAlertContext);
+export const useCinemaAlert = (): CinemaAlertContextValue => useContext(CinemaAlertContext);
 
 /**
  * Component hiển thị alert nổi theo chuẩn Dark Cinema.
  * Tự động gắn listener cho showCinemaAlert() và tự hủy sau khi hết thời gian.
  */
-export default function CinemaAlert() {
-  const [alertData, setAlertData] = useState(null);
-  const [isClosing, setIsClosing] = useState(false);
-  const timerRef = useRef(null);
-  const closeTimerRef = useRef(null);
+const CinemaAlert: React.FC = () => {
+  const [alertData, setAlertData] = useState<CinemaAlertDetail | null>(null);
+  const [isClosing, setIsClosing] = useState<boolean>(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const dismiss = () => {
+  const dismiss = (): void => {
     setIsClosing(true);
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     closeTimerRef.current = setTimeout(() => {
@@ -58,8 +73,8 @@ export default function CinemaAlert() {
   };
 
   useEffect(() => {
-    const handleAlertEvent = (event) => {
-      const detail = event?.detail;
+    const handleAlertEvent = (event: Event): void => {
+      const detail = (event as CinemaAlertEvent).detail;
       if (!detail || !detail.message) return;
 
       // Hủy timer cũ nếu đang chạy
@@ -86,7 +101,7 @@ export default function CinemaAlert() {
   if (!alertData) return null;
 
   // Lựa chọn icon phù hợp theo type
-  const renderIcon = () => {
+  const renderIcon = (): React.ReactNode => {
     switch (alertData.type) {
       case 'warning':
         return <FaExclamationTriangle className="alert-icon text-warning" />;
@@ -100,13 +115,12 @@ export default function CinemaAlert() {
         return <FaHeart className="alert-icon text-danger" />;
       case 'cinema':
       default:
-        // Đỏ cinema thương hiệu
         return <FaExclamationTriangle className="alert-icon text-cinema" />;
     }
   };
 
   return (
-    <div 
+    <div
       className={`cinema-alert-container ${isClosing ? 'closing' : ''}`}
       onClick={dismiss}
       role="alert"
@@ -147,7 +161,7 @@ export default function CinemaAlert() {
           border-radius: 12px;
           padding: 10px 22px;
           color: #ffffff;
-          box-shadow: 
+          box-shadow:
             0 12px 36px rgba(0, 0, 0, 0.75),
             0 0 0 1px rgba(255, 255, 255, 0.04);
           backdrop-filter: blur(16px);
@@ -245,4 +259,6 @@ export default function CinemaAlert() {
       `}</style>
     </div>
   );
-}
+};
+
+export default CinemaAlert;

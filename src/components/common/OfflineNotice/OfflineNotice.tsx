@@ -1,36 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { useNetworkStatus } from '@/utils/networkStatus';
-import styles from './OfflineNotice.module.css';
+// useNetworkStatus is still .js, cast for strict TS
+import useNetworkStatusRaw from '@/utils/networkStatus';
+const useNetworkStatus = useNetworkStatusRaw as unknown as () => boolean;
 import { useRouter } from 'next/router';
+import styles from './OfflineNotice.module.css';
 
-const OfflineNotice = () => {
+const OfflineNotice: React.FC = () => {
   const isOnline = useNetworkStatus();
   const router = useRouter();
-  const [offlineDuration, setOfflineDuration] = useState(0);
-  const [showNotice, setShowNotice] = useState(false);
-  
+  const [offlineDuration, setOfflineDuration] = useState<number>(0);
+  const [showNotice, setShowNotice] = useState<boolean>(false);
+
   useEffect(() => {
-    let intervalId;
-    
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
     if (!isOnline) {
       // Show the notice immediately when offline
       setShowNotice(true);
-      
+
       // Start counting the offline duration
       intervalId = setInterval(() => {
-        setOfflineDuration(prev => prev + 1);
+        setOfflineDuration((prev) => prev + 1);
       }, 1000);
-      
+
       // After 5 seconds offline, redirect to offline page
-      // (unless we're already on the offline page)
       if (router.pathname !== '/offline') {
         const timeoutId = setTimeout(() => {
           router.push('/offline');
         }, 5000);
-        
+
         return () => {
           clearTimeout(timeoutId);
-          clearInterval(intervalId);
+          if (intervalId) clearInterval(intervalId);
         };
       }
     } else {
@@ -40,21 +41,21 @@ const OfflineNotice = () => {
           setShowNotice(false);
           setOfflineDuration(0);
         }, 2000);
-        
+
         return () => clearTimeout(timeoutId);
       }
     }
-    
+
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
   }, [isOnline, router, showNotice]);
-  
+
   // Don't show the notice if we're on the offline page
   if (router.pathname === '/offline') {
     return null;
   }
-  
+
   if (!showNotice) {
     return null;
   }
@@ -63,12 +64,12 @@ const OfflineNotice = () => {
     <div className={styles.offlineContainer}>
       <div className={styles.offlineContent}>
         <div className={styles.iconContainer}>
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="64" 
-            height="64" 
-            viewBox="0 0 24 24" 
-            fill="none" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="64"
+            height="64"
+            viewBox="0 0 24 24"
+            fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
@@ -85,7 +86,7 @@ const OfflineNotice = () => {
         </div>
         <h2>Không có kết nối internet</h2>
         <p>Vui lòng kiểm tra kết nối internet của bạn và thử lại</p>
-        <button 
+        <button
           className={styles.retryButton}
           onClick={() => window.location.reload()}
         >
