@@ -1,42 +1,55 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * @file pages/lich-chieu.tsx
+ * @description Weekly release-schedule page showing movies distributed across days.
+ */
+import React, { useState, useEffect, MouseEvent } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { FaCalendarAlt, FaPlay, FaClock, FaCheckCircle } from 'react-icons/fa';
-import movieService from '@/API/services/movieService';
-import { LOCAL_DEFAULT_POSTER } from '@/config/movieFallbackConfig';
-import Skeleton from '@/components/UI/Skeleton';
-import { DAYS_OF_WEEK, SCHEDULE_CONFIG } from '@/config/scheduleConfig';
-import { SEO_CONFIG } from '@/config/seoConfig';
+import movieService from '../API/services/movieService';
+import { LOCAL_DEFAULT_POSTER } from '../config/movieFallbackConfig';
+import Skeleton from '../components/UI/Skeleton';
+import { FaCalendarAlt, FaPlay, FaClock } from 'react-icons/fa';
+import { DAYS_OF_WEEK, SCHEDULE_CONFIG } from '../config/scheduleConfig';
+import { SEO_CONFIG } from '../config/seoConfig';
+
+interface ScheduleMovie {
+  _id?: string;
+  name?: string;
+  origin_name?: string;
+  slug?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  [key: string]: unknown;
+}
 
 export default function ReleaseSchedulePage() {
-  const [selectedDay, setSelectedDay] = useState(new Date().getDay());
-  const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
+  const [movies, setMovies] = useState<ScheduleMovie[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    let isSubscribed = true;
-
-    const fetchScheduleMovies = async () => {
+    let subscribed = true;
+    const fetchScheduleMovies = async (): Promise<void> => {
       setLoading(true);
       try {
-        const list = await movieService.getMoviesPage(1, SCHEDULE_CONFIG.defaultLimit);
-        if (isSubscribed) {
-          // Distribute movies stably across days
+        const list = (await movieService.getMoviesPage(1, SCHEDULE_CONFIG.defaultLimit)) as ScheduleMovie[];
+        if (subscribed) {
           const filtered = list.filter((_, idx) => idx % 7 === selectedDay);
           setMovies(filtered.length > 0 ? filtered : list.slice(0, 6));
         }
       } catch {
-        if (isSubscribed) setMovies([]);
+        if (subscribed) setMovies([]);
       } finally {
-        if (isSubscribed) setLoading(false);
+        if (subscribed) setLoading(false);
       }
     };
-
     fetchScheduleMovies();
-    return () => {
-      isSubscribed = false;
-    };
+    return () => { subscribed = false; };
   }, [selectedDay]);
+
+  const handleImgError = (e: MouseEvent<HTMLImageElement>): void => {
+    e.currentTarget.src = LOCAL_DEFAULT_POSTER;
+  };
 
   return (
     <>
@@ -59,7 +72,6 @@ export default function ReleaseSchedulePage() {
           {DAYS_OF_WEEK.map((day) => {
             const isToday = new Date().getDay() === day.id;
             const isActive = selectedDay === day.id;
-
             return (
               <button
                 key={day.id}
@@ -80,11 +92,11 @@ export default function ReleaseSchedulePage() {
             {[...Array(6)].map((_, i) => (
               <div key={i} className="col-12 col-md-6 col-lg-4">
                 <div className="card bg-dark border-0 p-3 rounded-3 d-flex flex-row gap-3">
-                  <Skeleton width="90px" height="120px" borderRadius="6px" />
+                  <Skeleton width={90} height={120} borderRadius={6} />
                   <div className="flex-grow-1">
-                    <Skeleton height="18px" width="80%" />
-                    <Skeleton height="14px" width="40%" className="mt-2" />
-                    <Skeleton height="14px" width="60%" className="mt-3" />
+                    <Skeleton height={18} width="80%" />
+                    <Skeleton height={14} width="40%" className="mt-2" />
+                    <Skeleton height={14} width="60%" className="mt-3" />
                   </div>
                 </div>
               </div>
@@ -101,13 +113,10 @@ export default function ReleaseSchedulePage() {
                         src={movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER}
                         alt={movie.name}
                         className="schedule-poster"
-                        onError={(e) => { e.target.src = LOCAL_DEFAULT_POSTER; }}
+                        onError={handleImgError}
                       />
-                      <span className="badge bg-danger schedule-ep-badge">
-                        Tập {idx + 1}
-                      </span>
+                      <span className="badge bg-danger schedule-ep-badge">Tập {idx + 1}</span>
                     </div>
-
                     <div className="d-flex flex-column justify-content-between flex-grow-1 overflow-hidden text-white py-1">
                       <div>
                         <h6 className="text-truncate fw-semibold m-0" title={movie.name} style={{ fontSize: '0.95rem' }}>
@@ -117,7 +126,6 @@ export default function ReleaseSchedulePage() {
                           {movie.origin_name || movie.name}
                         </p>
                       </div>
-
                       <div className="d-flex align-items-center justify-content-between text-secondary small mt-2">
                         <span className="d-flex align-items-center gap-1">
                           <FaClock style={{ fontSize: '0.75rem' }} /> 20:00 hàng tuần

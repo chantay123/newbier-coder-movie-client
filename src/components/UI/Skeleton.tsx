@@ -4,16 +4,18 @@ export interface SkeletonProps {
   width?: string | number;
   height?: string | number;
   borderRadius?: string | number;
+  className?: string;
 }
 
 const Skeleton: React.FC<SkeletonProps> = ({
   width = '100%',
   height = '250px',
-  borderRadius = '0'
+  borderRadius = '0',
+  className = ''
 }) => {
   return (
     <div
-      className="skeleton-loading"
+      className={`skeleton-loading ${className}`.trim()}
       style={{
         width,
         height,
