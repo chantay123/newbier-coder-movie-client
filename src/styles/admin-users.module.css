@@ -2,7 +2,7 @@
 
 .userAdminDashboard {
   padding: 20px 24px;
-  background-color: #0b0f17;
+  background-color: #0a0a0c;
   color: #f1f5f9;
   min-height: calc(100vh - 60px);
 }
@@ -11,7 +11,7 @@
 .contentHeader {
   margin-bottom: 20px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .pageTitle {
@@ -25,7 +25,7 @@
 }
 
 .subtitle {
-  color: #94a3b8;
+  color: #9ca3af;
   font-size: 0.88rem;
   margin: 0;
 }
@@ -55,7 +55,7 @@
 
 /* Stat Cards */
 .statCard {
-  background-color: #111723;
+  background-color: #141416;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 16px 20px;
@@ -103,7 +103,7 @@
 
 /* User Table Card Container */
 .card {
-  background-color: #111723;
+  background-color: #141416;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   overflow: hidden;
@@ -115,7 +115,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background-color: #141b29;
+  background-color: #18181c;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 

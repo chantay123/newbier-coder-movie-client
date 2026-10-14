@@ -1,0 +1,431 @@
+/* src/styles/CinemaTable.module.css - Unified Cinema Dark Table Design System */
+
+.tableCard {
+  background-color: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  width: 100%;
+}
+
+.tableResponsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tableResponsive::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.tableResponsive::-webkit-scrollbar-track {
+  background: #141416;
+}
+
+.tableResponsive::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.tableResponsive::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  margin-bottom: 0;
+}
+
+.dataTable thead th {
+  background-color: #18181c !important;
+  color: #9ca3af !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  padding: 0.85rem 1rem !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  white-space: nowrap;
+}
+
+.dataTable tbody tr {
+  background-color: #141416 !important;
+  transition: background-color 0.12s ease;
+}
+
+.dataTable tbody tr:hover {
+  background-color: #1c1c22 !important;
+}
+
+.dataTable tbody td {
+  background-color: transparent !important;
+  color: #e2e8f0 !important;
+  padding: 0.85rem 1rem !important;
+  font-size: 0.83rem !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  vertical-align: middle !important;
+}
+
+.dataTable tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* Primary Cell with Poster/Avatar */
+.posterCell {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.posterThumb {
+  width: 44px;
+  height: 62px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background-color: #18181c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+}
+
+.posterImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.posterPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1e1e24;
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.primaryTitle {
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 0.88rem;
+  line-height: 1.3;
+  margin: 0;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secondaryTitle {
+  font-size: 0.77rem;
+  color: #9ca3af;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.metaChip {
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.metaChipSeries {
+  background-color: rgba(229, 9, 20, 0.12);
+  border-color: rgba(229, 9, 20, 0.25);
+  color: #f87171;
+}
+
+.metaChipSingle {
+  background-color: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
+}
+
+/* Metric / Performance Cell (Views, Likes) */
+.metricCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.metricItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.metricIconViews {
+  color: #60a5fa;
+  font-size: 0.85rem;
+}
+
+.metricIconLikes {
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
+.metricIconRating {
+  color: #f59e0b;
+  font-size: 0.85rem;
+}
+
+.metricValue {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* Badges */
+.badgeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 220px;
+}
+
+.genreBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.74rem;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+/* Status Toggle & Badges */
+.statusSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggleSwitch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+}
+
+.toggleSwitch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleSlider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #26262a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: 0.2s;
+  border-radius: 20px;
+}
+
+.toggleSlider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #9ca3af;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.toggleSwitch input:checked + .toggleSlider {
+  background-color: #e50914;
+  border-color: #e50914;
+}
+
+.toggleSwitch input:checked + .toggleSlider:before {
+  transform: translateX(16px);
+  background-color: #ffffff;
+}
+
+.statusLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.statusLabelActive {
+  color: #4ade80;
+}
+
+.statusLabelInactive {
+  color: #9ca3af;
+}
+
+/* Action Button Group */
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.actionBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.actionBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.actionBtnView:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+}
+
+.actionBtnEpisode:hover {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #c084fc;
+}
+
+.actionBtnEdit:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.actionBtnBan:hover {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
+.actionBtnDelete:hover {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: rgba(229, 9, 20, 0.4);
+  color: #ef4444;
+}
+
+/* Empty State */
+.emptyStateContainer {
+  padding: 3.5rem 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyStateIcon {
+  font-size: 2.5rem;
+  color: #6b7280;
+  margin-bottom: 0.75rem;
+  opacity: 0.6;
+}
+
+.emptyStateTitle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 0.35rem;
+}
+
+.emptyStateSubtitle {
+  color: #9ca3af;
+  font-size: 0.84rem;
+  max-width: 440px;
+  margin: 0 auto 1.25rem;
+}
+
+/* Responsive Utilities */
+@media (max-width: 992px) {
+  .hideTablet {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .hideMobile {
+    display: none !important;
+  }
+
+  .posterThumb {
+    width: 34px;
+    height: 48px;
+  }
+
+  .primaryTitle {
+    font-size: 0.82rem;
+  }
+
+  .secondaryTitle {
+    font-size: 0.72rem;
+  }
+
+  .dataTable thead th {
+    padding: 0.65rem 0.65rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .dataTable tbody td {
+    padding: 0.65rem 0.65rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .actionBtn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+}

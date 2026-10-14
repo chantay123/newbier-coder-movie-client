@@ -1,7 +1,7 @@
 /* Admin Dashboard Overview - Dark Cinema Aesthetic */
 .container {
   min-height: calc(100vh - 64px);
-  background: #0b0f17;
+  background: #0a0a0c;
   color: #f1f5f9;
   padding: 24px;
 }
@@ -9,10 +9,10 @@
 /* Header Section */
 .header {
   padding: 16px 20px;
-  background: #111723;
+  background: #141416;
   border-radius: 10px;
   margin-bottom: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .headerTitle {
@@ -55,8 +55,8 @@
 
 /* Unified Stat Cards */
 .statsCard {
-  background: #111723;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   padding: 18px 20px;
   height: 100%;
@@ -136,8 +136,8 @@
 
 /* Split Stat Cards (Feedback & Reports) */
 .splitCard {
-  background: #111723;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   height: 100%;
   display: flex;
@@ -233,10 +233,10 @@
 
 /* Charts Section */
 .chartContainer {
-  background: #111723;
+  background: #141416;
   border-radius: 10px;
   padding: 18px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 20px;
 }
 
@@ -301,10 +301,10 @@
 
 /* Recent Items Section */
 .recentItemsContainer {
-  background: #111723;
+  background: #141416;
   border-radius: 10px;
   padding: 18px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 20px;
 }
 

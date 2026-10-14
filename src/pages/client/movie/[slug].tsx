@@ -4,7 +4,7 @@
  * widescreen hero header, episode directory, cast & crew, comments, and
  * related film recommendations.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -13,7 +13,8 @@ import {
   CastCrewSection,
   MovieCommentsSection,
   TrailerModal,
-  useMovieDetail
+  useMovieDetail,
+  normalizeMovieDetail
 } from '@/features/movie-detail';
 import type { HeroHeaderMovie } from '@/features/client/components/detail/components/MovieHeroHeader/MovieHeroHeader';
 import type { CastCrewPerson } from '@/features/client/components/detail/components/CastCrewSection/CastCrewSection';
@@ -29,10 +30,11 @@ interface MovieDetailPageProps {
 export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
   const router = useRouter();
   const slug = initialSlug || (typeof router.query.slug === 'string' ? router.query.slug : '');
+  const isPreview = router.query.preview === 'true';
 
   const {
-    movie,
-    loading,
+    movie: fetchedMovie,
+    loading: fetchLoading,
     error,
     isFavorite,
     favoriteLoading,
@@ -41,7 +43,28 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
     commentsLoading,
     addComment,
     relatedMovies
-  } = useMovieDetail(slug);
+  } = useMovieDetail(isPreview ? null : slug);
+
+  // Live draft state when viewed from Admin Live Demo
+  const [draftMovie, setDraftMovie] = useState(null);
+
+  useEffect(() => {
+    if (isPreview && typeof window !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('admin_movie_preview_draft');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const normalized = normalizeMovieDetail(parsed, slug);
+          setDraftMovie(normalized as any);
+        }
+      } catch (e) {
+        console.error('Failed to parse admin preview draft', e);
+      }
+    }
+  }, [isPreview, slug]);
+
+  const movie = (isPreview && draftMovie) ? draftMovie : fetchedMovie;
+  const loading = isPreview ? !draftMovie : fetchLoading;
 
   const [activeTrailerMovie, setActiveTrailerMovie] = useState<unknown>(null);
 
@@ -97,6 +120,47 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
         <meta property="og:type" content="video.movie" />
       </Head>
 
+      {/* 0. Live Preview Mode Top Banner */}
+      {isPreview && draftMovie && (
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 9999,
+          background: 'rgba(18, 18, 22, 0.96)',
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid rgba(229, 9, 20, 0.6)',
+          color: '#ffffff',
+          padding: '0.45rem 1.25rem',
+          fontSize: '0.78rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div className="d-flex align-items-center gap-2">
+            <span style={{
+              background: '#e50914',
+              color: '#fff',
+              padding: '1px 7px',
+              borderRadius: 3,
+              fontSize: '0.68rem',
+              fontWeight: 700
+            }}>
+              LIVE DRAFT
+            </span>
+            <span>Chế độ Xem Thử Dữ Liệu Bản Nháp • Phim chưa lưu vào cơ sở dữ liệu</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-light"
+            style={{ fontSize: '0.7rem', padding: '0.15rem 0.55rem' }}
+            onClick={() => window.close()}
+          >
+            ✕ Đóng xem thử
+          </button>
+        </div>
+      )}
+
+      {/* 1. Cinema 21:9 Hero Header */}
       <MovieHeroHeader
         movie={movie as unknown as HeroHeaderMovie | null}
         isFavorite={isFavorite}

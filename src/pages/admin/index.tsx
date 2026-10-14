@@ -24,6 +24,12 @@ import {
   getFeedbackStats
 } from '@/features/admin/services/dashboardService';
 import { getReportStats } from '@/features/admin/services/reportService';
+import {
+  MOCK_DASHBOARD_STATS,
+  MOCK_ANALYTICS_DATA,
+  MOCK_FEEDBACK_DATA,
+  MOCK_REPORT_DATA
+} from '@/mock/admin';
 import AdminLayout from '@/layouts/AdminLayout';
 import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import dynamic from 'next/dynamic';
@@ -111,6 +117,7 @@ const AdminDashboardPage: NextPageWithLayout = () => {
 
   const [activeChartFilter, setActiveChartFilter] = useState('week');
   const [loading, setLoading] = useState(true);
+  const [isOfflinePreview, setIsOfflinePreview] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -124,7 +131,10 @@ const AdminDashboardPage: NextPageWithLayout = () => {
           getReportStats().catch(() => null)
         ]);
 
-        if (dashRes.status === 'fulfilled' && dashRes.value) {
+        let hasRealData = false;
+
+        if (dashRes.status === 'fulfilled' && dashRes.value && (dashRes.value.totalMovies > 0 || dashRes.value.newUsers > 0)) {
+          hasRealData = true;
           const val = dashRes.value;
           setStatistics({
             totalMovies: val.totalMovies ?? 0,
@@ -136,18 +146,24 @@ const AdminDashboardPage: NextPageWithLayout = () => {
               unread: val.feedback?.unread ?? 0
             }
           });
+        } else {
+          setStatistics(MOCK_DASHBOARD_STATS);
         }
 
-        if (analyticsRes.status === 'fulfilled' && analyticsRes.value) {
+        if (analyticsRes.status === 'fulfilled' && analyticsRes.value && analyticsRes.value.viewsByDay?.data?.length > 0) {
+          hasRealData = true;
           const val = analyticsRes.value;
           setAnalyticsData({
             viewsByDay: val.viewsByDay || { labels: [], data: [] },
             genreDistribution: val.genreDistribution || { labels: [], data: [] },
             recentMovies: val.recentMovies || []
           });
+        } else {
+          setAnalyticsData(MOCK_ANALYTICS_DATA);
         }
 
-        if (feedbackRes.status === 'fulfilled' && feedbackRes.value) {
+        if (feedbackRes.status === 'fulfilled' && feedbackRes.value && feedbackRes.value.recent?.length > 0) {
+          hasRealData = true;
           const val = feedbackRes.value;
           setFeedbackData({
             recent: val.recent || [],
@@ -155,9 +171,12 @@ const AdminDashboardPage: NextPageWithLayout = () => {
             byStatus: val.byStatus || [],
             byDay: val.byDay || { labels: [], data: [] }
           });
+        } else {
+          setFeedbackData(MOCK_FEEDBACK_DATA);
         }
 
-        if (reportRes.status === 'fulfilled' && reportRes.value) {
+        if (reportRes.status === 'fulfilled' && reportRes.value && reportRes.value.total > 0) {
+          hasRealData = true;
           const val = reportRes.value;
           setReportData({
             total: val.total ?? 0,
@@ -165,9 +184,20 @@ const AdminDashboardPage: NextPageWithLayout = () => {
             byStatus: val.byStatus || { pending: 0, 'in-progress': 0, resolved: 0, rejected: 0 },
             byType: val.byType || {}
           });
+        } else {
+          setReportData(MOCK_REPORT_DATA);
+        }
+
+        if (!hasRealData) {
+          setIsOfflinePreview(true);
         }
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error('Error fetching dashboard data, falling back to mock:', error);
+        setStatistics(MOCK_DASHBOARD_STATS);
+        setAnalyticsData(MOCK_ANALYTICS_DATA);
+        setFeedbackData(MOCK_FEEDBACK_DATA);
+        setReportData(MOCK_REPORT_DATA);
+        setIsOfflinePreview(true);
       } finally {
         setLoading(false);
       }
@@ -364,7 +394,14 @@ const AdminDashboardPage: NextPageWithLayout = () => {
           <div className="container-fluid p-0">
             <div className="row align-items-center">
               <div className="col-md-6">
-                <h1 className={styles.headerTitle}>Tổng Quan Hệ Thống</h1>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <h1 className={styles.headerTitle}>Tổng Quan Hệ Thống</h1>
+                  {isOfflinePreview && (
+                    <span style={{ fontSize: '0.74rem', padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: 'rgba(229, 9, 20, 0.15)', color: '#f87171', border: '1px solid rgba(229, 9, 20, 0.3)', fontWeight: 600 }}>
+                      Chế độ xem trước (Dữ liệu mẫu)
+                    </span>
+                  )}
+                </div>
                 <p className={styles.headerSubtitle}>
                   Chào mừng trở lại! Dưới đây là các chỉ số hoạt động chính của nền tảng.
                 </p>

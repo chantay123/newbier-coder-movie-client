@@ -21,4 +21,4 @@ export { default as CastCrewSection, type CastCrewPerson } from '@/features/clie
 export { default as MovieMetaBento } from '@/features/client/components/detail/components/MovieMetaBento/MovieMetaBento';
 export { default as MovieCommentsSection } from '@/features/client/components/detail/components/MovieCommentsSection/MovieCommentsSection';
 
-export { useMovieDetail } from '@/features/client/components/detail/hooks/useMovieDetail';
+export { useMovieDetail, normalizeMovieDetail } from '@/features/client/components/detail/hooks/useMovieDetail';
