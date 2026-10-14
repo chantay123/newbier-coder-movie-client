@@ -6,16 +6,29 @@ import { WATCH_CONFIG } from '@/config/watchConfig';
 import styles from './TrendingSidebar.module.css';
 
 /**
- * @file TrendingSidebar.js
+ * @file TrendingSidebar.tsx
  * @description Minimalist Cinema Recommended Movies Widget ("Phim Đề Xuất").
- * Features clean movie list without noisy tabs or rank numbers.
- *
- * @param {Object} props
- * @param {string} [props.currentSlug=''] - Current playing movie slug.
  */
-export default function TrendingSidebar({ currentSlug = '' }) {
-  const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+export interface RecommendedMovie {
+  _id?: string;
+  slug?: string;
+  name?: string;
+  origin_name?: string;
+  year?: number | string;
+  quality?: string;
+  episode_current?: string;
+  poster_url?: string;
+  thumb_url?: string;
+}
+
+export interface TrendingSidebarProps {
+  currentSlug?: string;
+}
+
+const TrendingSidebar: React.FC<TrendingSidebarProps> = ({ currentSlug = '' }) => {
+  const [movies, setMovies] = useState<RecommendedMovie[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const { limit, title: sectionTitle, emptyText } = WATCH_CONFIG.recommendations;
 
@@ -23,10 +36,10 @@ export default function TrendingSidebar({ currentSlug = '' }) {
     let isMounted = true;
     const controller = new AbortController();
 
-    const fetchRecommended = async () => {
+    const fetchRecommended = async (): Promise<void> => {
       setLoading(true);
       try {
-        const list = await movieService.getTop10Movies(controller.signal);
+        const list = (await movieService.getTop10Movies(controller.signal)) as RecommendedMovie[];
         if (isMounted) {
           setMovies(Array.isArray(list) ? list : []);
         }
@@ -49,9 +62,8 @@ export default function TrendingSidebar({ currentSlug = '' }) {
     };
   }, []);
 
-  const displayedMovies = useMemo(() => {
+  const displayedMovies = useMemo((): RecommendedMovie[] => {
     if (!movies || movies.length === 0) return [];
-    // Filter out current movie if present
     const filtered = currentSlug
       ? movies.filter((m) => m.slug !== currentSlug)
       : movies;
@@ -84,16 +96,15 @@ export default function TrendingSidebar({ currentSlug = '' }) {
       ) : displayedMovies.length > 0 ? (
         <div className={styles.movieList}>
           {displayedMovies.map((movie, idx) => {
-            const posterSrc =
-              movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER;
+            const posterSrc = movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER;
 
             const hasDistinctOrigin =
-              movie.origin_name &&
+              !!(movie.origin_name && movie.name) &&
               movie.origin_name.trim().toLowerCase() !== movie.name.trim().toLowerCase();
 
             return (
               <Link
-                key={movie._id || movie.slug || idx}
+                key={movie._id || movie.slug || String(idx)}
                 href={`/movie/${movie.slug}`}
                 className={styles.movieItem}
                 title={movie.name}
@@ -106,7 +117,8 @@ export default function TrendingSidebar({ currentSlug = '' }) {
                     className={styles.posterImg}
                     loading="lazy"
                     onError={(e) => {
-                      e.target.src = LOCAL_DEFAULT_POSTER;
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.src = LOCAL_DEFAULT_POSTER;
                     }}
                   />
                   {movie.quality && (
@@ -145,4 +157,6 @@ export default function TrendingSidebar({ currentSlug = '' }) {
       )}
     </aside>
   );
-}
+};
+
+export default TrendingSidebar;

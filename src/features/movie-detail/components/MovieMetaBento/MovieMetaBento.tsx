@@ -2,15 +2,43 @@ import React, { useState } from 'react';
 import styles from './MovieMetaBento.module.css';
 
 /**
- * @file MovieMetaBento.js
+ * @file MovieMetaBento.tsx
  * @description Two-column bento card: Collapsible synopsis overview on the left,
  * and high-density technical specifications on the right.
- *
- * @param {Object} props
- * @param {Object} props.movie - Normalized movie object.
  */
-export default function MovieMetaBento({ movie }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+
+interface CountryEntry {
+  name?: string;
+  slug?: string;
+}
+
+interface CategoryEntry {
+  name?: string;
+  slug?: string;
+}
+
+interface DirectorEntry {
+  name?: string;
+}
+
+export interface MovieMetaBentoMovie {
+  content?: string;
+  country?: CountryEntry[];
+  category?: CategoryEntry[];
+  directors?: DirectorEntry[];
+  director?: string;
+  type?: 'series' | 'single' | string;
+  view?: number;
+  rating?: number | string;
+  ratingCount?: number;
+}
+
+export interface MovieMetaBentoProps {
+  movie?: MovieMetaBentoMovie | null;
+}
+
+const MovieMetaBento: React.FC<MovieMetaBentoProps> = ({ movie }) => {
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   if (!movie) return null;
 
@@ -19,7 +47,7 @@ export default function MovieMetaBento({ movie }) {
 
   const countries = movie.country?.map((c) => c.name).join(', ') || 'Đang cập nhật';
   const categories = movie.category?.map((c) => c.name).join(', ') || 'Đang cập nhật';
-  const directorNames = movie.directors?.length > 0
+  const directorNames = movie.directors && movie.directors.length > 0
     ? movie.directors.map((d) => d.name).join(', ')
     : (movie.director ? String(movie.director) : 'Đang cập nhật');
 
@@ -107,4 +135,6 @@ export default function MovieMetaBento({ movie }) {
       </div>
     </div>
   );
-}
+};
+
+export default MovieMetaBento;

@@ -3,35 +3,89 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { LOCAL_DEFAULT_BACKDROP, LOCAL_DEFAULT_POSTER } from '@/config/movieConfig';
 import { getWatchProgress } from '@/utils/watchProgress';
+import type { WatchEpisode, WatchServer } from '../WatchSidebarPlaylist/WatchSidebarPlaylist';
 import styles from './MovieHeroHeader.module.css';
 
 /**
- * @file MovieHeroHeader.js
+ * @file MovieHeroHeader.tsx
  * @description Mature, high-density cinema header modeled after proven real-world
- * streaming platforms (e.g. AnimeVietSub, RoPhim, Bilutv).
- * Features a 2-column compact layout: 2:3 Poster with immediate action buttons on the left,
- * and comprehensive, structured movie facts + synopsis on the right.
- *
- * @param {Object} props
- * @param {Object} props.movie - Normalized movie detail object.
- * @param {Function} [props.onPlayTrailer] - Callback to open trailer modal.
- * @param {boolean} [props.isFavorite=false] - Favorite status.
- * @param {Function} [props.onToggleFavorite] - Toggle favorite callback.
+ * streaming platforms. 2-column compact layout: 2:3 Poster + structured movie facts.
  */
-export default function MovieHeroHeader({
+
+interface CountryEntry {
+  name?: string;
+  slug?: string;
+}
+
+interface CategoryEntry {
+  name?: string;
+  slug?: string;
+}
+
+interface DirectorEntry {
+  name?: string;
+}
+
+interface ActorEntry {
+  name?: string;
+}
+
+export interface HeroHeaderMovie {
+  _id?: string;
+  slug?: string;
+  name?: string;
+  origin_name?: string;
+  content?: string;
+  quality?: string;
+  lang?: string;
+  year?: number | string;
+  time?: string;
+  rating?: number | string;
+  status?: string;
+  type?: 'series' | 'single' | string;
+  view?: number;
+  director?: string;
+  actor?: string;
+  directors?: DirectorEntry[];
+  actors?: ActorEntry[];
+  country?: CountryEntry[];
+  category?: CategoryEntry[];
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+  episodes?: WatchServer[];
+  [key: string]: unknown;
+}
+
+export interface MovieHeroHeaderProps {
+  movie?: HeroHeaderMovie | null;
+  onPlayTrailer?: (movie: HeroHeaderMovie) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
+}
+
+/** Watch progress payload (partial) */
+interface WatchProgressPayload {
+  epSlug?: string;
+  serverIndex?: number;
+  episodeIndex?: number;
+  epName?: string;
+}
+
+const MovieHeroHeader: React.FC<MovieHeroHeaderProps> = ({
   movie,
   onPlayTrailer,
   isFavorite = false,
   onToggleFavorite
-}) {
+}) => {
   const router = useRouter();
-  const [copied, setCopied] = useState(false);
-  const [synopsisExpanded, setSynopsisExpanded] = useState(false);
-  const [savedProgress, setSavedProgress] = useState(null);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [synopsisExpanded, setSynopsisExpanded] = useState<boolean>(false);
+  const [savedProgress, setSavedProgress] = useState<WatchProgressPayload | null>(null);
 
   useEffect(() => {
     if (!movie?.slug) return;
-    const progress = getWatchProgress(movie.slug);
+    const progress = getWatchProgress(movie.slug) as WatchProgressPayload | null;
     if (progress && progress.epSlug) {
       setSavedProgress(progress);
     }
@@ -39,7 +93,7 @@ export default function MovieHeroHeader({
 
   if (!movie) return null;
 
-  const handleShare = () => {
+  const handleShare = (): void => {
     if (typeof window !== 'undefined') {
       navigator.clipboard.writeText(window.location.href);
       setCopied(true);
@@ -48,7 +102,7 @@ export default function MovieHeroHeader({
   };
 
   // Derive series vs single movie attributes
-  const firstServer = movie.episodes?.[0]?.server_data || [];
+  const firstServer: WatchEpisode[] = movie.episodes?.[0]?.server_data || [];
   const totalEpisodesCount = firstServer.length;
   const isSeries = movie.type === 'series' || totalEpisodesCount > 1;
 
@@ -57,7 +111,7 @@ export default function MovieHeroHeader({
 
   const latestEp = firstServer[totalEpisodesCount - 1];
   const latestEpSlug = latestEp?.slug || firstEpSlug;
-  const latestEpName = latestEp?.name || (totalEpisodesCount > 0 ? totalEpisodesCount : '1');
+  const latestEpName: string = latestEp?.name || (totalEpisodesCount > 0 ? String(totalEpisodesCount) : '1');
 
   // URL routes
   const watchFirstUrl = `/movie/${movie.slug}/watch?ep=${encodeURIComponent(firstEpSlug)}`;
@@ -67,18 +121,18 @@ export default function MovieHeroHeader({
     : watchFirstUrl;
 
   // Formatted metadata
-  const categories = movie.category || [];
-  const countries = movie.country || [];
-  const ratingVal = movie.rating ? Number(movie.rating).toFixed(1) : '8.6';
-  const directorDisplay = movie.directors?.length > 0
+  const categories: CategoryEntry[] = movie.category || [];
+  const countries: CountryEntry[] = movie.country || [];
+  const ratingVal: string = movie.rating ? Number(movie.rating).toFixed(1) : '8.6';
+  const directorDisplay: string = movie.directors && movie.directors.length > 0
     ? movie.directors.map((d) => d.name).join(', ')
     : (movie.director || 'Đang cập nhật');
-  const actorsDisplay = movie.actors?.length > 0
+  const actorsDisplay: string = movie.actors && movie.actors.length > 0
     ? movie.actors.slice(0, 5).map((a) => a.name).join(', ')
     : (movie.actor || 'Đang cập nhật');
 
   // Status badge display
-  let statusText = 'Hoàn Thành';
+  let statusText: string = 'Hoàn Thành';
   if (movie.status === 'ongoing') {
     statusText = `Đang Chiếu (Tập ${latestEpName})`;
   } else if (movie.status === 'upcoming') {
@@ -87,17 +141,16 @@ export default function MovieHeroHeader({
     statusText = `Hoàn Thành (${totalEpisodesCount}/${totalEpisodesCount})`;
   }
 
-  const synopsis = movie.content || 'Nội dung bộ phim đang được cập nhật.';
-  const synopsisRef = useRef(null);
-  const [hasOverflow, setHasOverflow] = useState(() => synopsis.length > 180);
+  const synopsis: string = movie.content || 'Nội dung bộ phim đang được cập nhật.';
+  const synopsisRef = useRef<HTMLParagraphElement | null>(null);
+  const [hasOverflow, setHasOverflow] = useState<boolean>(() => synopsis.length > 180);
 
   useEffect(() => {
     const el = synopsisRef.current;
     if (!el) return;
 
-    const checkOverflow = () => {
+    const checkOverflow = (): void => {
       if (!synopsisExpanded && el) {
-        // scrollHeight > clientHeight indicates the text is truly clamped
         setHasOverflow(el.scrollHeight > el.clientHeight + 4);
       }
     };
@@ -119,8 +172,9 @@ export default function MovieHeroHeader({
           alt=""
           className={styles.backdropImg}
           onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = LOCAL_DEFAULT_BACKDROP;
+            const img = e.currentTarget as HTMLImageElement;
+            img.onerror = null;
+            img.src = LOCAL_DEFAULT_BACKDROP;
           }}
         />
         <div className={styles.backdropGradient} />
@@ -149,8 +203,9 @@ export default function MovieHeroHeader({
                 alt={movie.name}
                 className={styles.posterImg}
                 onError={(e) => {
-                  e.currentTarget.onerror = null;
-                  e.currentTarget.src = LOCAL_DEFAULT_POSTER;
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = LOCAL_DEFAULT_POSTER;
                 }}
               />
               <span className={styles.qualityBadge}>{movie.quality || 'Full HD'}</span>
@@ -161,7 +216,7 @@ export default function MovieHeroHeader({
                 </span>
               )}
 
-              {/* Hover Play Overlay with Red Trailer Trigger Button like outer cards */}
+              {/* Hover Play Overlay with Red Trailer Trigger Button */}
               {onPlayTrailer && (
                 <div className={styles.playOverlay}>
                   <button
@@ -192,7 +247,7 @@ export default function MovieHeroHeader({
             <div className={styles.actionButtonGroup}>
               {isSeries ? (
                 <>
-                  {savedProgress && savedProgress.episodeIndex > 0 ? (
+                  {savedProgress && savedProgress.episodeIndex && savedProgress.episodeIndex > 0 ? (
                     <>
                       <button
                         type="button"
@@ -251,7 +306,7 @@ export default function MovieHeroHeader({
                 </button>
               )}
 
-              {/* Symmetrical 50/50 Dual Action Row: Theo dõi & Chia sẻ */}
+              {/* Symmetrical 50/50 Dual Action Row */}
               <div className={styles.dualActionRow}>
                 <button
                   type="button"
@@ -319,7 +374,7 @@ export default function MovieHeroHeader({
                   <span className={styles.factLabel}>Quốc gia:</span>
                   <span className={styles.factValue}>
                     {countries.map((c, i) => (
-                      <span key={c.slug || i}>
+                      <span key={c.slug || String(i)}>
                         {i > 0 && ', '}
                         <Link href={`/search?country=${encodeURIComponent(c.slug || '')}`} className={styles.metaLink}>
                           {c.name}
@@ -336,7 +391,7 @@ export default function MovieHeroHeader({
                   <div className={styles.tagWrap}>
                     {categories.map((cat, i) => (
                       <Link
-                        key={cat.slug || i}
+                        key={cat.slug || String(i)}
                         href={`/search?category=${encodeURIComponent(cat.slug || '')}`}
                         className={styles.categoryTag}
                       >
@@ -395,4 +450,6 @@ export default function MovieHeroHeader({
       </div>
     </section>
   );
-}
+};
+
+export default MovieHeroHeader;

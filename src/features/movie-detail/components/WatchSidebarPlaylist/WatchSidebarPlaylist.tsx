@@ -1,43 +1,52 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ServerVersionSelector from '@/features/movie-detail/components/ServerVersionSelector/ServerVersionSelector';
+// ServerVersionSelector is still .js, cast for strict TS
+const ServerVersionSelectorTyped = ServerVersionSelector as unknown as React.FC<Record<string, unknown>>;
 import { WATCH_CONFIG } from '@/config/watchConfig';
 import styles from './WatchSidebarPlaylist.module.css';
 
 // Configurable episodes per group (default 24)
 const GROUP_SIZE = WATCH_CONFIG.episodesPerGroup;
 
-/**
- * @file WatchSidebarPlaylist.js
- * @description Cinema Watch Page Episode Playlist Section (positioned below player).
- * Features:
- * - Direct Vietsub vs Thuyết Minh vs Lồng Tiếng version switcher with clean iconography.
- * - Group chunking dropdown (1-25, 26-50...) for seamless navigation with no DOM bloat.
- * - No episode search input (as requested).
- * - Responsive grid layout with active episode auto-scroll.
- *
- * @param {Object} props
- * @param {Array<Object>} [props.servers=[]] - Array of episode servers.
- * @param {number} [props.currentServerIndex=0] - Active server index.
- * @param {Function} props.onSelectServer - Callback to switch server.
- * @param {number} [props.currentEpisodeIndex=0] - Active episode index.
- * @param {Function} props.onSelectEpisode - Callback to switch episode.
- */
-export default function WatchSidebarPlaylist({
+/** Episode entry */
+export interface WatchEpisode {
+  name?: string;
+  slug?: string;
+  link?: string;
+  [key: string]: unknown;
+}
+
+/** Server entry */
+export interface WatchServer {
+  server_name?: string;
+  server_data?: WatchEpisode[];
+  [key: string]: unknown;
+}
+
+export interface WatchSidebarPlaylistProps {
+  servers?: WatchServer[];
+  currentServerIndex?: number;
+  onSelectServer?: (index: number) => void;
+  currentEpisodeIndex?: number;
+  onSelectEpisode?: (index: number) => void;
+  pinnedEpisodeIndex?: number;
+}
+
+const WatchSidebarPlaylist: React.FC<WatchSidebarPlaylistProps> = ({
   servers = [],
   currentServerIndex = 0,
   onSelectServer,
   currentEpisodeIndex = 0,
   onSelectEpisode,
   pinnedEpisodeIndex = -1
-}) {
-  const currentServer = servers[currentServerIndex] || servers[0] || null;
-  const episodes = currentServer?.server_data || [];
+}) => {
+  const currentServer: WatchServer | null = servers[currentServerIndex] || servers[0] || null;
+  const episodes: WatchEpisode[] = currentServer?.server_data || [];
   const totalEpisodes = episodes.length;
 
-  const activeBtnRef = useRef(null);
+  const activeBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Group pagination index (calculated by 25 episodes/group)
-  const [activeGroupIndex, setActiveGroupIndex] = useState(() =>
+  const [activeGroupIndex, setActiveGroupIndex] = useState<number>(() =>
     Math.max(0, Math.floor(currentEpisodeIndex / GROUP_SIZE))
   );
 
@@ -50,10 +59,9 @@ export default function WatchSidebarPlaylist({
   }, [currentEpisodeIndex, totalEpisodes]);
 
   const totalGroups = Math.ceil(episodes.length / GROUP_SIZE);
-  const currentGroupOfActiveEp = Math.floor(currentEpisodeIndex / GROUP_SIZE);
 
   // Sliced episodes for current 25-item group
-  const displayedEpisodes = useMemo(() => {
+  const displayedEpisodes = useMemo((): WatchEpisode[] => {
     const start = activeGroupIndex * GROUP_SIZE;
     return episodes.slice(start, start + GROUP_SIZE);
   }, [episodes, activeGroupIndex]);
@@ -106,8 +114,8 @@ export default function WatchSidebarPlaylist({
         )}
       </div>
 
-      {/* 2. Audio Version Selector (Vietsub vs Thuyết Minh with hover dropdown for multi-source) */}
-      <ServerVersionSelector
+      {/* 2. Audio Version Selector */}
+      <ServerVersionSelectorTyped
         servers={servers}
         currentServerIndex={currentServerIndex}
         onSelectServer={onSelectServer}
@@ -131,7 +139,7 @@ export default function WatchSidebarPlaylist({
                   ref={isPlaying ? activeBtnRef : null}
                   type="button"
                   className={`${styles.epButton} ${isPlaying ? styles.epButtonActive : ''} ${isPinned ? styles.epButtonPinned : ''}`}
-                  onClick={() => onSelectEpisode(actualIndex)}
+                  onClick={() => onSelectEpisode && onSelectEpisode(actualIndex)}
                   title={`${epLabel}${isPinned ? ' (Đã ghim)' : ''}`}
                 >
                   {isPlaying && (
@@ -153,4 +161,6 @@ export default function WatchSidebarPlaylist({
       </div>
     </section>
   );
-}
+};
+
+export default WatchSidebarPlaylist;

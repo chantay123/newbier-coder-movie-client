@@ -3,21 +3,34 @@ import Link from 'next/link';
 import styles from './CastCrewSection.module.css';
 
 /**
- * @file CastCrewSection.js
+ * @file CastCrewSection.tsx
  * @description Compact, high-density Cast & Crew showcase.
- * Features artist squircle avatars, prominent names, and character roles.
- *
- * @param {Object} props
- * @param {Array<Object>} [props.actors=[]] - Array of actor objects.
- * @param {Array<Object>} [props.directors=[]] - Array of director objects.
  */
-export default function CastCrewSection({
+
+export interface CastCrewPerson {
+  name?: string;
+  role?: string;
+  avatar_url?: string;
+  image?: string;
+  slug?: string;
+}
+
+export interface CastCrewSectionProps {
+  actors?: CastCrewPerson[];
+  directors?: CastCrewPerson[];
+}
+
+const CastCrewSection: React.FC<CastCrewSectionProps> = ({
   actors = [],
   directors = []
-}) {
-  const combined = [
-    ...directors.filter((d) => d.name && !d.name.includes('Đang cập nhật')).map((d) => ({ ...d, role: d.role || 'Đạo diễn' })),
-    ...actors.filter((a) => a.name && !a.name.includes('Đang cập nhật')).map((a) => ({ ...a, role: a.role || 'Diễn viên' }))
+}) => {
+  const combined: Array<CastCrewPerson & { role: string }> = [
+    ...directors
+      .filter((d) => d.name && !d.name.includes('Đang cập nhật'))
+      .map((d) => ({ ...d, role: d.role || 'Đạo diễn' })),
+    ...actors
+      .filter((a) => a.name && !a.name.includes('Đang cập nhật'))
+      .map((a) => ({ ...a, role: a.role || 'Diễn viên' }))
   ];
 
   if (combined.length === 0) {
@@ -65,10 +78,10 @@ export default function CastCrewSection({
                     alt={name}
                     className={styles.avatarImg}
                     onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                      if (e.currentTarget.nextElementSibling) {
-                        e.currentTarget.nextElementSibling.style.display = 'flex';
-                      }
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.style.display = 'none';
+                      const next = img.nextElementSibling as HTMLElement | null;
+                      if (next) next.style.display = 'flex';
                     }}
                   />
                 ) : null}
@@ -87,7 +100,7 @@ export default function CastCrewSection({
           if (slug) {
             return (
               <Link
-                key={slug || idx}
+                key={slug || String(idx)}
                 href={`/performer/${encodeURIComponent(slug)}`}
                 className={styles.castLink}
               >
@@ -97,7 +110,7 @@ export default function CastCrewSection({
           }
 
           return (
-            <div key={idx} className={styles.castLink}>
+            <div key={String(idx)} className={styles.castLink}>
               {cardContent}
             </div>
           );
@@ -105,4 +118,6 @@ export default function CastCrewSection({
       </div>
     </section>
   );
-}
+};
+
+export default CastCrewSection;
