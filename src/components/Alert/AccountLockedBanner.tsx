@@ -1,16 +1,26 @@
-import React from 'react';
+/**
+ * @file AccountLockedBanner.tsx
+ * @description Full-width banner shown to users whose account is locked.
+ */
+
+import React, { MouseEvent } from 'react';
 import { FaLock, FaEnvelope, FaSignOutAlt } from 'react-icons/fa';
-import Link from 'next/link';
 import { useAuth } from '../../utils/auth';
 import { useRouter } from 'next/router';
 
-const AccountLockedBanner = () => {
+const AccountLockedBanner: React.FC = () => {
   const { logout } = useAuth();
   const router = useRouter();
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     await logout();
     router.push('/auth/login');
+  };
+
+  const handleContactClick = (e: MouseEvent<HTMLAnchorElement>): void => {
+    // Default mailto: link is allowed; left as native anchor navigation.
+    e.preventDefault();
+    window.location.href = 'mailto:support@moviestreaming.com';
   };
 
   return (
@@ -22,14 +32,18 @@ const AccountLockedBanner = () => {
         <div className="banner-text">
           <h4>Tài khoản của bạn đã bị khóa</h4>
           <p>
-            Tài khoản của bạn đã bị tạm khóa vì vi phạm điều khoản sử dụng của chúng tôi. 
-            Vui lòng liên hệ quản trị viên để được hỗ trợ mở khóa tài khoản.
+            Tài khoản của bạn đã bị tạm khóa vì vi phạm điều khoản sử dụng của chúng tôi. Vui
+            lòng liên hệ quản trị viên để được hỗ trợ mở khóa tài khoản.
           </p>
           <div className="banner-actions">
-            <a href="mailto:support@moviestreaming.com" className="contact-button">
+            <a
+              href="mailto:support@moviestreaming.com"
+              onClick={handleContactClick}
+              className="contact-button"
+            >
               <FaEnvelope /> Liên hệ hỗ trợ
             </a>
-            <button onClick={handleLogout} className="logout-button">
+            <button onClick={handleLogout} className="logout-button" type="button">
               <FaSignOutAlt /> Đăng xuất
             </button>
           </div>
@@ -52,12 +66,8 @@ const AccountLockedBanner = () => {
         }
 
         @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-          }
-          to {
-            transform: translateY(0);
-          }
+          from { transform: translateY(-100%); }
+          to { transform: translateY(0); }
         }
 
         .banner-content {
@@ -103,7 +113,8 @@ const AccountLockedBanner = () => {
           flex-wrap: wrap;
         }
 
-        .contact-button, .logout-button {
+        .contact-button,
+        .logout-button {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;

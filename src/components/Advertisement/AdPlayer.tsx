@@ -1,50 +1,67 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FaForward } from 'react-icons/fa';
-import adService from '@/API/services/adService';
-import styles from '../../styles/AdPlayer.module.css';
-import { useAdContext } from '@/context/AdContext'; // Import AdContext
+/**
+ * @file AdPlayer.tsx
+ * @description Video-ad player with skip countdown and tracking.
+ */
 
-const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
-  const [ad, setAd] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [canSkip, setCanSkip] = useState(false);
-  const [adTracked, setAdTracked] = useState(false);
-  const videoRef = useRef(null);
-  const timerRef = useRef(null);
-  const skipCountdownRef = useRef(skipDelay);
+import React, { useState, useEffect, useRef, MouseEvent } from 'react';
+import { FaForward } from 'react-icons/fa';
+import adService, { Advertisement } from '@/API/services/adService';
+import styles from '../../styles/AdPlayer.module.css';
+import { useAdContext } from '@/context/AdContext';
+
+export interface AdPlayerProps {
+  onAdComplete: () => void;
+  allowSkip?: boolean;
+  skipDelay?: number;
+}
+
+type AdServiceWithTracking = {
+  getRandomVideoAd: () => Promise<Advertisement | null>;
+  trackAdImpression: (id: string) => Promise<unknown>;
+  trackAdSkip: (id: string) => Promise<unknown>;
+  trackAdClick: (id: string) => Promise<unknown>;
+};
+
+const trackingService = adService as unknown as AdServiceWithTracking;
+
+const AdPlayer: React.FC<AdPlayerProps> = ({
+  onAdComplete,
+  allowSkip = true,
+  skipDelay = 5
+}) => {
+  const [ad, setAd] = useState<Advertisement | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [canSkip, setCanSkip] = useState<boolean>(false);
+  const [adTracked, setAdTracked] = useState<boolean>(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const skipCountdownRef = useRef<number>(skipDelay);
   const { hideVideoAds, isLoading: isAdContextLoading } = useAdContext();
 
   useEffect(() => {
     if (hideVideoAds === true) {
       if (videoRef.current) {
         videoRef.current.pause();
-        videoRef.current.src = "";
+        videoRef.current.src = '';
       }
-
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-
       onAdComplete();
     }
   }, [hideVideoAds, onAdComplete]);
 
   useEffect(() => {
-    if (hideVideoAds === true) {
-      return;
-    }
+    if (hideVideoAds === true) return;
+    if (isAdContextLoading) return;
 
-    if (isAdContextLoading) {
-      return;
-    }
-
-    const fetchAd = async () => {
+    const fetchAd = async (): Promise<void> => {
       try {
         setLoading(true);
-        const adData = await adService.getRandomVideoAd();
+        const adData: Advertisement | null = await trackingService.getRandomVideoAd();
 
-        if (hideVideoAds === true) {
+        if (hideVideoAds) {
           onAdComplete();
           return;
         }
@@ -73,39 +90,39 @@ const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
   }, [hideVideoAds, isAdContextLoading, onAdComplete]);
 
   useEffect(() => {
-    const trackImpression = async () => {
+    const trackImpression = async (): Promise<void> => {
       if (ad && !adTracked) {
         try {
-          await adService.trackAdImpression(ad._id);
+          await trackingService.trackAdImpression(ad._id);
           setAdTracked(true);
         } catch (error) {
           console.error('Error tracking ad impression:', error);
         }
       }
     };
-
     trackImpression();
   }, [ad, adTracked]);
+
   useEffect(() => {
     if (!ad || !videoRef.current) return;
 
     const videoElement = videoRef.current;
 
-    const handleCanPlay = () => {
-      videoElement.play().catch(err => {
+    const handleCanPlay = (): void => {
+      videoElement.play().catch((err) => {
         console.error('Error playing video ad:', err);
         onAdComplete();
       });
     };
 
-    const handleEnded = () => {
+    const handleEnded = (): void => {
       onAdComplete();
     };
 
     timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
+      setTimeRemaining((prev) => {
         if (prev <= 1) {
-          clearInterval(timerRef.current);
+          if (timerRef.current) clearInterval(timerRef.current);
           return 0;
         }
         return prev - 1;
@@ -125,33 +142,29 @@ const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
     return () => {
       videoElement.removeEventListener('canplay', handleCanPlay);
       videoElement.removeEventListener('ended', handleEnded);
-
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
   }, [ad, onAdComplete, allowSkip, skipDelay]);
 
-  const handleSkip = async () => {
+  const handleSkip = async (): Promise<void> => {
     if (!canSkip || !ad) return;
 
     try {
-      await adService.trackAdSkip(ad._id);
+      await trackingService.trackAdSkip(ad._id);
     } catch (error) {
       console.error('Error tracking ad skip:', error);
     }
-
     onAdComplete();
   };
 
-  const handleAdClick = async () => {
+  const handleAdClick = async (): Promise<void> => {
     if (!ad) return;
 
     try {
-      await adService.trackAdClick(ad._id);
-
+      await trackingService.trackAdClick(ad._id);
       window.open(ad.link, '_blank');
-
       if (videoRef.current) {
         videoRef.current.pause();
       }
@@ -161,12 +174,17 @@ const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
     }
   };
 
-  if (!ad) {
-    return null;
-  }  return (
+  if (!ad) return null;
+
+  return (
     <div className={styles.adPlayerContainer}>
       <div className={styles.videoWrapper}>
-        <div className={styles.adClickArea} onClick={handleAdClick}>
+        <div
+          className={styles.adClickArea}
+          onClick={handleAdClick}
+          role="button"
+          tabIndex={0}
+        >
           <video
             ref={videoRef}
             className={styles.adVideo}
@@ -182,7 +200,7 @@ const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
           <div className={styles.adInfo}>
             <span className={styles.adLabel}>Quảng cáo</span>
           </div>
-            <div className={styles.adDetails}>
+          <div className={styles.adDetails}>
             <p className={styles.adTitle}>{ad.name}</p>
             <p className={styles.adAdvertiser}>{ad.advertiser}</p>
           </div>
@@ -190,11 +208,12 @@ const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
           {allowSkip && (
             <button
               className={`${styles.skipButton} ${canSkip ? styles.canSkip : ''}`}
-              onClick={(e) => {
+              onClick={(e: MouseEvent<HTMLButtonElement>) => {
                 e.stopPropagation();
                 handleSkip();
               }}
               disabled={!canSkip}
+              type="button"
               aria-label="Skip advertisement"
             >
               <FaForward className={styles.skipIcon} />
@@ -208,4 +227,3 @@ const AdPlayer = ({ onAdComplete, allowSkip = true, skipDelay = 5 }) => {
 };
 
 export default AdPlayer;
-
