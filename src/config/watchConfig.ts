@@ -1,22 +1,22 @@
 /**
- * @file watchConfig.js
- * @description Centralized Configuration for the Movie Watch & Player Page.
- * Configures episode pagination chunks, sidebar recommendations, UI labels,
- * fallbacks, and SEO defaults without hardcoding values in UI components.
+ * @file watchConfig.ts
+ * @description Cấu hình tập trung cho trang xem phim và trình phát.
+ * Gom kích thước tập phim, đề xuất sidebar, nhãn UI, fallback và mặc định SEO,
+ * tránh hardcode giá trị trong component UI.
  */
 
 export const WATCH_CONFIG = {
-  // Episode playlist chunk size (24 items per group for balanced grid layout)
+  // Số tập phim mỗi nhóm trong playlist (24 tập mỗi nhóm cho layout cân đối)
   episodesPerGroup: 24,
 
-  // Sidebar recommendations widget settings
+  // Cấu hình widget đề xuất sidebar
   recommendations: {
     limit: 10,
     title: 'Phim Đề Xuất',
     emptyText: 'Đang cập nhật danh sách đề xuất...'
   },
 
-  // UI labels & text tokens
+  // Nhãn và text cho UI
   labels: {
     playlistTitle: 'Danh Sách Tập',
     totalEpisodesSuffix: 'tập',
@@ -37,13 +37,15 @@ export const WATCH_CONFIG = {
     defaultEpisodePrefix: 'Tập'
   },
 
-  // SEO & Head defaults
+  // Mặc định SEO & Head
   seo: {
     siteName: 'MovieStreaming',
     defaultBackdrop: '/img/background/movies-wall.jpg',
-    buildPageTitle: (movieName, epTitle) =>
+    buildPageTitle: (movieName: string, epTitle?: string) =>
       `Xem phim ${movieName}${epTitle ? ` - ${epTitle}` : ''} | MovieStreaming`,
-    buildDescription: (movieName, epTitle) =>
+    buildDescription: (movieName: string, epTitle?: string) =>
       `Xem phim ${movieName}${epTitle ? ` ${epTitle}` : ''} chất lượng cao trực tuyến miễn phí.`
   }
-};
+} as const;
+
+export default WATCH_CONFIG;

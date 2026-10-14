@@ -1,74 +1,62 @@
-// Network status utility functions
 /**
- * A custom hook to detect network status changes
- * @returns {Boolean} True if online, false if offline
+ * @file networkStatus.ts
+ * @description Custom hook phát hiện trạng thái mạng (online/offline).
+ * Kiểm tra cả navigator.onLine lẫn kết nối thực sự qua API ping.
  */
+
+'use client';
+
 import { useState, useEffect } from 'react';
 
+/**
+ * Hook theo dõi trạng thái mạng.
+ * @returns True nếu online, False nếu offline
+ */
 export const useNetworkStatus = () => {
-  const [isOnline, setIsOnline] = useState(
+  const [isOnline, setIsOnline] = useState<boolean>(
     typeof window !== 'undefined' ? window.navigator.onLine : true
   );
 
   useEffect(() => {
-    // Only run on client side
     if (typeof window === 'undefined') return;
 
-    // Handler for online status
-    const handleOnline = () => {
-      setIsOnline(true);
-    };
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-    // Handler for offline status
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
+    // Custom event từ service worker
+    const handleAppOnline = () => setIsOnline(true);
+    const handleAppOffline = () => setIsOnline(false);
 
-    // Custom app events from service worker
-    const handleAppOnline = () => {
-      setIsOnline(true);
-    };
-
-    const handleAppOffline = () => {
-      setIsOnline(false);
-    };
-
-    // Add event listeners
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('appOnline', handleAppOnline);
     window.addEventListener('appOffline', handleAppOffline);
 
-    // Check network status using fetch to verify true connectivity
+    // Kiểm tra kết nối thực qua API ping
     const checkRealConnectivity = async () => {
       try {
-        // Send a small request to check real connectivity
-        // We use a timestamp to avoid cache
         const response = await fetch(`/api/ping?_=${Date.now()}`, {
           method: 'GET',
           cache: 'no-cache',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' }
         });
-        
+
         if (response.ok) {
           setIsOnline(true);
         } else {
           setIsOnline(false);
         }
-      } catch (error) {
+      } catch {
         setIsOnline(false);
       }
     };
 
-    // Initial check
+    // Kiểm tra lần đầu
     checkRealConnectivity();
 
-    // Regular check every 30 seconds
+    // Kiểm tra định kỳ mỗi 30 giây
     const intervalId = setInterval(checkRealConnectivity, 30000);
 
-    // Cleanup event listeners on component unmount
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -80,3 +68,5 @@ export const useNetworkStatus = () => {
 
   return isOnline;
 };
+
+export default useNetworkStatus;

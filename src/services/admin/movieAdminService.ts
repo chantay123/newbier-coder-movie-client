@@ -1,7 +1,7 @@
 // src/services/admin/movieAdminService.ts
 
 import axiosInstance from '../../API/config/axiosConfig';
-import { API_URL, endpoints } from '../../config/API.js';
+import { API_URL, endpoints } from '../../config/API';
 
 export interface Movie {
   _id: string;

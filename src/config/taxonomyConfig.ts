@@ -1,23 +1,23 @@
 /**
- * @file taxonomyConfig.js
- * @description Centralized Taxonomy Registry for Fastify Backend and Frontend Routing.
- * Maps URL-friendly unaccented slugs to Backend database slugs, localized labels, badges,
- * and search fallback keywords using a unified, extensible schema.
+ * @file taxonomyConfig.ts
+ * @description Hệ thống phân loại tập trung cho backend Fastify và routing frontend.
+ * Ánh xạ slug thuần (không dấu) sang slug database, nhãn hiển thị tiếng Việt, badge,
+ * và từ khoá tìm kiếm dự phòng, theo schema thống nhất và mở rộng.
  */
 
 /**
- * Standard Taxonomy Item Factory.
- * Enforces uniform schema for any category, country, format, or tag created in the future.
+ * Factory tạo item phân loại chuẩn hoá.
+ * Áp dụng schema đồng nhất cho mọi loại: thể loại, quốc gia, định dạng, tag.
  *
- * @param {Object} params
- * @param {string} params.slug - URL-friendly unaccented slug (e.g. 'han-quoc', 'hoat-hinh')
- * @param {Array<string>} params.backendSlugs - Database-stored slugs (including Vietnamese accents)
- * @param {string} params.nameVi - Localized Vietnamese display label
- * @param {string} params.nameEn - Localized English display label
- * @param {string} [params.badge='CINEMA'] - Short badge label for card headers and badges
- * @param {string} [params.searchKeyword] - Fallback search keyword for search endpoint
- * @param {string} [params.baseRoute='/'] - Root route path (e.g. '/quoc-gia', '/the-loai')
- * @returns {Object} Standardized taxonomy entity
+ * @param params Các tham số cấu hình
+ * @param params.slug Slug thuần, không dấu, dùng cho URL (ví dụ 'han-quoc', 'hoat-hinh')
+ * @param params.backendSlugs Các slug lưu trong database (có dấu tiếng Việt)
+ * @param params.nameVi Nhãn hiển thị tiếng Việt
+ * @param params.nameEn Nhãn tiếng Anh
+ * @param [params.badge='CINEMA'] Nhãn badge ngắn cho header card và nhãn
+ * @param [params.searchKeyword] Từ khoá tìm kiếm dự phòng cho endpoint search
+ * @param [params.baseRoute='/'] Đường dẫn gốc (ví dụ '/quoc-gia', '/the-loai')
+ * @returns Entity phân loại đã chuẩn hoá
  */
 export function createTaxonomyItem({
   slug,
@@ -27,9 +27,17 @@ export function createTaxonomyItem({
   badge = 'CINEMA',
   searchKeyword,
   baseRoute = ''
+}: {
+  slug: string;
+  backendSlugs?: string[];
+  nameVi: string;
+  nameEn?: string;
+  badge?: string;
+  searchKeyword?: string;
+  baseRoute?: string;
 }) {
   const normalizedSlug = slug.toLowerCase().trim();
-  const allBackendSlugs = Array.from(new Set([normalizedSlug, ...backendSlugs.map(s => s.toLowerCase().trim())]));
+  const allBackendSlugs = Array.from(new Set([normalizedSlug, ...backendSlugs.map((s: string) => s.toLowerCase().trim())]));
 
   return {
     slug: normalizedSlug,
@@ -43,7 +51,7 @@ export function createTaxonomyItem({
 }
 
 /**
- * Standard Countries Registry.
+ * Hệ thống các quốc gia.
  */
 export const TAXONOMY_COUNTRIES = {
   'han-quoc': createTaxonomyItem({
@@ -127,10 +135,10 @@ export const TAXONOMY_COUNTRIES = {
     searchKeyword: 'anh',
     baseRoute: '/quoc-gia'
   })
-};
+} as const;
 
 /**
- * Standard Categories Registry.
+ * Hệ thống các thể loại phim.
  */
 export const TAXONOMY_CATEGORIES = {
   'hoat-hinh': createTaxonomyItem({
@@ -205,10 +213,10 @@ export const TAXONOMY_CATEGORIES = {
     searchKeyword: 'tam ly',
     baseRoute: '/the-loai'
   })
-};
+} as const;
 
 /**
- * Standard Formats Registry.
+ * Hệ thống các định dạng phim.
  */
 export const TAXONOMY_FORMATS = {
   'phim-bo': createTaxonomyItem({
@@ -235,22 +243,24 @@ export const TAXONOMY_FORMATS = {
     badge: 'SHOW',
     baseRoute: '/dinh-dang'
   })
-};
+} as const;
 
 /**
- * Resolves country taxonomy metadata from any input slug.
- * @param {string} slug - Unaccented or accented slug
- * @returns {Object} Country metadata
+ * Tra cứu metadata quốc gia từ slug đầu vào.
+ * Hỗ trợ cả slug thuần và slug có dấu.
+ *
+ * @param slug Slug đầu vào (thuần hoặc có dấu)
+ * @returns Metadata quốc gia hoặc item mặc định
  */
-export function resolveCountryTaxonomy(slug) {
+export function resolveCountryTaxonomy(slug: string | null | undefined) {
   if (!slug) return null;
   const normalized = slug.toLowerCase().trim();
 
-  if (TAXONOMY_COUNTRIES[normalized]) {
-    return TAXONOMY_COUNTRIES[normalized];
+  if (normalized in TAXONOMY_COUNTRIES) {
+    return (TAXONOMY_COUNTRIES as Record<string, ReturnType<typeof createTaxonomyItem>>)[normalized];
   }
 
-  for (const item of Object.values(TAXONOMY_COUNTRIES)) {
+  for (const item of Object.values(TAXONOMY_COUNTRIES as Record<string, ReturnType<typeof createTaxonomyItem>>)) {
     if (item.backendSlugs.includes(normalized)) {
       return item;
     }
@@ -266,19 +276,21 @@ export function resolveCountryTaxonomy(slug) {
 }
 
 /**
- * Resolves category taxonomy metadata from any input slug.
- * @param {string} slug - Unaccented or accented slug
- * @returns {Object} Category metadata
+ * Tra cứu metadata thể loại từ slug đầu vào.
+ * Hỗ trợ cả slug thuần và slug có dấu.
+ *
+ * @param slug Slug đầu vào (thuần hoặc có dấu)
+ * @returns Metadata thể loại hoặc item mặc định
  */
-export function resolveCategoryTaxonomy(slug) {
+export function resolveCategoryTaxonomy(slug: string | null | undefined) {
   if (!slug) return null;
   const normalized = slug.toLowerCase().trim();
 
-  if (TAXONOMY_CATEGORIES[normalized]) {
-    return TAXONOMY_CATEGORIES[normalized];
+  if (normalized in TAXONOMY_CATEGORIES) {
+    return (TAXONOMY_CATEGORIES as Record<string, ReturnType<typeof createTaxonomyItem>>)[normalized];
   }
 
-  for (const item of Object.values(TAXONOMY_CATEGORIES)) {
+  for (const item of Object.values(TAXONOMY_CATEGORIES as Record<string, ReturnType<typeof createTaxonomyItem>>)) {
     if (item.backendSlugs.includes(normalized)) {
       return item;
     }
@@ -294,19 +306,21 @@ export function resolveCategoryTaxonomy(slug) {
 }
 
 /**
- * Resolves format taxonomy metadata from any input slug.
- * @param {string} slug - Unaccented or alias slug
- * @returns {Object} Format metadata
+ * Tra cứu metadata định dạng từ slug đầu vào.
+ * Hỗ trợ cả slug thuần và slug alias.
+ *
+ * @param slug Slug đầu vào
+ * @returns Metadata định dạng hoặc item mặc định
  */
-export function resolveFormatTaxonomy(slug) {
+export function resolveFormatTaxonomy(slug: string | null | undefined) {
   if (!slug) return null;
   const normalized = slug.toLowerCase().trim();
 
-  if (TAXONOMY_FORMATS[normalized]) {
-    return TAXONOMY_FORMATS[normalized];
+  if (normalized in TAXONOMY_FORMATS) {
+    return (TAXONOMY_FORMATS as Record<string, ReturnType<typeof createTaxonomyItem>>)[normalized];
   }
 
-  for (const item of Object.values(TAXONOMY_FORMATS)) {
+  for (const item of Object.values(TAXONOMY_FORMATS as Record<string, ReturnType<typeof createTaxonomyItem>>)) {
     if (item.backendSlugs.includes(normalized)) {
       return item;
     }

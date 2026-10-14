@@ -773,3 +773,4 @@ export const withAccountStatus = (Component) => {
 };
 
 export default useAuth;
+export default useAuth;
