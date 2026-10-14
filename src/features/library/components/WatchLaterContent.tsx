@@ -1,22 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { FaClock, FaTimes, FaPlay, FaStar, FaFilm, FaSync } from 'react-icons/fa';
-import watchLaterService from '@/API/services/watchLaterService';
+// watchLaterService is still .js, cast for strict TS
+import watchLaterServiceRaw from '@/API/services/watchLaterService';
+const watchLaterService = watchLaterServiceRaw as unknown as {
+  getWatchLaterList: () => Promise<WatchLaterMovie[]>;
+  removeFromWatchLater: (id: string) => Promise<{ success: boolean; message?: string }>;
+};
 import { toast } from 'react-toastify';
 
-export function WatchLaterContent({ inProfilePage = true }) {
-  const [watchLaterList, setWatchLaterList] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('all');
+/**
+ * @file WatchLaterContent.tsx
+ * @description Watch-later list page with filters, refresh, optimistic delete.
+ */
+
+type FilterType = 'all' | 'movie' | 'series';
+
+export interface WatchLaterMovie {
+  id: string;
+  slug?: string;
+  title: string;
+  thumbnail?: string;
+  rating?: number;
+  quality?: string;
+  year?: number | string;
+  type?: 'movie' | 'single' | 'series' | 'tv' | string;
+  [key: string]: unknown;
+}
+
+export interface WatchLaterContentProps {
+  inProfilePage?: boolean;
+}
+
+const WatchLaterContent: React.FC<WatchLaterContentProps> = ({ inProfilePage = true }) => {
+  const [watchLaterList, setWatchLaterList] = useState<WatchLaterMovie[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   useEffect(() => {
     fetchWatchLaterList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchWatchLaterList = async () => {
+  const fetchWatchLaterList = async (): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -24,33 +53,35 @@ export function WatchLaterContent({ inProfilePage = true }) {
       const data = await watchLaterService.getWatchLaterList();
 
       setWatchLaterList(data || []);
-    } catch (error) {
-      console.error('Error in fetchWatchLaterList:', error);
-      setError('Có lỗi xảy ra khi tải danh sách xem sau: ' + error.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Error in fetchWatchLaterList:', err);
+      setError('Có lỗi xảy ra khi tải danh sách xem sau: ' + message);
       setWatchLaterList([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (): Promise<void> => {
     try {
       setRefreshing(true);
       await fetchWatchLaterList();
       toast.success('Danh sách xem sau đã được làm mới!');
-    } catch (error) {
-      console.error('[WATCH_LATER] Error refreshing:', error);
+    } catch (err) {
+      console.error('[WATCH_LATER] Error refreshing:', err);
       toast.error('Không thể làm mới danh sách xem sau');
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleRemoveWatchLater = async (movieId) => {
+  const handleRemoveWatchLater = async (movieId: string): Promise<void> => {
     try {
       setIsDeleting(true);
 
-      setWatchLaterList(prevList => prevList.filter(m => m.id !== movieId));
+      // Optimistic remove
+      setWatchLaterList((prevList) => prevList.filter((m) => m.id !== movieId));
 
       const result = await watchLaterService.removeFromWatchLater(movieId);
 
@@ -60,8 +91,8 @@ export function WatchLaterContent({ inProfilePage = true }) {
         toast.error(result.message || 'Không thể xóa phim khỏi danh sách xem sau');
         fetchWatchLaterList();
       }
-    } catch (error) {
-      console.error('[WATCH_LATER] Error removing movie:', error);
+    } catch (err) {
+      console.error('[WATCH_LATER] Error removing movie:', err);
       toast.error('Có lỗi xảy ra khi xóa phim khỏi danh sách xem sau');
       fetchWatchLaterList();
     } finally {
@@ -69,7 +100,7 @@ export function WatchLaterContent({ inProfilePage = true }) {
     }
   };
 
-  const filteredWatchLater = watchLaterList.filter(movie => {
+  const filteredWatchLater: WatchLaterMovie[] = watchLaterList.filter((movie) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'movie') return movie.type === 'movie' || movie.type === 'single';
     if (activeFilter === 'series') return movie.type === 'series' || movie.type === 'tv';
@@ -89,7 +120,7 @@ export function WatchLaterContent({ inProfilePage = true }) {
             onClick={handleRefresh}
             disabled={refreshing}
           >
-            <FaSync className={refreshing ? "spin" : ""} /> Làm mới
+            <FaSync className={refreshing ? 'spin' : ''} /> Làm mới
           </button>
         </div>
       </div>
@@ -151,8 +182,9 @@ export function WatchLaterContent({ inProfilePage = true }) {
                   src={movie.thumbnail}
                   alt={movie.title}
                   onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "/img/Phim.png";
+                    const img = e.currentTarget as HTMLImageElement;
+                    img.onerror = null;
+                    img.src = '/img/Phim.png';
                   }}
                 />
                 <div className="movie-overlay">
@@ -356,7 +388,7 @@ export function WatchLaterContent({ inProfilePage = true }) {
 
         .movie-poster {
           position: relative;
-          padding-top: 150%; /* Aspect ratio 2:3 */
+          padding-top: 150%;
           overflow: hidden;
         }
 
@@ -436,8 +468,9 @@ export function WatchLaterContent({ inProfilePage = true }) {
           width: 40px;
           height: 40px;
           border-radius: 50%;
-          background-color:rgba(237, 239, 240, 0.33);
+          background-color: rgba(237, 239, 240, 0.33);
         }
+
         .play-circle:hover {
           background-color: rgba(255, 255, 255, 0.9);
           transform: scale(1.1);
@@ -447,7 +480,7 @@ export function WatchLaterContent({ inProfilePage = true }) {
           font-size: 16px;
           background-color: rgba(255, 255, 255, 0.9);
           margin-left: 2px;
-          color:rgb(63, 52, 52);
+          color: rgb(63, 52, 52);
         }
 
         .movie-button.play:hover {
@@ -560,6 +593,7 @@ export function WatchLaterContent({ inProfilePage = true }) {
       `}</style>
     </div>
   );
-}
+};
 
+export { WatchLaterContent };
 export default WatchLaterContent;
