@@ -1,31 +1,24 @@
 /**
- * @file homeSectionsConfig.js
- * @description Centralized Section Registry and Fallback Strategy for the Homepage.
- * Configures all layout orders, customizable section props, and localized text labels.
- * 
+ * @file homeSectionsConfig.ts
+ * @description Hệ thống đăng ký Section và chiến lược Fallback cho trang chủ.
+ * Gom các layout orders, props tuỳ chỉnh, nhãn text và thời điểm load cho từng section.
+ *
  * ARCHITECTURE - BATCHED SEQUENTIAL LOADING:
- * - Each section declares `loadAfterScroll: boolean`.
- * - `loadAfterScroll: false`: Loaded in batch together with the preceding section (Tải kèm).
- * - `loadAfterScroll: true`: Defines a scroll breakpoint (Điểm dừng). Pauses loading until user scrolls to it.
- * - `BATCH_LOADING_CONFIG.delayMs`: Configurable waiting time (default: 2000ms = 2s) with spinner before revealing the batch.
+ * - Mỗi section khai báo `loadAfterScroll`.
+ * - `loadAfterScroll: false`: Tải cùng batch với section trước đó.
+ * - `loadAfterScroll: true`: Điểm dừng - chờ user scroll tới mới load.
+ * - `BATCH_LOADING_CONFIG.delayMs`: Thời gian chờ (mặc định 2000ms) với spinner trước khi reveal batch.
  */
 
 import movieService from '@/API/services/movieService';
 import { SYSTEM_CONFIG } from './systemConfig';
 
-/**
- * Global Batch Loading Timing Configuration.
- * Customize the waiting duration (in milliseconds) before any scroll batch reveals its content.
- */
+/** Thời gian chờ mặc định (ms) trước khi reveal batch khi scroll breakpoint */
 export const BATCH_LOADING_CONFIG = {
-  // Default waiting delay in milliseconds (2000ms = 2 seconds)
-  delayMs: 2000,
-};
+  delayMs: 2000
+} as const;
 
-/**
- * Supported UI language dictionaries.
- * Switch active language by changing NEXT_PUBLIC_LOCALE or editing the dictionary below.
- */
+/** Dictionary ngôn ngữ UI. */
 export const HOME_I18N = {
   vi: {
     heroTitle: 'Phim Nổi Bật',
@@ -73,21 +66,109 @@ export const HOME_I18N = {
     infiniteLoading: 'Loading more movies...',
     allLoaded: 'All content loaded'
   }
-};
+} as const;
 
-// Current active locale (synchronized with SYSTEM_CONFIG)
-export const CURRENT_LOCALE = SYSTEM_CONFIG.locale || 'vi';
-export const t = (key) => (HOME_I18N[CURRENT_LOCALE] || HOME_I18N.vi)[key] || key;
+export type LocaleKey = keyof typeof HOME_I18N;
+type Locale = typeof HOME_I18N[LocaleKey];
 
-/**
- * Sequential Fallback Runner.
- * Executes steps sequentially from top to bottom, returning the first non-empty list.
- * 
- * @param {Array<() => Promise<Array>>} steps - Sequence of fetch tasks by priority
- * @param {Array} [fallback=[]] - Safety mock dataset if all API calls fail
- * @returns {Promise<Array>}
- */
-export async function fetchFirstAvailable(steps = [], fallback = []) {
+/** Ngôn ngữ hiện tại, đồng bộ với SYSTEM_CONFIG */
+export const CURRENT_LOCALE = (SYSTEM_CONFIG.locale || 'vi') as LocaleKey;
+
+/** Hàm dịch theo key i18n */
+export const t = (key: keyof Locale): string => HOME_I18N[CURRENT_LOCALE]?.[key] || key;
+
+/** Loại card size hỗ trợ */
+export type CardSize = 'sm' | 'md' | 'lg';
+
+/** Hàm loader của section */
+export type SectionLoader = (
+  mock?: unknown[],
+  page?: number,
+  limit?: number
+) => Promise<unknown[]>;
+
+/** Options tuỳ chỉnh cho mỗi section */
+export interface SectionOverrides {
+  id: string;
+  enabled?: boolean;
+  isFullWidth?: boolean;
+  minHeight?: number;
+  cardSize?: CardSize;
+  limit?: number;
+  loadAfterScroll?: boolean;
+  delayMs?: number;
+  badge?: string;
+  title?: string;
+  categorySlug?: string;
+  autoPlayInterval?: number;
+  viewAllHref?: string;
+  rails?: RailItem[];
+  load?: SectionLoader;
+  defaultPeriod?: string;
+  defaultCategory?: string;
+}
+
+/** Item rail cho section country */
+export interface RailItem {
+  id: string;
+  countrySlug?: string;
+  categorySlug?: string;
+  limit?: number;
+  title: string;
+  badge: string;
+  viewAllHref?: string;
+  load: (fallback?: unknown[]) => Promise<unknown[]>;
+}
+
+/** Section đầy đủ */
+export interface HomeSection {
+  id: string;
+  enabled: boolean;
+  isFullWidth: boolean;
+  minHeight: number;
+  cardSize: 'sm' | 'md' | 'lg';
+  limit: number;
+  loadAfterScroll: boolean;
+  delayMs: number;
+  badge?: string;
+  title?: string;
+  categorySlug?: string;
+  autoPlayInterval?: number;
+  viewAllHref?: string;
+  rails?: RailItem[];
+  load?: (mock?: unknown[], page?: number, limit?: number) => Promise<unknown[]>;
+  defaultPeriod?: string;
+  defaultCategory?: string;
+}
+
+/** Factory tạo section config với default schema */
+export function defineSection(options: SectionOverrides): HomeSection {
+  return {
+    id: options.id,
+    enabled: options.enabled ?? true,
+    isFullWidth: options.isFullWidth ?? false,
+    minHeight: options.minHeight ?? 320,
+    cardSize: options.cardSize ?? 'md',
+    limit: options.limit ?? 20,
+    loadAfterScroll: options.loadAfterScroll ?? false,
+    delayMs: options.delayMs ?? BATCH_LOADING_CONFIG.delayMs,
+    badge: options.badge,
+    title: options.title,
+    categorySlug: options.categorySlug,
+    autoPlayInterval: options.autoPlayInterval,
+    viewAllHref: options.viewAllHref,
+    rails: options.rails,
+    load: options.load,
+    defaultPeriod: options.defaultPeriod,
+    defaultCategory: options.defaultCategory
+  };
+}
+
+/** Fetcher tuần tự - trả về mảng đầu tiên có dữ liệu */
+export async function fetchFirstAvailable(
+  steps: Array<() => Promise<unknown[]>> = [],
+  fallback: unknown[] = []
+): Promise<unknown[]> {
   const mode = SYSTEM_CONFIG.dataMode || 'api_only';
   if (mode === 'mock_only') return fallback;
 
@@ -96,38 +177,16 @@ export async function fetchFirstAvailable(steps = [], fallback = []) {
       const data = await step();
       if (Array.isArray(data) && data.length > 0) return data;
     } catch {
-      // Step failed or empty -> proceed to the next fallback step
+      // Bỏ qua, chuyển sang bước fallback tiếp theo
     }
   }
 
   return mode === 'api_only' ? [] : fallback;
 }
 
-/**
- * Factory for creating Section Configurations with consistent schema defaults.
- *
- * @param {Object} options - Section configuration overrides
- * @returns {Object} Standardized section definition
- */
-export function defineSection(options) {
-  return {
-    enabled: true,
-    isFullWidth: false,
-    minHeight: 320,
-    cardSize: 'md',
-    limit: 20,
-    loadAfterScroll: false,
-    delayMs: BATCH_LOADING_CONFIG.delayMs,
-    ...options
-  };
-}
-
-/**
- * Section Bundles Registry.
- * Centralizes all behaviors, layout modes, props, limits, data loaders, and loading breakpoints.
- */
-export const HOME_SECTIONS = {
-  // === BATCH 1: CRITICAL INITIAL VIEWPORT (Loaded immediately on page open) ===
+/** Hệ thống đăng ký các Section cho trang chủ */
+export const HOME_SECTIONS: Record<string, HomeSection> = {
+  // === BATCH 1: Tải ngay khi mở trang ===
   hero: defineSection({
     id: 'hero',
     isFullWidth: true,
@@ -170,11 +229,11 @@ export const HOME_SECTIONS = {
     ], mock)
   }),
 
-  // === BATCH 2: SCROLL BREAKPOINT 1 (Pauses until user scrolls past Batch 1) ===
+  // === BATCH 2: Tải khi scroll tới (breakpoint 1) ===
   country: defineSection({
     id: 'country',
     minHeight: 320,
-    loadAfterScroll: true, // BREAKPOINT 1: Pauses until scrolled to
+    loadAfterScroll: true,
     delayMs: 2000,
     rails: [
       {
@@ -211,7 +270,7 @@ export const HOME_SECTIONS = {
     limit: 6,
     autoPlayInterval: 7000,
     viewAllHref: '/the-loai/hoat-hinh',
-    loadAfterScroll: false, // Loads in batch with country
+    loadAfterScroll: false,
     load: (mock = []) => fetchFirstAvailable([
       () => movieService.getMoviesByCategory('hoat-hinh', 6),
       () => movieService.getHeroMovies(6)
@@ -226,21 +285,22 @@ export const HOME_SECTIONS = {
     categorySlug: 'hoat-hinh',
     limit: 20,
     viewAllHref: '/the-loai/hoat-hinh',
-    loadAfterScroll: false, // Loads in batch with country
+    loadAfterScroll: false,
     load: (mock = []) => fetchFirstAvailable([
       () => movieService.getMoviesByCategory('hoat-hinh', 20)
     ], mock)
   }),
 
-  // === BATCH 3: SCROLL BREAKPOINT 2 (Pauses until user scrolls past Batch 2) ===
+  // === BATCH 3: Tải khi scroll tới (breakpoint 2) ===
   latest: defineSection({
     id: 'latest',
     minHeight: 480,
     limit: 24,
-    loadAfterScroll: true, // BREAKPOINT 2: Pauses until scrolled to
+    loadAfterScroll: true,
     delayMs: 2000,
-    load: (page = 1, limit = 24) => movieService.getMoviesPage(page, limit)
-  }),
+    load: ((page: number = 1, limit: number = 24) =>
+      movieService.getMoviesPage(page, limit)) as SectionOverrides['load']
+  } as SectionOverrides),
 
   radar: defineSection({
     id: 'radar',
@@ -261,7 +321,7 @@ export const HOME_SECTIONS = {
     loadAfterScroll: false
   }),
 
-  // === BATCH 4: BOTTOM LAZY SECTION ===
+  // === BATCH 4: SECTION CUỐI - LAZY ===
   upcoming: defineSection({
     id: 'upcoming',
     enabled: false,
@@ -272,12 +332,8 @@ export const HOME_SECTIONS = {
   })
 };
 
-/**
- * Section Display Order.
- * - Change the array ordering to reorder sections on the homepage.
- * - Remove an ID from this array to temporarily hide that section.
- */
-export const HOME_SECTION_ORDER = [
+/** Thứ tự hiển thị section. Đổi array để đổi thứ tự, xoá ID để ẩn section tạm thời. */
+export const HOME_SECTION_ORDER: readonly string[] = [
   'hero',
   'carousel_3d',
   'recommended',
@@ -290,3 +346,5 @@ export const HOME_SECTION_ORDER = [
   'community',
   'upcoming'
 ];
+
+export default HOME_SECTIONS;

@@ -1,7 +1,7 @@
 /**
- * @file movieConfig.js
- * @description Centralized configuration for movie pages, hero banners, and data providers.
- * Backed by SYSTEM_CONFIG and movieFallbackConfig for unified system architecture.
+ * @file movieConfig.ts
+ * @description Cấu hình tập trung cho trang phim, hero banner, và data providers.
+ * Đồng bộ với SYSTEM_CONFIG và movieFallbackConfig.
  */
 
 import { SYSTEM_CONFIG } from './systemConfig';
@@ -28,8 +28,7 @@ export {
 } from './movieFallbackConfig';
 
 /**
- * Movie configuration object.
- * Synchronized with global SYSTEM_CONFIG.
+ * Cấu hình phim, đồng bộ với SYSTEM_CONFIG toàn cục.
  */
 export const MOVIE_CONFIG = {
   useMockData: SYSTEM_CONFIG.useMockData,
@@ -65,23 +64,25 @@ export const MOVIE_CONFIG = {
     defaultBackdrop: LOCAL_DEFAULT_BACKDROP,
     itemsPerPage: SYSTEM_CONFIG.ui.itemsPerPage
   }
-};
+} as const;
 
 /**
- * Retrieves the configured API endpoint for a given category.
- * @param {string} categoryKey - Category identifier key.
- * @returns {string} Full or relative API endpoint.
+ * Lấy endpoint API đã cấu hình cho một category.
+ *
+ * @param categoryKey Khóa định danh category
+ * @returns Endpoint API đầy đủ hoặc tương đối
  */
-export const getCategoryEndpoint = (categoryKey) => {
-  const category = MOVIE_CONFIG.categories[categoryKey];
+export const getCategoryEndpoint = (categoryKey: string): string => {
+  const category = (MOVIE_CONFIG.categories as Record<string, { endpoint: string }>)[categoryKey];
   return category ? category.endpoint : MOVIE_CONFIG.categories.new.endpoint;
 };
 
 /**
- * Checks whether mock data mode is currently active.
- * @returns {boolean} True if mock data should be used.
+ * Kiểm tra mock data mode có đang bật không.
+ *
+ * @returns True nếu nên dùng mock data
  */
-export const isMockModeActive = () => {
+export const isMockModeActive = (): boolean => {
   return MOVIE_CONFIG.useMockData;
 };
 
