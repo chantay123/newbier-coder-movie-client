@@ -2,18 +2,33 @@ import React, { useState, useEffect, useContext } from 'react';
 import styles from '@/styles/UserRatingDetails.module.css';
 import { RatingContext } from './RatingStats';
 
-const UserRatingDetails = ({ movieSlug }) => {
-  const { showUserRatingDetails, setShowUserRatingDetails, showStats } = useContext(RatingContext) || {};
-  const [userRatings, setUserRatings] = useState([]);
-  const [filteredRatings, setFilteredRatings] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
-  const [selectedStarFilter, setSelectedStarFilter] = useState(0);
-  const [sortOrder, setSortOrder] = useState('newest');
+/** User rating entry */
+export interface UserRating {
+  _id?: string;
+  rating?: number;
+  review?: string;
+  createdAt?: string;
+  userId?: {
+    username?: string;
+  };
+}
+
+export interface UserRatingDetailsProps {
+  movieSlug?: string;
+}
+
+const UserRatingDetails: React.FC<UserRatingDetailsProps> = ({ movieSlug }) => {
+  const { showUserRatingDetails, setShowUserRatingDetails } = useContext(RatingContext) || {};
+  const [userRatings, setUserRatings] = useState<UserRating[]>([]);
+  const [filteredRatings, setFilteredRatings] = useState<UserRating[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState<boolean>(false);
+  const [selectedStarFilter, setSelectedStarFilter] = useState<number>(0);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'highest' | 'lowest'>('newest');
 
   useEffect(() => {
-    const fetchUserRatings = async () => {
+    const fetchUserRatings = async (): Promise<void> => {
       if (!movieSlug || !showDetails) return;
 
       try {
@@ -27,7 +42,7 @@ const UserRatingDetails = ({ movieSlug }) => {
           throw new Error(`Failed to fetch movie info: ${movieResponse.status}`);
         }
 
-        const movieData = await movieResponse.json();
+        const movieData = (await movieResponse.json()) as { data?: { _id?: string } };
         if (!movieData.data || !movieData.data._id) {
           throw new Error('Movie ID not found');
         }
@@ -39,7 +54,7 @@ const UserRatingDetails = ({ movieSlug }) => {
           throw new Error(`Failed to fetch ratings: ${ratingsResponse.status}`);
         }
 
-        const ratingsData = await ratingsResponse.json();
+        const ratingsData = (await ratingsResponse.json()) as { success?: boolean; data?: UserRating[] };
 
         if (ratingsData.success && Array.isArray(ratingsData.data)) {
           setUserRatings(ratingsData.data);
@@ -49,8 +64,9 @@ const UserRatingDetails = ({ movieSlug }) => {
           setFilteredRatings([]);
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('Error fetching user ratings:', err);
-        setError(err.message);
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -63,21 +79,21 @@ const UserRatingDetails = ({ movieSlug }) => {
     let result = [...userRatings];
 
     if (selectedStarFilter > 0) {
-      result = result.filter(rating => rating.rating === selectedStarFilter);
+      result = result.filter((rating) => rating.rating === selectedStarFilter);
     }
 
     if (sortOrder === 'newest') {
-      result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     } else if (sortOrder === 'highest') {
-      result.sort((a, b) => b.rating - a.rating);
+      result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     } else if (sortOrder === 'lowest') {
-      result.sort((a, b) => a.rating - b.rating);
+      result.sort((a, b) => (a.rating || 0) - (b.rating || 0));
     }
 
     setFilteredRatings(result);
   }, [userRatings, selectedStarFilter, sortOrder]);
 
-  const toggleDetails = () => {
+  const toggleDetails = (): void => {
     const newShowDetails = !showDetails;
     setShowDetails(newShowDetails);
 
@@ -86,11 +102,11 @@ const UserRatingDetails = ({ movieSlug }) => {
     }
   };
 
-  const handleStarFilterClick = (stars) => {
+  const handleStarFilterClick = (stars: number): void => {
     setSelectedStarFilter(selectedStarFilter === stars ? 0 : stars);
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | undefined): string => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('vi-VN', {
@@ -133,7 +149,7 @@ const UserRatingDetails = ({ movieSlug }) => {
               <select
                 className={styles.sortSelect}
                 value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
+                onChange={(e) => setSortOrder(e.target.value as 'newest' | 'highest' | 'lowest')}
                 aria-label="Sắp xếp đánh giá"
               >
                 <option value="newest">Mới nhất</option>
@@ -173,7 +189,7 @@ const UserRatingDetails = ({ movieSlug }) => {
                       {[...Array(5)].map((_, i) => (
                         <i
                           key={i}
-                          className={`bi ${i < rating.rating ? 'bi-star-fill text-warning' : 'bi-star text-muted'}`}
+                          className={`bi ${i < (rating.rating || 0) ? 'bi-star-fill text-warning' : 'bi-star text-muted'}`}
                         />
                       ))}
                     </div>

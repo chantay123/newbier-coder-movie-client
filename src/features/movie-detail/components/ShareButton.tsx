@@ -1,4 +1,14 @@
-const ShareButton = ({ movie }) => {
+import React from 'react';
+
+interface ShareableMovie {
+  url?: string;
+}
+
+export interface ShareButtonProps {
+  movie?: ShareableMovie | null;
+}
+
+const ShareButton: React.FC<ShareButtonProps> = ({ movie }) => {
   const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(movie?.url || '')}`;
 
   return (

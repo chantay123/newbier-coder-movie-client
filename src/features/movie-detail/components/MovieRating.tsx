@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 
-const MovieRating = ({ movieId }) => {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
+export interface MovieRatingProps {
+  movieId?: string;
+}
 
-  const handleSubmit = async () => {
+const MovieRating: React.FC<MovieRatingProps> = ({ movieId }) => {
+  const [rating, setRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>('');
+
+  const handleSubmit = async (): Promise<void> => {
     try {
       await fetch('http://localhost:5000/api/movies/rate', {
         method: 'POST',
@@ -24,7 +28,7 @@ const MovieRating = ({ movieId }) => {
     <div className="mt-4">
       <h4>Đánh giá phim</h4>
       <div className="rating mb-3">
-        {[1,2,3,4,5].map(star => (
+        {[1, 2, 3, 4, 5].map((star) => (
           <span
             key={star}
             className={`star ${rating >= star ? 'active' : ''}`}

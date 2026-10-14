@@ -8,36 +8,85 @@ import {
 } from '@/utils/movieNormalizer';
 
 /**
- * @file TrailerModal.js
+ * @file TrailerModal.tsx
  * @description Cinematic trailer modal that embeds the movie's real trailer
  * (from `movie.trailer` or its legacy aliases) directly in a YouTube iframe.
  * Falls back to a poster + metadata panel when no playable trailer is
  * available. Never auto-redirects to YouTube.
- *
- * @param {Object} props
- * @param {Object|null} props.movie - Movie to play the trailer for. Null closes the modal.
- * @param {Function} props.onClose - Called when the user closes the modal.
  */
-export default function TrailerModal({ movie, onClose }) {
-  // Resolved trailer info. We use a single state object so the JSX can
-  // distinguish "embeddable video" from "no trailer available".
-  const [trailerState, setTrailerState] = useState({
+
+/** Category entry từ movie */
+interface CategoryEntry {
+  slug?: string;
+  name?: string;
+}
+
+/** Trailer object dạng TMDB-style */
+interface TrailerObject {
+  url?: string;
+  key?: string;
+  site?: string;
+}
+
+/** Movie payload - loose shape từ API */
+export interface TrailerMovie {
+  _id?: string;
+  slug?: string;
+  title?: string;
+  name?: string;
+  origin_name?: string;
+  description?: string;
+  content?: string;
+  overview?: string;
+  synopsis?: string;
+  duration?: number | string;
+  runtime?: number | string;
+  episode_time?: number | string;
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+  year?: number | string;
+  category?: CategoryEntry[];
+  trailer_url?: string;
+  trailerUrl?: string;
+  video_url?: string;
+  trailer?: TrailerObject | string;
+}
+
+export interface TrailerModalProps {
+  movie: TrailerMovie | null;
+  onClose: () => void;
+}
+
+interface TrailerState {
+  embedUrl: string;
+  provider: 'youtube' | 'raw' | null;
+  available: boolean;
+}
+
+interface MetaInfo {
+  title: string;
+  originTitle: string;
+  backdrop: string;
+  poster: string;
+  year: number | string | null;
+  categories: CategoryEntry[];
+  description: string;
+  duration: number | string | null;
+}
+
+const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
+  const [trailerState, setTrailerState] = useState<TrailerState>({
     embedUrl: '',
-    provider: null, // 'youtube' | 'raw' | null
+    provider: null,
     available: false,
   });
-  const [loading, setLoading] = useState(false);
-
-  // ---------------------------------------------------------------------------
-  // Pure helpers (defined inside the component for closure access; cheap to
-  // recreate on each render and easy to read for Interns).
-  // ---------------------------------------------------------------------------
+  const [loading, setLoading] = useState<boolean>(false);
 
   /**
-   * Extracts an 11-char YouTube video ID from a string (watch URL, short URL,
-   * embed URL, or a bare ID). Returns null when the input is not YouTube.
+   * Extracts an 11-char YouTube video ID from a string.
    */
-  const extractYouTubeId = (str) => {
+  const extractYouTubeId = (str: string | undefined | null): string | null => {
     if (!str || typeof str !== 'string') return null;
     const clean = str.trim();
     if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) return clean;
@@ -48,20 +97,9 @@ export default function TrailerModal({ movie, onClose }) {
   };
 
   /**
-   * Resolves the movie's trailer to a YouTube embed URL using the
-   * backend-provided data, in priority order:
-   *   1. `movie.trailer_url` / `movie.trailerUrl` / `movie.video_url` (legacy
-   *      explicit URL fields).
-   *   2. `movie.trailer.url` (full YouTube/Vimeo/etc URL when the backend
-   *      pre-builds it).
-   *   3. `movie.trailer.key` (TMDB-style 11-char ID) — only when
-   *      `movie.trailer.site` is missing or equals "YouTube".
-   *
-   * Returns an object describing what was found:
-   *   { embedUrl, provider, available } where `available` is false when
-   *   the backend provided no usable trailer.
+   * Resolves the movie's trailer to a YouTube embed URL.
    */
-  const resolveTrailer = (m) => {
+  const resolveTrailer = (m: TrailerMovie | null): TrailerState => {
     if (!m) return { embedUrl: '', provider: null, available: false };
 
     // 1) Legacy explicit URL fields win.
@@ -76,10 +114,9 @@ export default function TrailerModal({ movie, onClose }) {
       return { embedUrl: legacy, provider: 'raw', available: true };
     }
 
-    // 2/3) Object-shaped trailer payload (the spec'd contract).
+    // 2/3) Object-shaped trailer payload
     const t = m.trailer;
     if (t && typeof t === 'object') {
-      // a) URL present: try to use it as a YouTube embed if possible.
       if (typeof t.url === 'string' && t.url.trim() !== '') {
         const ytId = extractYouTubeId(t.url);
         if (ytId) return { embedUrl: YOUTUBE_CONFIG.getEmbedUrl(ytId), provider: 'youtube', available: true };
@@ -87,34 +124,28 @@ export default function TrailerModal({ movie, onClose }) {
           const sep = t.url.includes('?') ? '&' : '?';
           return { embedUrl: `${t.url}${sep}autoplay=1`, provider: 'raw', available: true };
         }
-        // Other providers (Vimeo, mp4…): we still try to embed directly.
         return { embedUrl: t.url, provider: 'raw', available: true };
       }
 
-      // b) YouTube key present and site is YouTube (or unspecified).
       const site = (t.site || '').toString().toLowerCase();
       const isYouTube = !site || site === 'youtube';
       if (isYouTube && typeof t.key === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(t.key.trim())) {
         return { embedUrl: YOUTUBE_CONFIG.getEmbedUrl(t.key.trim()), provider: 'youtube', available: true };
       }
-
-      // c) Other providers with no URL: we cannot embed safely.
     }
 
     return { embedUrl: '', provider: null, available: false };
   };
 
-  // Compute metadata once per movie change. We keep this derivation in a
-  // memo so the render path is stable when only the trailer URL changes.
-  const meta = useMemo(() => {
+  const meta = useMemo<MetaInfo | null>(() => {
     if (!movie) return null;
     const title = movie.title || movie.name || movie.origin_name || 'Trailer Phim';
     const originTitle =
       movie.origin_name && movie.origin_name !== title ? movie.origin_name : '';
-    const backdrop = resolveMovieBackdrop(movie);
+    const backdrop = resolveMovieBackdrop(movie as never) || '';
     const poster = movie.poster_url || movie.thumb_url || backdrop;
-    const year = resolveMovieYear(movie);
-    const categories = resolveMovieCategories(movie);
+    const year = resolveMovieYear(movie as never);
+    const categories = resolveMovieCategories(movie as never) || [];
     const description =
       movie.description ||
       movie.content ||
@@ -125,10 +156,6 @@ export default function TrailerModal({ movie, onClose }) {
     return { title, originTitle, backdrop, poster, year, categories, description, duration };
   }, [movie]);
 
-  // ---------------------------------------------------------------------------
-  // Trailer resolution: run on every `movie` change. We synchronously resolve
-  // from the movie object — no extra API calls.
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!movie) {
       setTrailerState({ embedUrl: '', provider: null, available: false });
@@ -136,16 +163,13 @@ export default function TrailerModal({ movie, onClose }) {
       return;
     }
 
-    // ESC key closes the modal.
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
 
-    // Resolve from the movie object directly.
     const result = resolveTrailer(movie);
     setTrailerState(result);
-    // We only show a "loading" indicator while the iframe is warming up.
     setLoading(!!result.embedUrl);
 
     return () => {
@@ -154,33 +178,25 @@ export default function TrailerModal({ movie, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movie]);
 
-  // Force-remount the iframe whenever the embed URL changes so the player
-  // stops the previous video and starts fresh. The "noopener" trick (set
-  // src to about:blank) also stops audio when closing the modal.
   const iframeKey = useMemo(
     () => `${trailerState.provider || 'none'}-${trailerState.embedUrl}`,
     [trailerState]
   );
 
-  // Safety-net: when the parent unmounts <TrailerModal> (movie becomes null)
-  // the component itself is destroyed and the iframe goes with it — no
-  // audio leak.  We keep an empty cleanup here for clarity; the early
-  // return below does NOT guard this useEffect, so the hook count stays
-  // constant (1) across all renders, satisfying the Rules of Hooks.
   useEffect(() => {
     return () => {
       // No-op: iframe is unmounted with the component, which stops playback.
     };
   }, []);
 
-  // Guarding null movie AFTER all hooks so hook order is always stable.
   if (!movie || !meta) return null;
 
   return (
     <div
       className="modal-backdrop-overlay"
       onClick={(e) => {
-        if (e.target.classList.contains('modal-backdrop-overlay')) {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('modal-backdrop-overlay')) {
           onClose();
         }
       }}
@@ -216,9 +232,6 @@ export default function TrailerModal({ movie, onClose }) {
               className="trailer-iframe"
             />
           ) : (
-            // No trailer available — show the movie's backdrop/poster
-            // and a "no trailer" message. We never redirect to YouTube
-            // by default in this state.
             <div className="trailer-fallback-stage">
               {meta.backdrop && (
                 <img
@@ -242,9 +255,7 @@ export default function TrailerModal({ movie, onClose }) {
           )}
         </div>
 
-        {/* Movie Metadata Panel — always visible below the player.
-            Uses the resolved backdrop when available so the panel feels
-            connected to the video above. */}
+        {/* Movie Metadata Panel */}
         <div className="trailer-meta-panel">
           <div className="trailer-meta-poster">
             {meta.poster && (
@@ -378,7 +389,6 @@ export default function TrailerModal({ movie, onClose }) {
           to { transform: rotate(360deg); }
         }
 
-        /* Fallback Stage */
         .trailer-fallback-stage {
           position: absolute;
           inset: 0;
@@ -445,7 +455,6 @@ export default function TrailerModal({ movie, onClose }) {
           margin-bottom: 0;
         }
 
-        /* Metadata panel — sits below the video player. */
         .trailer-meta-panel {
           display: flex;
           gap: 18px;
@@ -574,4 +583,6 @@ export default function TrailerModal({ movie, onClose }) {
       `}</style>
     </div>
   );
-}
+};
+
+export default TrailerModal;

@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 
-const ReportButton = ({ movieId }) => {
-  const [showModal, setShowModal] = useState(false);
-  const [reportType, setReportType] = useState('');
-  const [description, setDescription] = useState('');
+export interface ReportButtonProps {
+  movieId?: string;
+}
 
-  const handleSubmit = async () => {
+const ReportButton: React.FC<ReportButtonProps> = ({ movieId }) => {
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [reportType, setReportType] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+
+  const handleSubmit = async (): Promise<void> => {
     try {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/movies/report`, {
         method: 'POST',
