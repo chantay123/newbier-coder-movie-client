@@ -22,16 +22,16 @@ import {
   getDashboardStats,
   getAnalyticsData,
   getFeedbackStats
-} from '@/API/services/admin/dashboardService';
-import { getReportStats } from '@/API/services/admin/reportService';
+} from '@/features/admin/services/dashboardService';
+import { getReportStats } from '@/features/admin/services/reportService';
 import {
   MOCK_DASHBOARD_STATS,
   MOCK_ANALYTICS_DATA,
   MOCK_FEEDBACK_DATA,
   MOCK_REPORT_DATA
 } from '@/mock/admin';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import AdminRoute from '@/components/ProtectedRoute/AdminRoute';
+import AdminLayout from '@/layouts/AdminLayout';
+import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import dynamic from 'next/dynamic';
 import ApexCharts from 'apexcharts';
 import { NextPageWithLayout } from '@/types/next';

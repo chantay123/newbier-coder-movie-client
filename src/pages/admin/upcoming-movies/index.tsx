@@ -5,11 +5,11 @@ import { useRouter } from 'next/router';
 import styles from '@/styles/AdminUpcomingMovies.module.css';
 import { Spinner } from 'react-bootstrap';
 import { FaPlus, FaEdit, FaTrash, FaSearch, FaEye, FaPaperPlane, FaFilm, FaCalendarAlt } from 'react-icons/fa';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import ConfirmModal from '@/components/Admin/Common/ConfirmModal';
-import { getUpcomingMovies, deleteUpcomingMovie, releaseUpcomingMovie } from '@/services/admin/upcomingMovieService';
-import { UpcomingMovie } from '@/services/admin/upcomingMovieService';
-import Pagination from '@/components/Admin/Common/Pagination';
+import AdminLayout from '@/layouts/AdminLayout';
+import ConfirmModal from '@/features/admin/components/Common/ConfirmModal';
+import { getUpcomingMovies, deleteUpcomingMovie, releaseUpcomingMovie } from '@/features/admin/services/upcomingMovieAdminService';
+import type { UpcomingMovie } from '@/features/admin/services/upcomingMovieAdminService';
+import Pagination from '@/features/admin/components/Common/Pagination';
 
 const UpcomingMoviesPage: React.FC = () => {
   const router = useRouter();

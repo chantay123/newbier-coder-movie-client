@@ -1,1 +1,0 @@
-export { default } from '@/features/movie-detail/components/UserRatingDetails';

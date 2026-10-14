@@ -1,0 +1,343 @@
+/**
+ * @file movieNormalizer.ts
+ * @description Bộ chuyển đổi dữ liệu phòng thủ và chuẩn hoá entity phim.
+ * Đảm bảo shape object nhất quán, ngăn UI bị vỡ layout.
+ */
+
+import {
+  LOCAL_DEFAULT_BACKDROP,
+  LOCAL_DEFAULT_POSTER,
+  MOVIE_FALLBACK_DEFAULTS
+} from '@/config/movieFallbackConfig';
+import { SYSTEM_CONFIG } from '@/config/systemConfig';
+
+/** Category item chuẩn */
+export interface CategoryItem {
+  name: string;
+  slug: string;
+}
+
+/** Actor item chuẩn */
+export interface ActorItem {
+  name: string;
+  role: string;
+  slug: string;
+  avatar_url?: string;
+  [key: string]: unknown;
+}
+
+/** Director item chuẩn */
+export interface DirectorItem {
+  name: string;
+  role: string;
+  slug: string;
+  [key: string]: unknown;
+}
+
+/** Movie entity đã chuẩn hoá - kế thừa từ raw server shape */
+export interface NormalizedHeroMovie {
+  [key: string]: unknown;
+  _id: string;
+  name: string;
+  origin_name: string;
+  backdrop_url: string;
+  poster_url: string;
+  thumb_url: string;
+  year: string | number;
+  quality: string;
+  category: CategoryItem[];
+  content: string;
+  rating: string | number;
+  time: string;
+  lang: string;
+}
+
+/**
+ * Resolves a possibly-relative image URL from the backend into a fully
+ * qualified URL the browser can load.
+ *
+ * @param url Raw URL từ API
+ * @returns URL đầy đủ hoặc input gốc nếu không thể kết hợp an toàn
+ */
+export const resolveImageUrl = (url: string | null | undefined): string => {
+  if (!url || typeof url !== 'string') return '';
+  const cleaned = url.trim();
+  if (cleaned === '') return '';
+
+  // Already absolute (http, https, data, blob).
+  if (/^(https?:|data:|blob:)/i.test(cleaned)) return cleaned;
+
+  // Protocol-relative URL.
+  if (cleaned.startsWith('//')) {
+    const proto = (typeof window !== 'undefined' && window.location?.protocol) || 'https:';
+    return `${proto}${cleaned}`;
+  }
+
+  // Host-relative URL: combine with the configured image origin.
+  if (cleaned.startsWith('/')) {
+    const origin = SYSTEM_CONFIG.imageOrigin || '';
+    if (origin) return `${origin}${cleaned}`;
+    return cleaned;
+  }
+
+  // Unknown shape — return as-is để Network panel hiển thị lỗi rõ ràng.
+  return cleaned;
+};
+
+/**
+ * Safely resolves the best available backdrop or poster URL for a movie.
+ * Hệ thống phân cấp: backdrop_url -> poster_url -> thumb_url -> placeholder SVG mặc định.
+ *
+ * @param movie Raw movie object từ backend API
+ * @param fallbackIndex Index tham số, giữ chữ ký tương thích
+ * @returns URL ảnh đã xác thực
+ */
+export const resolveMovieBackdrop = (
+  movie?: Record<string, unknown> | null,
+  fallbackIndex: number = 0
+): string => {
+  if (!movie) return LOCAL_DEFAULT_BACKDROP;
+
+  const candidates = [
+    movie.backdrop_url,
+    movie.backdrop,
+    movie.backdropUrl,
+    movie.image_backdrop,
+    movie.imageBackdrop,
+    movie.poster_url,
+    movie.poster,
+    movie.posterUrl,
+    movie.thumb_url,
+    movie.thumb,
+    movie.thumbUrl,
+    movie.image,
+    movie.imageUrl
+  ];
+  for (const candidate of candidates) {
+    const resolved = resolveImageUrl(candidate as string | null | undefined);
+    if (resolved) return resolved;
+  }
+
+  // Ép kiểu rõ ràng để dùng fallbackIndex, tránh warning "unused"
+  void fallbackIndex;
+  return LOCAL_DEFAULT_BACKDROP;
+};
+
+/**
+ * Safely resolves the subtitle / original title.
+ * Ngăn layout nhảy chiều cao khi server chưa có origin_name.
+ *
+ * @param movie Movie object
+ * @returns Subtitle text hoặc non-breaking space
+ */
+export const resolveMovieSubTitle = (movie?: Record<string, unknown> | null): string => {
+  if (!movie) return '\u00A0';
+
+  if (movie.origin_name && typeof movie.origin_name === 'string' && movie.origin_name.trim() !== '') {
+    return movie.origin_name.trim();
+  }
+
+  return (movie.name as string) || '\u00A0';
+};
+
+/**
+ * Safely resolves movie categories.
+ * Nếu backend trả về rỗng, tự sinh badge thông tin dựa trên type/lang.
+ *
+ * @param movie Movie object
+ * @returns Mảng category items
+ */
+export const resolveMovieCategories = (movie?: Record<string, unknown> | null): CategoryItem[] => {
+  if (movie?.category && Array.isArray(movie.category) && movie.category.length > 0) {
+    return movie.category as CategoryItem[];
+  }
+
+  const synthesized: CategoryItem[] = [];
+
+  if (movie?.type === 'series') {
+    synthesized.push({ name: 'Phim Bộ Đặc Sắc', slug: 'phim-bo' });
+  } else {
+    synthesized.push({ name: 'Phim Lẻ Chiếu Rạp', slug: 'phim-le' });
+  }
+
+  if (movie?.lang && typeof movie.lang === 'string') {
+    synthesized.push({ name: movie.lang, slug: 'ngon-ngu' });
+  } else {
+    synthesized.push({ name: 'Thịnh Hành', slug: 'thinh-hanh' });
+  }
+
+  return synthesized;
+};
+
+/**
+ * Safely resolves movie release year.
+ *
+ * @param movie Movie object
+ * @returns Năm phát hành
+ */
+export const resolveMovieYear = (movie?: Record<string, unknown> | null): string | number => {
+  if (movie?.year && String(movie.year).trim() !== '') {
+    return movie.year as string | number;
+  }
+  return MOVIE_FALLBACK_DEFAULTS.year;
+};
+
+/**
+ * Safely resolves movie video quality label.
+ *
+ * @param movie Movie object
+ * @returns Nhãn chất lượng chuẩn
+ */
+export const resolveMovieQuality = (movie?: Record<string, unknown> | null): string => {
+  if (movie?.quality && typeof movie.quality === 'string' && movie.quality.trim() !== '') {
+    return movie.quality.trim() === '4K' ? '4K Ultra HD' : movie.quality.trim();
+  }
+  return MOVIE_FALLBACK_DEFAULTS.quality;
+};
+
+/**
+ * Chuẩn hoá phòng thủ cấp cao cho phim Hero Spotlight.
+ * Gộp dữ liệu thô từ server với fallback an toàn, sinh schema phim 100% resilient.
+ *
+ * @param rawMovie Movie object thô từ Backend API
+ * @param index Chỉ số slide carousel
+ * @returns Movie object đã chuẩn hoá hoặc null nếu input rỗng
+ */
+export const normalizeHeroMovie = (
+  rawMovie?: Record<string, unknown> | null,
+  index: number = 0
+): NormalizedHeroMovie | null => {
+  if (!rawMovie) return null;
+
+  const posterCandidates = [
+    rawMovie.poster_url,
+    rawMovie.poster,
+    rawMovie.posterUrl,
+    rawMovie.image
+  ];
+  const thumbCandidates = [
+    rawMovie.thumb_url,
+    rawMovie.thumb,
+    rawMovie.thumbUrl,
+    rawMovie.thumbnail
+  ];
+  const backdropCandidates = [
+    rawMovie.backdrop_url,
+    rawMovie.backdrop,
+    rawMovie.backdropUrl,
+    rawMovie.cover
+  ];
+
+  const resolveFirstUsable = (candidates: unknown[]): string => {
+    for (const c of candidates) {
+      const r = resolveImageUrl(c as string | null | undefined);
+      if (r) return r;
+    }
+    return '';
+  };
+
+  const resolvedBackdrop = resolveFirstUsable(backdropCandidates)
+    || resolveMovieBackdrop(rawMovie, index);
+  const resolvedPoster = resolveFirstUsable(posterCandidates)
+    || resolveFirstUsable(thumbCandidates)
+    || LOCAL_DEFAULT_POSTER;
+  const resolvedThumb = resolveFirstUsable(thumbCandidates)
+    || resolveFirstUsable(posterCandidates)
+    || resolvedPoster
+    || LOCAL_DEFAULT_POSTER;
+
+  return {
+    ...rawMovie,
+    _id: (rawMovie._id as string) || (rawMovie.id as string) || `hero-${index}`,
+    name: (rawMovie.name as string) || 'Phim Đang Cập Nhật',
+    origin_name: resolveMovieSubTitle(rawMovie),
+    backdrop_url: resolvedBackdrop || LOCAL_DEFAULT_BACKDROP,
+    poster_url: resolvedPoster,
+    thumb_url: resolvedThumb,
+    year: resolveMovieYear(rawMovie),
+    quality: resolveMovieQuality(rawMovie),
+    category: resolveMovieCategories(rawMovie),
+    content: (rawMovie.content as string) || (rawMovie.description as string) || MOVIE_FALLBACK_DEFAULTS.description,
+    rating: (rawMovie.vote_average as string | number)
+      || (rawMovie.rating as string | number)
+      || ((rawMovie.tmdb as { vote_average?: string | number } | undefined)?.vote_average)
+      || MOVIE_FALLBACK_DEFAULTS.rating,
+    time: (rawMovie.time as string) || (rawMovie.type === 'series' ? '45 phút/tập' : '110 phút'),
+    lang: (rawMovie.lang as string) || 'Vietsub'
+  };
+};
+
+/**
+ * Safely resolves actors array with rich profiles.
+ *
+ * @param movie Movie object
+ * @returns Mảng actor objects { name, role, slug, avatar_url }
+ */
+export const resolveMovieActors = (movie?: Record<string, unknown> | null): ActorItem[] => {
+  if (!movie) return [];
+
+  if (Array.isArray(movie.actor) && movie.actor.length > 0) {
+    return (movie.actor as unknown[]).map((a, i) => {
+      if (typeof a === 'string') {
+        return { name: a.trim(), role: 'Diễn viên', slug: `actor-${i}` } satisfies ActorItem;
+      }
+      const obj = a as Record<string, unknown>;
+      return {
+        ...obj,
+        name: (obj.name as string) || '',
+        role: (obj.role as string) || 'Diễn viên',
+        slug: (obj.slug as string) || `actor-${i}`
+      } satisfies ActorItem;
+    });
+  }
+
+  if (typeof movie.actor === 'string' && movie.actor.trim() !== '') {
+    return movie.actor.split(',').map((name, i) => ({
+      name: name.trim(),
+      role: 'Diễn viên',
+      slug: `actor-${i}`
+    }));
+  }
+
+  return [];
+};
+
+/**
+ * Safely resolves directors array.
+ *
+ * @param movie Movie object
+ * @returns Mảng director objects
+ */
+export const resolveMovieDirectors = (movie?: Record<string, unknown> | null): DirectorItem[] => {
+  if (!movie) return [];
+
+  if (Array.isArray(movie.director) && movie.director.length > 0) {
+    return (movie.director as unknown[])
+      .map((d, i) => {
+        if (typeof d === 'string') {
+          return { name: d.trim(), role: 'Đạo diễn', slug: `director-${i}` } satisfies DirectorItem;
+        }
+        const obj = d as Record<string, unknown>;
+        return {
+          ...obj,
+          name: (obj.name as string) || '',
+          role: (obj.role as string) || 'Đạo diễn',
+          slug: (obj.slug as string) || `director-${i}`
+        } satisfies DirectorItem;
+      })
+      .filter((d) => d.name);
+  }
+
+  if (typeof movie.director === 'string' && movie.director.trim() !== '') {
+    return movie.director
+      .split(',')
+      .map((name, i) => ({
+        name: name.trim(),
+        role: 'Đạo diễn',
+        slug: `director-${i}`
+      }))
+      .filter((d) => d.name);
+  }
+
+  return [];
+};

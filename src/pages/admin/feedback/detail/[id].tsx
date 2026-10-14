@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import AdminRoute from '@/components/ProtectedRoute/AdminRoute';
+import AdminLayout from '@/layouts/AdminLayout';
+import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from 'axios';
 import {
   FaEnvelope, FaArrowLeft, FaClock, FaReply, FaTrash,

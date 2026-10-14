@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import AdminLayout from '@/components/Layout/AdminLayout';
+import AdminLayout from '@/layouts/AdminLayout';
 import {
   sendMaintenanceNotification,
   sendCustomNotification,
   getNotificationHistory
-} from '@/API/services/admin/emailNotificationService';
+} from '@/features/admin/services/emailNotificationService';
 import { toast } from 'react-hot-toast';
 import { Card, Button, Spinner, Modal } from 'react-bootstrap';
 
@@ -225,7 +225,7 @@ Trân trọng,
 
     try {
       setIsLoading(true);
-      const response = await sendMaintenanceNotification(maintenanceForm) as ApiResponse;
+      const response = await sendMaintenanceNotification({ ...maintenanceForm }) as ApiResponse;
 
       if (response.success) {
         toast.success(`Đã gửi thông báo bảo trì thành công đến ${response.count || 0} người dùng`);
@@ -266,7 +266,7 @@ Trân trọng,
 
     try {
       setIsLoading(true);
-      const response = await sendCustomNotification(customForm) as ApiResponse;
+      const response = await sendCustomNotification({ ...customForm }) as ApiResponse;
 
       if (response.success) {
         toast.success(`Đã gửi thông báo tùy chỉnh thành công đến ${response.count || 0} người dùng`);

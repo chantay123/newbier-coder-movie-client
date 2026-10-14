@@ -1,0 +1,530 @@
+/**
+ * @file mockMovies.ts
+ * @description Mock data chuẩn hoá và Schema Contract cho Backend API.
+ * Dùng làm đặc tả cho backend engineer khi triển khai response của các endpoint.
+ */
+
+/**
+ * Item thể loại phim.
+ */
+export interface CategoryItem {
+  name: string;
+  slug: string;
+}
+
+/**
+ * Item quốc gia sản xuất.
+ */
+export interface CountryItem {
+  name: string;
+  slug: string;
+}
+
+/**
+ * Server episode data.
+ */
+export interface EpisodeServerData {
+  name: string;
+  slug: string;
+  link_embed: string;
+}
+
+/**
+ * Server episode.
+ */
+export interface EpisodeServer {
+  server_name: string;
+  server_data: EpisodeServerData[];
+}
+
+/**
+ * Schema chuẩn cho phim từ API.
+ */
+export interface MovieSchema {
+  _id: string;
+  name: string;
+  origin_name: string;
+  slug: string;
+  year: number;
+  quality: '4K' | 'FHD' | 'HD' | 'Trailer 4K';
+  lang: string;
+  type: 'single' | 'series';
+  status?: 'ongoing' | 'completed' | 'upcoming';
+  episode_current?: string;
+  episode_total?: number;
+  time?: string;
+  rating?: number;
+  view?: number;
+  content?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  backdrop_url?: string;
+  trailer_url?: string;
+  category?: CategoryItem[];
+  country?: CountryItem[];
+  episodes?: EpisodeServer[];
+}
+
+// ============================================================================
+// CASE 1: Bom tấn phim lẻ 4K
+// ============================================================================
+export const mockFeaturedMovie: MovieSchema = {
+  _id: 'mock-featured-1',
+  name: 'Dune: Hành Tinh Cát - Phần Hai',
+  origin_name: 'Dune: Part Two',
+  slug: 'dune-hanh-tinh-cat-phan-hai',
+  year: 2024,
+  quality: '4K',
+  lang: 'Vietsub + Thuyết minh',
+  type: 'single',
+  status: 'completed',
+  episode_current: 'Full',
+  time: '166 phút',
+  rating: 8.8,
+  view: 125400,
+  content:
+    'Paul Atreides hợp nhất với Chani và người Fremen trong khi tìm kiếm sự trả thù chống lại những kẻ đã hủy hoại gia đình anh. Phải đối mặt với sự lựa chọn giữa tình yêu của đời mình và số phận của vũ trụ, anh cố gắng ngăn chặn một tương lai khủng khiếp mà chỉ anh có thể thấy trước.',
+  poster_url: 'https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
+  thumb_url: 'https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
+  backdrop_url: 'https://image.tmdb.org/t/p/original/eZ239CUp1d6OryZEBPnO2n87gMG.jpg',
+  trailer_url: 'Way9Dexny3w',
+  category: [
+    { name: 'Khoa Học Viễn Tưởng', slug: 'khoa-hoc-vien-tuong' },
+    { name: 'Hành Động', slug: 'hanh-dong' },
+    { name: 'Phiêu Lưu', slug: 'phieu-luu' }
+  ],
+  country: [{ name: 'Mỹ', slug: 'my' }],
+  episodes: [
+    {
+      server_name: 'Vietsub #1',
+      server_data: [
+        {
+          name: 'Full',
+          slug: 'full',
+          link_embed: 'https://www.youtube.com/embed/Way9Dexny3w'
+        }
+      ]
+    }
+  ]
+};
+
+// ============================================================================
+// CASE 2: Phim bộ đang chiếu với tiến độ tập
+// ============================================================================
+export const mockOngoingSeries: MovieSchema = {
+  _id: 'mock-series-ongoing-2',
+  name: 'Arcane: Liên Minh Huyền Thoại - Mùa 2',
+  origin_name: 'Arcane: League of Legends Season 2',
+  slug: 'arcane-season-2',
+  year: 2024,
+  quality: '4K',
+  lang: 'Lồng tiếng + Vietsub',
+  type: 'series',
+  status: 'ongoing',
+  episode_current: 'Tập 6/9',
+  episode_total: 9,
+  time: '42 phút/tập',
+  rating: 9.0,
+  view: 245000,
+  content:
+    'Căng thẳng giữa thành phố Piltover thịnh vượng và thế giới ngầm Zaun nghèo nàn lên đến đỉnh điểm sau vụ tấn công vào Hội đồng. Hai chị em Vi và Jinx đứng ở hai đầu chiến tuyến trong cuộc chiến định đoạt tương lai của cả hai thế giới.',
+  poster_url: 'https://image.tmdb.org/t/p/w500/fqldf2t8ztc9aiwn3k6mlX3tvRT.jpg',
+  thumb_url: 'https://image.tmdb.org/t/p/w500/fqldf2t8ztc9aiwn3k6mlX3tvRT.jpg',
+  backdrop_url: 'https://image.tmdb.org/t/p/original/5cvnxEHT3e39DvT6ARw4GNCFrB0.jpg',
+  trailer_url: 'yu95qJjB5eY',
+  category: [
+    { name: 'Hoạt Hình', slug: 'hoat-hinh' },
+    { name: 'Hành Động', slug: 'hanh-dong' },
+    { name: 'Viễn Tưởng', slug: 'vien-tuong' }
+  ],
+  country: [{ name: 'Mỹ', slug: 'my' }],
+  episodes: [
+    {
+      server_name: 'Lồng tiếng VIP',
+      server_data: [
+        { name: 'Tập 1', slug: 'tap-1', link_embed: 'https://www.youtube.com/embed/yu95qJjB5eY' },
+        { name: 'Tập 6', slug: 'tap-6', link_embed: 'https://www.youtube.com/embed/yu95qJjB5eY' }
+      ]
+    }
+  ]
+};
+
+// ============================================================================
+// CASE 3: Phim bộ trọn bộ hoàn tất
+// ============================================================================
+export const mockCompletedSeries: MovieSchema = {
+  _id: 'mock-series-completed-3',
+  name: 'Trò Chơi Vương Quyền',
+  origin_name: 'Game of Thrones',
+  slug: 'tro-choi-vuong-quyen',
+  year: 2019,
+  quality: '4K',
+  lang: 'Vietsub',
+  type: 'series',
+  status: 'completed',
+  episode_current: 'Trọn bộ 73 tập',
+  episode_total: 73,
+  time: '60 phút/tập',
+  rating: 9.2,
+  view: 320000,
+  content:
+    'Chín gia tộc quý tộc chiến đấu tàn khốc để giành quyền kiểm soát Ngai Sắt của vùng đất Westeros huyền thoại, trong khi một đội quân bóng ma cổ xưa từ phương Bắc đang trỗi dậy đe dọa sự tồn vong của toàn nhân loại.',
+  poster_url: 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
+  thumb_url: 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
+  backdrop_url: 'https://image.tmdb.org/t/p/original/2OMB0ynKlyIenMJWI2Dy9IWT4c.jpg',
+  trailer_url: 'KPLWWIOCOOQ',
+  category: [
+    { name: 'Phim Bộ', slug: 'phim-bo' },
+    { name: 'Giả Tưởng', slug: 'gia-tuong' },
+    { name: 'Chính Kịch', slug: 'chinh-kich' }
+  ],
+  country: [{ name: 'Mỹ', slug: 'my' }],
+  episodes: [
+    {
+      server_name: 'Vietsub VIP',
+      server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: 'https://www.youtube.com/embed/KPLWWIOCOOQ' }]
+    }
+  ]
+};
+
+// ============================================================================
+// CASE 4: Phim sắp ra mắt
+// ============================================================================
+export const mockUpcomingMovie: MovieSchema = {
+  _id: 'mock-upcoming-4',
+  name: 'Avatar: Lửa Và Tro Tàn',
+  origin_name: 'Avatar: Fire and Ash',
+  slug: 'avatar-lua-va-tro-tan',
+  year: 2025,
+  quality: 'Trailer 4K',
+  lang: 'Vietsub',
+  type: 'single',
+  status: 'upcoming',
+  episode_current: 'Sắp chiếu',
+  time: 'Khởi chiếu 12/2025',
+  rating: 8.5,
+  view: 89000,
+  content:
+    'Phần phim thứ ba đưa gia đình Sully khám phá một tộc người Na\'vi mới đầy thù địch được gọi là \'Người Tro\', sinh sống quanh các ngọn núi lửa hung hãn của hành tinh Pandora bí ẩn.',
+  poster_url: 'https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg',
+  thumb_url: 'https://image.tmdb.org/t/p/w500/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg',
+  backdrop_url: 'https://image.tmdb.org/t/p/original/s16H6tpK2utvwDtzZ8Qy4qm5Emw.jpg',
+  trailer_url: 'd9MyW72ELq0',
+  category: [
+    { name: 'Khoa Học Viễn Tưởng', slug: 'khoa-hoc-vien-tuong' },
+    { name: 'Hành Động', slug: 'hanh-dong' },
+    { name: 'Chiếu Rạp', slug: 'chieu-rap' }
+  ],
+  country: [{ name: 'Mỹ', slug: 'my' }],
+  episodes: []
+};
+
+// ============================================================================
+// CASE 5: Phim châu Á đoạt giải
+// ============================================================================
+export const mockAwardWinningMovie: MovieSchema = {
+  _id: 'mock-award-5',
+  name: 'Ký Sinh Trùng',
+  origin_name: 'Parasite',
+  slug: 'ky-sinh-trung',
+  year: 2019,
+  quality: '4K',
+  lang: 'Vietsub',
+  type: 'single',
+  status: 'completed',
+  episode_current: 'Full',
+  time: '132 phút',
+  rating: 8.6,
+  view: 198000,
+  content:
+    'Gia đình Kim nghèo khó dần thâm nhập vào cuộc sống của gia đình Park giàu có bằng cách đóng giả những người làm công lành nghề không quen biết nhau, mở ra chuỗi bi kịch bất ngờ.',
+  poster_url: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+  thumb_url: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+  backdrop_url: 'https://image.tmdb.org/t/p/original/hiKmpZMGZsrkA3cdce8a7Dpos1j.jpg',
+  trailer_url: '5xH0hhJ_Vn8',
+  category: [
+    { name: 'Tâm Lý', slug: 'tam-ly' },
+    { name: 'Giật Gân', slug: 'giat-gan' },
+    { name: 'Hài Đen', slug: 'hai-den' }
+  ],
+  country: [{ name: 'Hàn Quốc', slug: 'han-quoc' }],
+  episodes: [
+    {
+      server_name: 'Vietsub #1',
+      server_data: [{ name: 'Full', slug: 'full', link_embed: 'https://www.youtube.com/embed/5xH0hhJ_Vn8' }]
+    }
+  ]
+};
+
+// ============================================================================
+// FULL MOCK MOVIE REPOSITORY
+// ============================================================================
+export const mockMovies: MovieSchema[] = [
+  mockFeaturedMovie,
+  mockOngoingSeries,
+  mockCompletedSeries,
+  mockUpcomingMovie,
+  mockAwardWinningMovie,
+  {
+    _id: 'mock-6',
+    name: 'Oppenheimer',
+    origin_name: 'Oppenheimer',
+    slug: 'oppenheimer',
+    year: 2023,
+    quality: '4K',
+    lang: 'Vietsub',
+    type: 'single',
+    episode_current: 'Full',
+    time: '180 phút',
+    rating: 8.9,
+    view: 98200,
+    content:
+      'Câu chuyện về nhà vật lý lý thuyết J. Robert Oppenheimer, người đứng đầu Dự án Manhattan phát triển bom nguyên tử trong Thế chiến II.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/r2J02Z2OpNTctetOs2tYx0OZEHG.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/r2J02Z2OpNTctetOs2tYx0OZEHG.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/original/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
+    trailer_url: 'uYPbbksJxIg',
+    category: [{ name: 'Chính Kịch', slug: 'chinh-kich' }, { name: 'Lịch Sử', slug: 'lich-su' }],
+    country: [{ name: 'Mỹ', slug: 'my' }],
+    episodes: []
+  },
+  {
+    _id: 'mock-7',
+    name: 'Người Nhện: Du Hành Vũ Trụ Nhện',
+    origin_name: 'Spider-Man: Across the Spider-Verse',
+    slug: 'nguoi-nhen-du-hanh-vu-tru-nhen',
+    year: 2023,
+    quality: 'FHD',
+    lang: 'Vietsub',
+    type: 'single',
+    episode_current: 'Full',
+    time: '140 phút',
+    rating: 8.7,
+    view: 84300,
+    content:
+      'Miles Morales phiêu lưu xuyên Đa Vũ Trụ, gặp gỡ đội quân Người Nhện được giao nhiệm vụ bảo vệ sự tồn tại của nó.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/fiVW06jE7z9YnO4trhaMEdclSiC.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/fiVW06jE7z9YnO4trhaMEdclSiC.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg',
+    category: [{ name: 'Hoạt Hình', slug: 'hoat-hinh' }, { name: 'Hành Động', slug: 'hanh-dong' }],
+    country: [{ name: 'Mỹ', slug: 'my' }],
+    episodes: []
+  }
+];
+
+export const mockKoreanMovies: MovieSchema[] = [
+  mockAwardWinningMovie,
+  {
+    _id: 'mock-kr-2',
+    name: 'Hạ Cánh Nơi Anh',
+    origin_name: 'Crash Landing on You',
+    slug: 'ha-canh-noi-anh',
+    year: 2020,
+    quality: 'HD',
+    lang: 'Thuyết minh',
+    type: 'series',
+    episode_current: 'Tập 16/16',
+    time: '70 phút/tập',
+    rating: 8.7,
+    view: 280000,
+    content:
+      'Một người thừa kế giàu có của Hàn Quốc vô tình hạ cánh xuống Triều Tiên sau một tai nạn dù lượn và rơi vào lưới tình với một sĩ quan quân đội.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
+    country: [{ name: 'Hàn Quốc', slug: 'han-quoc' }],
+    category: [{ name: 'Lãng Mạn', slug: 'lang-man' }],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: '' }]
+      }
+    ]
+  },
+  {
+    _id: 'mock-kr-3',
+    name: 'Trò Chơi Con Mực',
+    origin_name: 'Squid Game',
+    slug: 'tro-choi-con-muc',
+    year: 2021,
+    quality: '4K',
+    lang: 'Vietsub',
+    type: 'series',
+    episode_current: 'Tập 9/9',
+    time: '55 phút/tập',
+    rating: 8.0,
+    view: 450000,
+    content:
+      'Hàng trăm người chơi kẹt tiền chấp nhận lời mời kỳ lạ để cạnh tranh trong các trò chơi trẻ con với mức thưởng khổng lồ nhưng rủi ro chí mạng.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
+    country: [{ name: 'Hàn Quốc', slug: 'han-quoc' }],
+    category: [{ name: 'Hành Động', slug: 'hanh-dong' }],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: '' }]
+      }
+    ]
+  }
+];
+
+export const mockChineseMovies: MovieSchema[] = [
+  {
+    _id: 'mock-cn-1',
+    name: 'Trần Tình Lệnh',
+    origin_name: 'The Untamed',
+    slug: 'tran-tinh-lenh',
+    year: 2019,
+    quality: 'FHD',
+    lang: 'Thuyết minh',
+    type: 'series',
+    episode_current: 'Tập 50/50',
+    time: '45 phút/tập',
+    rating: 8.9,
+    view: 310000,
+    content: 'Hai tâm hồn tri kỷ cùng nhau khám phá một âm mưu đen tối trong giới tu tiên.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg',
+    country: [{ name: 'Trung Quốc', slug: 'trung-quoc' }],
+    category: [{ name: 'Cổ Trang', slug: 'co-trang' }],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: '' }]
+      }
+    ]
+  },
+  {
+    _id: 'mock-cn-2',
+    name: 'Cuồng Phong',
+    origin_name: 'The Knockout',
+    slug: 'cuong-phong',
+    year: 2023,
+    quality: 'HD',
+    lang: 'Vietsub',
+    type: 'series',
+    episode_current: 'Tập 39/39',
+    time: '45 phút/tập',
+    rating: 8.6,
+    view: 190000,
+    content: 'Cuộc đấu trí kéo dài hai thập kỷ giữa viên cảnh sát hình sự chính trực và ông trùm thế giới ngầm.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
+    country: [{ name: 'Trung Quốc', slug: 'trung-quoc' }],
+    category: [{ name: 'Hình Sự', slug: 'hinh-su' }],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: '' }]
+      }
+    ]
+  },
+  {
+    _id: 'mock-cn-3',
+    name: 'Thương Lan Quyết',
+    origin_name: 'Love Between Fairy and Devil',
+    slug: 'thuong-lan-quyet',
+    year: 2022,
+    quality: '4K',
+    lang: 'Thuyết minh',
+    type: 'series',
+    episode_current: 'Tập 36/36',
+    time: '45 phút/tập',
+    rating: 8.8,
+    view: 290000,
+    content: 'Mối tình đầy trắc trở nhưng sâu đậm giữa Nguyệt Tôn ma giới Đông Phương Thanh Thương và hoa tiên nhỏ Hoa Lan Nhỏ.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg',
+    country: [{ name: 'Trung Quốc', slug: 'trung-quoc' }],
+    category: [{ name: 'Tiên Hiệp', slug: 'tien-hiep' }],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: '' }]
+      }
+    ]
+  },
+  {
+    _id: 'mock-cn-4',
+    name: 'Trường Nguyệt Từn Minh',
+    origin_name: 'Till The End of The Moon',
+    slug: 'truong-nguyet-tan-minh',
+    year: 2023,
+    quality: 'FHD',
+    lang: 'Vietsub',
+    type: 'series',
+    episode_current: 'Tập 40/40',
+    time: '45 phút/tập',
+    rating: 8.5,
+    view: 260000,
+    content: 'Lê Tô Tô trở về 500 năm trước ngăn chặn Đàm Đài Từn biến thành Ma Thần hủy diệt tam giới.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/A7bsoxYqg3nL42N5sMeq56t3l5l.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/A7bsoxYqg3nL42N5sMeq56t3l5l.jpg',
+    country: [{ name: 'Trung Quốc', slug: 'trung-quoc' }],
+    category: [{ name: 'Huyền Huyễn', slug: 'huyen-huyen' }],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Tập 1', slug: 'tap-1', link_embed: '' }]
+      }
+    ]
+  }
+];
+
+export const mockAnimationMovies: MovieSchema[] = [
+  {
+    _id: 'mock-anime-1',
+    name: 'Khóa Chặt Cửa Nào Suzume',
+    origin_name: 'Suzume no Tojimari',
+    slug: 'khoa-chat-cua-nao-suzume',
+    year: 2022,
+    quality: '4K',
+    lang: 'Vietsub + Lồng tiếng',
+    type: 'single',
+    status: 'completed',
+    episode_current: 'Full',
+    time: '122 phút',
+    rating: 8.2,
+    view: 540000,
+    content:
+      'Cuộc hành trình xuyên qua Nhật Bản của cô gái 17 tuổi Suzume để đóng những cánh cửa tai ương đang mở ra khắp nơi và bảo vệ tương lai nhân loại.',
+    poster_url: 'https://image.tmdb.org/t/p/w500/vIeu8WysZrTSm2TNmZWnE329vBQ.jpg',
+    thumb_url: 'https://image.tmdb.org/t/p/w500/vIeu8WysZrTSm2TNmZWnE329vBQ.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/original/bQXAqRx2gNs46tURHWmuNX3dWE8.jpg',
+    trailer_url: '6c-gPv_y9mY',
+    country: [{ name: 'Nhật Bản', slug: 'nhat-ban' }],
+    category: [
+      { name: 'Hoạt Hình', slug: 'hoat-hinh' },
+      { name: 'Anime', slug: 'anime' },
+      { name: 'Phiêu Lưu', slug: 'phieu-luu' }
+    ],
+    episodes: [
+      {
+        server_name: 'Server 1',
+        server_data: [{ name: 'Full', slug: 'full', link_embed: '' }]
+      }
+    ]
+  }
+];
+
+export const mockCategories = [
+  {
+    id: 'new',
+    title: 'Phim mới cập nhật',
+    endpoint: 'danh-sach/phim-moi-cap-nhat',
+    movies: mockMovies
+  }
+];
+
+export default {
+  mockMovies,
+  mockFeaturedMovie,
+  mockOngoingSeries,
+  mockCompletedSeries,
+  mockUpcomingMovie,
+  mockAwardWinningMovie,
+  mockKoreanMovies,
+  mockChineseMovies,
+  mockAnimationMovies,
+  mockCategories
+};

@@ -1,0 +1,97 @@
+/**
+ * @file authConfig.ts
+ * @description Cấu hình tập trung cho giao diện xác thực, asset artwork,
+ * đặc tả endpoint API, nhãn UI, placeholder, và thông báo lỗi.
+ */
+
+export const AUTH_CONFIG = {
+  // Endpoint và contract cho backend authentication
+  api: {
+    // Khớp với endpoint backend: /api/v1/auth/login
+    endpoint: (
+      process.env.NEXT_PUBLIC_CORE_API_URL
+        ? `${process.env.NEXT_PUBLIC_CORE_API_URL.replace(/\/+$/, '')}/auth/login`
+        : (process.env.NEXT_PUBLIC_API_URL
+            ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/login`
+            : 'http://localhost:5000/api/v1/auth/login')
+    ),
+    successCode: '000000',
+    invalidCredentialsCode: '00000204'
+  },
+
+  // Cấu hình artwork
+  artwork: {
+    defaultLoginImage: process.env.NEXT_PUBLIC_LOGIN_IMAGE || '/img/chantay.jpg',
+    defaultRegisterImage: process.env.NEXT_PUBLIC_REGISTER_IMAGE || '/img/chantay.jpg',
+    altText: 'Welcome Illustration'
+  },
+
+  // Alias tương thích ngược
+  defaultLoginArtwork: process.env.NEXT_PUBLIC_LOGIN_IMAGE || '/img/chantay.jpg',
+  artworkAlt: 'Welcome Illustration',
+
+  // Tất cả text, copy, placeholder và thông báo lỗi cho màn Login
+  login: {
+    meta: {
+      title: 'Welcome - Đăng nhập',
+      description: 'Đăng nhập tài khoản của bạn'
+    },
+    navigation: {
+      backHome: 'Trang chủ'
+    },
+    header: {
+      title: 'Welcome',
+      subtitle: 'We are glad to see you back with us'
+    },
+    placeholders: {
+      username: 'Email hoặc Username',
+      email: 'Email hoặc Username',
+      password: 'Password'
+    },
+    accessibility: {
+      showPassword: 'Hiện mật khẩu',
+      hidePassword: 'Ẩn mật khẩu'
+    },
+    validation: {
+      requiredFields: 'Vui lòng nhập tài khoản và mật khẩu',
+      invalidEmail: 'Email hoặc Username không hợp lệ',
+      invalidCredentials: 'Invalid credentials',
+      wrongPassword: 'Invalid credentials',
+      serverError: 'Không thể kết nối máy chủ'
+    },
+    notifications: {
+      registeredSuccess: 'Đăng ký thành công! Vui lòng đăng nhập bằng tài khoản mới.',
+      loginSuccess: 'Đăng nhập thành công! Đang chuyển hướng...'
+    },
+    buttons: {
+      submit: 'SignIn',
+      submitting: 'Processing...'
+    },
+    remember: {
+      label: 'Ghi nhớ đăng nhập',
+      ariaLabel: 'Ghi nhớ đăng nhập trên thiết bị này'
+    },
+    links: {
+      forgotPassword: 'Forgot password?',
+      signupNow: 'Signup Now'
+    },
+    divider: {
+      boldText: 'SignIn',
+      normalText: 'with Others'
+    },
+    social: {
+      google: 'Đăng nhập bằng Google',
+      facebook: 'Đăng nhập bằng Facebook',
+      github: 'Đăng nhập bằng GitHub',
+      linkedin: 'Đăng nhập bằng LinkedIn',
+      googleFailed: 'Đăng nhập Google thất bại',
+      googleConnectError: 'Không thể kết nối tới Google',
+      facebookFailed: 'Đăng nhập Facebook thất bại',
+      githubDisabled: 'Tính năng đăng nhập GitHub chưa được kích hoạt trên máy chủ.',
+      githubUpdating: 'Tính năng đăng nhập GitHub đang được cập nhật',
+      linkedinUpdating: 'Tính năng đăng nhập LinkedIn đang được hoàn thiện'
+    }
+  }
+} as const;
+
+export default AUTH_CONFIG;
