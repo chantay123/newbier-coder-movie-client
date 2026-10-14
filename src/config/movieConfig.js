@@ -23,7 +23,8 @@ export {
   resolveMovieQuality,
   normalizeHeroMovie,
   resolveMovieActors,
-  resolveMovieDirectors
+  resolveMovieDirectors,
+  resolveImageUrl
 } from './movieFallbackConfig';
 
 /**

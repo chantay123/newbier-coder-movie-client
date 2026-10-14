@@ -41,7 +41,7 @@ export default function ReleaseSchedulePage() {
   return (
     <>
       <Head>
-        <title>{SEO_CONFIG.formatTitle(SCHEDULE_CONFIG.pageTitle)}</title>
+        <title>{String(SEO_CONFIG.formatTitle(SCHEDULE_CONFIG.pageTitle))}</title>
         <meta name="description" content={SCHEDULE_CONFIG.pageDescription} />
       </Head>
 
