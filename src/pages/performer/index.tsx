@@ -1,29 +1,40 @@
+/**
+ * @file pages/performer/index.tsx
+ * @description Performer (actor/director) listing page with search.
+ */
 import React, { useState, useEffect } from 'react';
+import type { ReactElement } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { FaSearch, FaUserCircle, FaStar } from 'react-icons/fa';
+import { FaSearch, FaUserCircle } from 'react-icons/fa';
 import Skeleton from '@/components/UI/Skeleton';
 import { TMDB_CONFIG } from '@/config/systemConfig';
 
-export default function PerformerListPage() {
-  const [performers, setPerformers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+interface TMDBPerson {
+  id: number;
+  name: string;
+  profile_path?: string | null;
+  known_for_department?: string;
+  known_for?: Array<{ title?: string; name?: string }>;
+}
+
+export default function PerformerListPage(): ReactElement {
+  const [performers, setPerformers] = useState<TMDBPerson[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     let isSubscribed = true;
 
-    const fetchPerformers = async () => {
+    const fetchPerformers = async (): Promise<void> => {
       setLoading(true);
       try {
         const endpoint = searchTerm.trim()
           ? `${TMDB_CONFIG.baseUrl}/search/person?api_key=${TMDB_CONFIG.apiKey}&query=${encodeURIComponent(searchTerm.trim())}&language=vi-VN`
           : `${TMDB_CONFIG.baseUrl}/person/popular?api_key=${TMDB_CONFIG.apiKey}&language=vi-VN&page=1`;
 
-        const res = await fetch(endpoint).then((r) => r.json()).catch(() => null);
-        if (isSubscribed && res?.results) {
-          setPerformers(res.results);
-        }
+        const res = (await fetch(endpoint).then((r) => r.json()).catch(() => null)) as { results?: TMDBPerson[] } | null;
+        if (isSubscribed && res?.results) setPerformers(res.results);
       } catch {
         if (isSubscribed) setPerformers([]);
       } finally {
@@ -38,6 +49,8 @@ export default function PerformerListPage() {
     };
   }, [searchTerm]);
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>): void => setSearchTerm(e.target.value);
+
   return (
     <>
       <Head>
@@ -51,14 +64,13 @@ export default function PerformerListPage() {
             <h1 className="h3 text-white fw-bold text-uppercase m-0">Diễn Viên Nổi Bật</h1>
             <p className="text-secondary small m-0 mt-1">Khám phá các ngôi sao điện ảnh và tác phẩm nổi tiếng</p>
           </div>
-
           <div className="search-bar-wrapper">
             <FaSearch className="text-secondary me-2" />
             <input
               type="text"
               placeholder="Tìm kiếm diễn viên..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               className="search-input"
             />
           </div>
@@ -72,8 +84,8 @@ export default function PerformerListPage() {
                   <div className="mx-auto rounded-circle overflow-hidden mb-2" style={{ width: '90px', height: '90px' }}>
                     <Skeleton width="100%" height="100%" />
                   </div>
-                  <Skeleton height="16px" width="70%" className="mx-auto" />
-                  <Skeleton height="12px" width="50%" className="mx-auto mt-2" />
+                  <Skeleton height={16} width="70%" className="mx-auto" />
+                  <Skeleton height={12} width="50%" className="mx-auto mt-2" />
                 </div>
               </div>
             ))}
@@ -83,7 +95,6 @@ export default function PerformerListPage() {
             {performers.map((person) => {
               const photo = TMDB_CONFIG.getImageUrl(person.profile_path, 'w500', '/img/user-avatar.png');
               const knownFor = person.known_for?.map((k) => k.title || k.name).filter(Boolean).slice(0, 2).join(', ');
-
               return (
                 <div key={person.id} className="col-6 col-sm-4 col-md-3 col-lg-2">
                   <Link href={`/performer/${person.id}`} className="text-decoration-none">
@@ -93,7 +104,7 @@ export default function PerformerListPage() {
                           src={photo}
                           alt={person.name}
                           className="rounded-circle avatar-img"
-                          onError={(e) => { e.target.src = '/img/user-avatar.png'; }}
+                          onError={(e) => { (e.target as HTMLImageElement).src = '/img/user-avatar.png'; }}
                         />
                       </div>
                       <h6 className="text-white text-truncate m-0 fw-semibold" style={{ fontSize: '0.9rem' }} title={person.name}>
@@ -143,11 +154,7 @@ export default function PerformerListPage() {
           border: 2px solid rgba(229, 9, 20, 0.35);
           transition: transform 0.25s ease, border-color 0.25s ease;
         }
-        .avatar-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
+        .avatar-img { width: 100%; height: 100%; object-fit: cover; }
         .performer-card {
           background: #161b22 !important;
           transition: transform 0.25s ease, box-shadow 0.25s ease;

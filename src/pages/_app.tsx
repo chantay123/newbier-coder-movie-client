@@ -1,62 +1,69 @@
-import "bootstrap/dist/css/bootstrap.min.css";
-import Head from "next/head";
+/**
+ * @file pages/_app.tsx
+ * @description Custom Next.js App component: global CSS, providers, layout, and
+ * smart drag-vs-click detection across the application.
+ */
+import 'bootstrap/dist/css/bootstrap.min.css';
+import Head from 'next/head';
+import type { AppProps } from 'next/app';
+import type { ComponentType, ReactNode } from 'react';
 import '../styles/animation.css';
-import '../styles/subscription-details.css'; // Import CSS for subscription details
-// import '../styles/admin-fix.css';
-import '../styles/feedbackAdmin.css'; // Import CSS for feedback admin
-import { SessionProvider } from "next-auth/react";
-import { AuthProvider, withAccountStatus } from "../utils/auth";
-import { useEffect, useState, useCallback } from "react";
+import '../styles/subscription-details.css';
+import '../styles/feedbackAdmin.css';
+import { SessionProvider } from 'next-auth/react';
+import { AuthProvider, withAccountStatus } from '../utils/auth';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import Layout from "../components/Layout";
-import OfflineNotice from "../components/OfflineNotice";
-import NetworkStatusBar from "../components/NetworkStatusBar";
-import CinemaAlert from "../components/UI/CinemaAlert";
-import AdContextProvider from "../context/AdContext";
-import { registerServiceWorker } from "../utils/serviceWorker";
-import { ROUTES } from "../config/routesConfig";
+import Layout from '../components/Layout';
+import OfflineNotice from '../components/OfflineNotice';
+import NetworkStatusBar from '../components/NetworkStatusBar';
+import CinemaAlert from '../components/UI/CinemaAlert';
+import AdContextProvider from '../context/AdContext';
+import { registerServiceWorker } from '../utils/serviceWorker';
+import { ROUTES } from '../config/routesConfig';
 
-function MyApp({ Component, pageProps: { session, ...pageProps } }) {
+type AppPageProps = AppProps & { session?: unknown };
+
+interface PageWithLayout {
+  (props: Record<string, unknown>): ReactNode;
+  getLayout?: (page: ReactNode) => ReactNode;
+}
+
+function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps): ReactNode {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [user, setUser] = useState<unknown>(null);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      require("bootstrap/dist/js/bootstrap.bundle.min.js");
-
-      // Register service worker for offline functionality
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('bootstrap/dist/js/bootstrap.bundle.min.js');
       registerServiceWorker();
     }
   }, []);
 
-  // Global Smart Drag vs Click Detection across the entire application
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
     let startX = 0;
     let startY = 0;
     let isDragging = false;
-    const DRAG_THRESHOLD = 8; // 8px movement threshold to distinguish drag from click
+    const DRAG_THRESHOLD = 8;
 
-    const handlePointerDown = (e) => {
+    const handlePointerDown = (e: PointerEvent): void => {
       startX = e.clientX;
       startY = e.clientY;
       isDragging = false;
     };
 
-    const handlePointerMove = (e) => {
-      // Only track if mouse button is held down (buttons > 0) or on touch/pen
+    const handlePointerMove = (e: PointerEvent): void => {
       if (e.pointerType === 'mouse' && e.buttons === 0) return;
       const diffX = Math.abs(e.clientX - startX);
       const diffY = Math.abs(e.clientY - startY);
-      if (diffX > DRAG_THRESHOLD || diffY > DRAG_THRESHOLD) {
-        isDragging = true;
-      }
+      if (diffX > DRAG_THRESHOLD || diffY > DRAG_THRESHOLD) isDragging = true;
     };
 
-    const handleClickCapture = (e) => {
+    const handleClickCapture = (e: MouseEvent): void => {
       if (isDragging) {
-        // User was dragging! Suppress click to prevent navigating to link
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -67,7 +74,6 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     window.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: true });
     window.addEventListener('pointermove', handlePointerMove, { capture: true, passive: true });
     window.addEventListener('click', handleClickCapture, { capture: true });
-
     return () => {
       window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
       window.removeEventListener('pointermove', handlePointerMove, { capture: true });
@@ -75,14 +81,14 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
     };
   }, []);
 
-  const initializeUser = useCallback(() => {
+  const initializeUser = useCallback((): void => {
     if (typeof window !== 'undefined' && !isInitialized) {
       const userData = localStorage.getItem('user');
       if (userData) {
         try {
           setUser(JSON.parse(userData));
-        } catch (error) {
-          console.error('Error parsing user data:', error);
+        } catch (err) {
+          console.error('Error parsing user data:', err);
         }
       }
       setIsInitialized(true);
@@ -97,31 +103,23 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   const isAuthPage = router.pathname.startsWith(ROUTES.AUTH_PREFIX);
   const isSearchPage = router.pathname === ROUTES.SEARCH;
 
-  const getLayout = useCallback((page) => {
-    if (Component.getLayout) {
-      return Component.getLayout(page);
-    }
+  const PageWithLayout = Component as unknown as PageWithLayout;
 
-    if (isAdminPage) {
-      return page;
-    }
-
+  const getLayout = useCallback((page: ReactNode): ReactNode => {
+    if (PageWithLayout.getLayout) return PageWithLayout.getLayout(page);
+    if (isAdminPage) return page;
     return <Layout Component={Component}>{page}</Layout>;
   }, [Component, isAdminPage]);
 
-  const getWrappedComponent = useCallback(() => {
+  const getWrappedComponent = useCallback((): ReactNode => {
     const component = getLayout(<Component {...pageProps} />);
-
-    if (isAuthPage || isAdminPage || isSearchPage) {
-      return component;
-    }
-
-    const AccountStatusWrapper = withAccountStatus(() => component);
+    if (isAuthPage || isAdminPage || isSearchPage) return component;
+    const AccountStatusWrapper = withAccountStatus((): ReactNode => component);
     return <AccountStatusWrapper />;
   }, [Component, pageProps, getLayout, isAuthPage, isAdminPage, isSearchPage]);
 
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={session as never}>
       <AuthProvider>
         <AdContextProvider>
           <Head>
@@ -144,36 +142,18 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
           }
-
-          /* Seamless full-bleed layout: hide visible scrollbar tracks across all modern browsers */
           html, body {
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE and Edge */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
             overflow-x: hidden;
           }
-          ::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
-            width: 0px;
-            background: transparent;
-          }
-
-          /* Enhanced contrast for dark cinema theme: prevent muted text from sinking into dark backgrounds */
-          .text-muted,
-          .form-text {
-            color: #94a3b8 !important; /* Clear, elegant slate instead of muddy Bootstrap #6c757d */
-          }
-
-          /* Clear, high-contrast placeholders across all inputs and textareas */
-          ::placeholder,
-          .form-control::placeholder,
-          input::placeholder,
-          textarea::placeholder {
-            color: #94a3b8 !important; /* Visible slate placeholder with full opacity */
+          ::-webkit-scrollbar { display: none; width: 0px; background: transparent; }
+          .text-muted, .form-text { color: #94a3b8 !important; }
+          ::placeholder, .form-control::placeholder, input::placeholder, textarea::placeholder {
+            color: #94a3b8 !important;
             opacity: 1 !important;
           }
-
-          .form-control:focus::placeholder,
-          input:focus::placeholder {
+          .form-control:focus::placeholder, input:focus::placeholder {
             color: #cbd5e1 !important;
             opacity: 1 !important;
           }
