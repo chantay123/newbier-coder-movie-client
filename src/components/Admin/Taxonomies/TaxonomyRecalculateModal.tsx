@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { FaSyncAlt, FaTimes, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import styles from '@/styles/AdminTaxonomies.module.css';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 interface TaxonomyRecalculateModalProps {
   isOpen: boolean;

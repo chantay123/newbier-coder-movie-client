@@ -156,7 +156,7 @@ const AdminUsersPage = () => {
         return;
       }
     } catch (err) {
-      console.warn('Backend getUsersForAdmin unreachable, using mock users dataset:', err);
+
     }
 
     // Fallback to rich mock users
@@ -198,7 +198,7 @@ const AdminUsersPage = () => {
         return;
       }
     } catch (err) {
-      console.warn('Failed to fetch user stats from API, using mock stats:', err);
+
     }
     setUserStats(MOCK_USER_STATS);
   }, []);
@@ -213,17 +213,17 @@ const AdminUsersPage = () => {
         setRoles(rolesData);
       } else {
         setRoles([]);
-        console.error('Invalid roles data format:', rolesData);
+
       }
 
       if (Array.isArray(accountTypesData)) {
         setAccountTypes(accountTypesData);
       } else {
         setAccountTypes([]);
-        console.error('Invalid account types data format:', accountTypesData);
+
       }
     } catch (err) {
-      console.error('Failed to fetch roles or account types:', err);
+
     }
   }, []);
 
@@ -282,7 +282,7 @@ const AdminUsersPage = () => {
       try {
         ws = new WebSocket(wsUrl);
       } catch (err) {
-        console.warn('[AdminUsers] Failed to open WebSocket — realtime disabled');
+
         return;
       }
       wsRef.current = ws;
@@ -341,7 +341,7 @@ const AdminUsersPage = () => {
         } catch (err) {
           // The server may emit a non-JSON keep-alive frame; log but
           // don't break the page.
-          console.warn('[AdminUsers] WebSocket message parse failed');
+
         }
       };
 
@@ -353,10 +353,7 @@ const AdminUsersPage = () => {
           return;
         }
         if (wsReconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-          console.warn(
-            `[AdminUsers] WebSocket unreachable after ${MAX_RECONNECT_ATTEMPTS} attempts — ` +
-            'realtime updates disabled until the page is reloaded.'
-          );
+
           return;
         }
         const attempt = wsReconnectAttemptsRef.current;
@@ -486,7 +483,7 @@ const AdminUsersPage = () => {
       }
       setError(errorMessage);
       alert(errorMessage);
-      console.error('Error toggling user status:', err);
+
     }
   };
 

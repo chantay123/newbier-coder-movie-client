@@ -7,7 +7,7 @@ interface SidebarToggleProps {
 
 const SidebarToggle: React.FC<SidebarToggleProps> = ({ className = "" }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  
+
   const toggleSidebar = () => {
     const body = document.querySelector('body');
     if (body) {
@@ -17,10 +17,10 @@ const SidebarToggle: React.FC<SidebarToggleProps> = ({ className = "" }) => {
   };
 
   return (
-    <button 
+    <button
       type="button"
       onClick={toggleSidebar}
-      className={`btn ${className}`} 
+      className={`btn ${className}`}
       title={isCollapsed ? "Mở rộng sidebar" : "Thu nhỏ sidebar"}
       style={{
         background: 'none',

@@ -25,30 +25,30 @@ const ReleasedMovieLink: React.FC<ReleasedMovieLinkProps> = ({ upcomingMovieId }
     try {
       // Fetch the upcoming movie first
       const response = await axiosInstance.get(`/upcoming-movies/${upcomingMovieId}`);
-      
+
       if (response.data?.upcomingMovie?.is_released) {
         // If released, search for the movie with same name or slug in the movies collection
         const searchResponse = await axiosInstance.get('/movies', {
-          params: { 
+          params: {
             search: response.data.upcomingMovie.name,
-            limit: 5 
+            limit: 5
           }
         });
-        
+
         if (searchResponse.data?.movies?.length > 0) {
           // Find the movie that best matches the name or slug
           const matchingMovie = searchResponse.data.movies.find(
-            (m: any) => m.name === response.data.upcomingMovie.name || 
+            (m: any) => m.name === response.data.upcomingMovie.name ||
                         m.slug === response.data.upcomingMovie.slug
           );
-          
+
           if (matchingMovie) {
             setReleasedMovieId(matchingMovie._id);
           }
         }
       }
     } catch (err) {
-      console.error('Error checking released movie:', err);
+
       setError('Không thể kiểm tra trạng thái phim đã phát hành');
     } finally {
       setLoading(false);

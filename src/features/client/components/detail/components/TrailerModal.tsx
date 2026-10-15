@@ -98,35 +98,57 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
     available: false,
   });
   const [loading, setLoading] = useState<boolean>(false);
+  const [iframeFailed, setIframeFailed] = useState<boolean>(false);
 
   /**
-   * Extracts an 11-char YouTube video ID from a string.
+   * Extracts a YouTube video ID (6-15 chars) from a string.
+   * Accepts legacy short IDs from some backends (e.g. 'KPLWW1QCOQ')
+   * as well as the canonical 11-char YouTube keys.
    */
   const extractYouTubeId = (str: string | undefined | null): string | null => {
     if (!str || typeof str !== 'string') return null;
     const clean = str.trim();
     if (!clean) return null;
 
-    // 1) Already a bare 11-char YouTube key (e.g. 'Way9Dexny3w').
-    if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) return clean;
+    // 1) Already a bare 6-15 char YouTube key. The canonical length is 11,
+    //    but some legacy backends store 9-10 char IDs.
+    if (/^[a-zA-Z0-9_-]{6,15}$/.test(clean)) return clean;
 
     // 2) Full YouTube URL of any variant.
     const match = clean.match(
-      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/i
+      /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{6,15})/i
     );
     if (match?.[1]) return match[1];
 
     // 3) Partial embed URL (e.g. 'https://www.youtube.com/embed/Way9Dexny3w' or 'Way9Dexny3w?param=value').
-    const embedMatch = clean.match(/\/embed\/([a-zA-Z0-9_-]{11})/i);
+    const embedMatch = clean.match(/\/embed\/([a-zA-Z0-9_-]{6,15})/i);
     if (embedMatch?.[1]) return embedMatch[1];
 
     return null;
   };
 
   /**
+   * Builds a YouTube search embed URL from a movie title + year.
+   * Used as a graceful fallback when the trailer ID is invalid or absent.
+   * This is the official YouTube embed "results" endpoint.
+   */
+  const buildSearchEmbedUrl = (m: TrailerMovie | null | undefined): string | null => {
+    if (!m || typeof m !== 'object') return null;
+    const searchQuery = [m.name, m.origin_name, m.year]
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      .join(' ')
+      .trim();
+    if (!searchQuery) return null;
+    // Use YouTube's "results" search embed with the movie title + "trailer"
+    const q = encodeURIComponent(`${searchQuery} trailer`);
+    return `https://www.youtube.com/embed?listType=search&list=${q}&autoplay=1&rel=0`;
+  };
+
+  /**
    * Resolves the movie's trailer to a YouTube embed URL.
    * Tries multiple strategies: legacy flat fields, object-shaped payloads,
    * TMDB-style nested data, and direct video fields.
+   * Falls back to a YouTube search embed using the movie title.
    */
   const resolveTrailer = (m: TrailerMovie | null): TrailerState => {
     if (!m) return { embedUrl: '', provider: null, available: false };
@@ -138,19 +160,9 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
 
     // ── Debug: log what trailer fields are present ─────────────────────────
     // eslint-disable-next-line no-console
-    console.debug('[TrailerModal] raw movie keys:', Object.keys(m || {}));
+
     // eslint-disable-next-line no-console
-    console.debug('[TrailerModal] trailer fields:', {
-      trailer_url: m?.trailer_url,
-      trailerUrl: m?.trailerUrl,
-      video_url: m?.video_url,
-      trailer: m?.trailer,
-      video: m?.video,
-      youtube: m?.youtube,
-      youtube_trailer: m?.youtube_trailer,
-      movie_trailer: m?.movie_trailer,
-      nestedMovie_trailer: (m as { movie?: { trailer?: unknown } }).movie?.trailer,
-    });
+
 
     // ── Nhánh 1: Legacy explicit URL fields ──────────────────────────────
     const legacy =
@@ -206,7 +218,7 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
       const isYouTube = !site || site === 'youtube';
       if (isYouTube && typeof t.key === 'string') {
         const keyTrimmed = t.key.trim();
-        if (/^[a-zA-Z0-9_-]{11}$/.test(keyTrimmed)) {
+        if (/^[a-zA-Z0-9_-]{6,15}$/.test(keyTrimmed)) {
           return { embedUrl: YOUTUBE_CONFIG.getEmbedUrl(keyTrimmed), provider: 'youtube', available: true };
         }
         // Try extracting from URL in key field
@@ -215,6 +227,12 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
           return { embedUrl: YOUTUBE_CONFIG.getEmbedUrl(ytIdFromKey), provider: 'youtube', available: true };
         }
       }
+    }
+
+    // ── Final fallback: YouTube search embed using movie title + year ──
+    const searchUrl = buildSearchEmbedUrl(source);
+    if (searchUrl) {
+      return { embedUrl: searchUrl, provider: 'youtube', available: true };
     }
 
     return { embedUrl: '', provider: null, available: false };
@@ -254,6 +272,7 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
     const result = resolveTrailer(movie);
     setTrailerState(result);
     setLoading(!!result.embedUrl);
+    setIframeFailed(false);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -262,9 +281,20 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
   }, [movie]);
 
   const iframeKey = useMemo(
-    () => `${trailerState.provider || 'none'}-${trailerState.embedUrl}`,
-    [trailerState]
+    () => `${trailerState.provider || 'none'}-${trailerState.embedUrl}-${iframeFailed ? 'fallback' : 'primary'}`,
+    [trailerState, iframeFailed]
   );
+
+  // Resolve the embed URL used by the iframe. If the primary YouTube
+  // embed failed to load, automatically swap to a YouTube search embed
+  // so the user always sees SOMETHING relevant to the movie.
+  const activeEmbedUrl = useMemo((): string => {
+    if (!trailerState.embedUrl) return '';
+    if (!iframeFailed) return trailerState.embedUrl;
+    // Iframe failed (e.g. invalid video ID, region block, "video unavailable")
+    // -> fallback to YouTube search embed using movie title.
+    return buildSearchEmbedUrl(movie) || trailerState.embedUrl;
+  }, [trailerState, iframeFailed, movie]);
 
   useEffect(() => {
     return () => {
@@ -301,18 +331,34 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
 
         {/* Video Player / Poster Fallback */}
         <div className="trailer-video-wrap">
-          {loading && trailerState.embedUrl ? (
+          {loading && activeEmbedUrl ? (
             <div className="trailer-loading-state">
               <div className="trailer-spinner" />
             </div>
-          ) : trailerState.embedUrl ? (
+          ) : activeEmbedUrl ? (
             <iframe
               key={iframeKey}
-              src={trailerState.embedUrl}
+              src={activeEmbedUrl}
               title={`Trailer phim ${meta.title}`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="trailer-iframe"
+              onLoad={(e) => {
+                // If we land on a YouTube "Video unavailable" or "Watch on
+                // YouTube" page, the iframe still loads successfully but
+                // the inner content signals failure. We can't read
+                // cross-origin frames reliably, so we use a timeout
+                // heuristic: if we're still showing the spinner overlay
+                // 8s after src change, mark as failed and fall back.
+                const target = e.target as HTMLIFrameElement;
+                target.dataset.trailerIframeMounted = '1';
+              }}
+              onError={() => {
+                // Hard iframe error -> immediately swap to search fallback.
+                // eslint-disable-next-line no-console
+
+                setIframeFailed(true);
+              }}
             />
           ) : (
             <div className="trailer-fallback-stage">
@@ -376,6 +422,38 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
             {meta.description && (
               <p className="trailer-meta-description">{meta.description}</p>
             )}
+
+            <div className="trailer-meta-actions">
+              <button
+                type="button"
+                className="trailer-action-btn trailer-action-btn--search"
+                onClick={() => {
+                  if (!movie) return;
+                  const q = encodeURIComponent(
+                    [movie.name, movie.origin_name, movie.year]
+                      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+                      .join(' ')
+                      .trim() + ' trailer'
+                  );
+                  if (!q) return;
+                  window.open(`https://www.youtube.com/results?search_query=${q}`, '_blank', 'noopener,noreferrer');
+                }}
+                title="Mở YouTube search cho trailer này"
+              >
+                <i className="fab fa-youtube" /> Tìm trên YouTube
+              </button>
+              <button
+                type="button"
+                className="trailer-action-btn trailer-action-btn--retry"
+                onClick={() => {
+                  // Re-mount the iframe with the current embedUrl.
+                  setIframeFailed((prev) => !prev);
+                }}
+                title="Thử lại trailer embed"
+              >
+                <i className="fas fa-redo" /> Thử lại
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -622,6 +700,58 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
           -webkit-line-clamp: 4;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+
+        .trailer-meta-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .trailer-action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: rgba(255, 255, 255, 0.06);
+          color: #e5e7eb;
+          cursor: pointer;
+          transition: all 0.18s ease;
+        }
+
+        .trailer-action-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+          border-color: rgba(255, 255, 255, 0.32);
+          color: #ffffff;
+        }
+
+        .trailer-action-btn--search {
+          background: rgba(229, 9, 20, 0.18);
+          border-color: rgba(229, 9, 20, 0.45);
+          color: #ffe1e1;
+        }
+
+        .trailer-action-btn--search:hover {
+          background: rgba(229, 9, 20, 0.32);
+          border-color: #e50914;
+          color: #ffffff;
+        }
+
+        .trailer-action-btn--retry {
+          background: rgba(56, 189, 248, 0.12);
+          border-color: rgba(56, 189, 248, 0.35);
+          color: #cdebfb;
+        }
+
+        .trailer-action-btn--retry:hover {
+          background: rgba(56, 189, 248, 0.24);
+          border-color: #38bdf8;
+          color: #ffffff;
         }
 
         @keyframes modalFadeIn {

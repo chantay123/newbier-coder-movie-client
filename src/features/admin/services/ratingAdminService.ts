@@ -32,7 +32,7 @@ export const getMovieRatings = async (movieId: string): Promise<RatingStats> => 
     const response = await axiosInstance.get(`/admin/ratings/${movieId}`);
     return (response.data as { data: RatingStats }).data;
   } catch (error) {
-    console.error('Error fetching movie ratings:', error);
+
     throw error;
   }
 };
@@ -42,7 +42,7 @@ export const syncMovieRatings = async (movieId: string): Promise<unknown> => {
     const response = await axiosInstance.post('/admin/ratings/update-movie-ratings', { movieId });
     return (response.data as { data: unknown }).data;
   } catch (error) {
-    console.error('Error syncing movie ratings:', error);
+
     throw error;
   }
 };
@@ -52,7 +52,7 @@ export const syncAllMovieRatings = async (): Promise<unknown> => {
     const response = await axiosInstance.get('/admin/ratings/sync-all');
     return (response.data as { data: unknown }).data;
   } catch (error) {
-    console.error('Error syncing all movie ratings:', error);
+
     throw error;
   }
 };

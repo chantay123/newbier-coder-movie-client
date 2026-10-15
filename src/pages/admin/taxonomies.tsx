@@ -3,10 +3,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Head from 'next/head';
-import AdminRoute from '@/components/ProtectedRoute/AdminRoute';
-import AdminLayout from '@/components/Layout/AdminLayout';
-import BackToTop from '@/components/UI/BackToTop';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
+import AdminLayout from '@/layouts/AdminLayout';
+import BackToTop from '@/features/shared/components/UI/BackToTop';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 import {
   FaTags,
   FaGlobeAmericas,
@@ -25,8 +25,8 @@ import styles from '@/styles/AdminTaxonomies.module.css';
 import TaxonomyFormModal, { TaxonomyItem } from '@/components/Admin/Taxonomies/TaxonomyFormModal';
 import TaxonomyRecalculateModal from '@/components/Admin/Taxonomies/TaxonomyRecalculateModal';
 import TaxonomyDeleteModal from '@/components/Admin/Taxonomies/TaxonomyDeleteModal';
-import CinemaDropdown from '@/components/Admin/Common/CinemaDropdown';
-import AdminPagination from '@/components/Admin/Common/AdminPagination';
+import CinemaDropdown from '@/features/admin/components/Common/CinemaDropdown';
+import AdminPagination from '@/features/admin/components/Common/AdminPagination';
 import { ADMIN_TAXONOMIES_I18N } from '@/config/i18n/admin';
 import {
   INITIAL_CATEGORIES as MOCK_CATEGORIES,

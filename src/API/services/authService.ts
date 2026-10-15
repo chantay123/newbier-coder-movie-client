@@ -185,8 +185,6 @@ const authService = {
 
     const loginEndpoint = AUTH_CONFIG?.api?.endpoint || `${API_URL}/auth/login`;
 
-    console.debug('[authService] POST', loginEndpoint, { body: { username: payload.username, hasPassword: !!payload.password } });
-
     const response = await fetch(loginEndpoint, {
       method: 'POST',
       headers: {
@@ -203,14 +201,14 @@ const authService = {
       responseText = await response.text();
       if (responseText) {
         data = JSON.parse(responseText);
-        console.debug('[authService] Response status:', response.status, '| Body:', JSON.stringify(data));
+
       }
     } catch {
       // silent parse handling
     }
 
     if (!response.ok) {
-      console.debug('[authService] HTTP error', response.status, responseText.slice(0, 200));
+
     }
 
     // Diagnostic helper: deep-search for an access token anywhere in the
@@ -350,7 +348,7 @@ const authService = {
       // whitelist to decide which messages are "invalid credentials"
       // specifically. Anything else is passed through verbatim so that
       // server errors (5xx) are not mis-reported as a user typo.
-      console.debug('[authService] Non-success responseStatus:', data.responseStatus);
+
       const isInvalidCreds =
         code === AUTH_CONFIG.api.invalidCredentialsCode ||
         response.status === 401 ||
@@ -399,7 +397,7 @@ const authService = {
     }
 
     // Case 4: 200 but token not found anywhere — unexpected server response.
-    console.warn('[authService] Token not found in response. Status:', response.status, '| Keys:', data ? Object.keys(data) : 'null');
+
     throw new Error('Không nhận được token từ máy chủ.');
   },
 
@@ -421,7 +419,7 @@ const authService = {
         errorMessage = errorData.error || errorData.message || errorMessage;
       } else {
         const textData = await response.text();
-        console.error('Received non-JSON response:', textData);
+
         if (textData.includes('<!DOCTYPE')) {
           errorMessage = 'Lỗi kết nối máy chủ. Vui lòng kiểm tra lại API URL.';
         }
@@ -432,7 +430,7 @@ const authService = {
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const textData = await response.text();
-      console.error('Received non-JSON response:', textData);
+
       throw new Error('Server trả về định dạng không phải JSON. Vui lòng kiểm tra log và cấu hình API.');
     }
 
@@ -479,7 +477,7 @@ const authService = {
             keepalive: true
           });
         } catch (networkError) {
-          console.warn('Logout API call failed (continuing with local cleanup):', (networkError as Error)?.message);
+
         }
       }
     } finally {
@@ -619,7 +617,7 @@ const authService = {
               token = user.backendToken;
             }
           } catch (e) {
-            console.error('Error parsing user from localStorage:', e);
+
           }
         }
       }
@@ -643,7 +641,7 @@ const authService = {
               if (err?.code === 'REFRESH_REJECTED') {
                 throw new Error('Session expired. Please log in again.');
               }
-              console.warn('Proactive token refresh failed; using existing token:', err?.message);
+
             }
           }
         }
@@ -651,7 +649,7 @@ const authService = {
 
       return token ? { 'Authorization': `Bearer ${token}` } : {};
     } catch (error) {
-      console.error('Error getting auth header:', error);
+
       throw error;
     }
   },
@@ -682,13 +680,12 @@ const authService = {
           : null) || localStorage.getItem(STORAGE_KEYS.user);
       return userJson ? (JSON.parse(userJson) as UserPayload) : null;
     } catch (e) {
-      console.error('Error parsing user from localStorage:', e);
+
       return null;
     }
   },
 
   updateProfile: async (profileData: ProfileData): Promise<{ success: boolean; message: string; user: UserPayload }> => {
-    console.group('===== Profile Update =====');
 
     const headers = await authService.getAuthHeader();
 
@@ -718,13 +715,12 @@ const authService = {
       if (contentType && contentType.includes('application/json')) {
         const errorData = await response.json();
         errorMessage = errorData.error || errorData.message || errorMessage;
-        console.error('Error response:', errorData);
+
       } else {
         const textData = await response.text();
-        console.error('Received non-JSON error response:', textData);
+
       }
 
-      console.groupEnd();
       throw new Error(errorMessage);
     }
 
@@ -746,7 +742,6 @@ const authService = {
     };
 
     localStorage.setItem('user', JSON.stringify(updatedUser));
-    console.groupEnd();
 
     return {
       success: true,
@@ -774,10 +769,10 @@ const authService = {
       if (contentType && contentType.includes('application/json')) {
         const errorData = await response.json();
         errorMessage = errorData.error || errorData.message || errorMessage;
-        console.error('Error response:', errorData);
+
       } else {
         const textData = await response.text();
-        console.error('Received non-JSON error response:', textData);
+
       }
       throw new Error(errorMessage);
     }
@@ -816,7 +811,6 @@ const authService = {
   },
 
   changePassword: async (passwordData: PasswordData): Promise<{ success: boolean; message: string }> => {
-    console.group('===== Change Password =====');
 
     const headers = await authService.getAuthHeader();
 
@@ -843,17 +837,16 @@ const authService = {
       if (contentType && contentType.includes('application/json')) {
         const errorData = await response.json();
         errorMessage = errorData.error || errorData.message || errorMessage;
-        console.error('Error response:', errorData);
+
       } else {
         const textData = await response.text();
-        console.error('Received non-JSON error response:', textData);
+
       }
-      console.groupEnd();
+
       throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    console.groupEnd();
 
     return {
       success: true,
@@ -971,7 +964,7 @@ const authService = {
         favoriteGenres: []
       };
     } catch (error) {
-      console.error('Error fetching user watch stats:', error);
+
       return {
         totalWatchedMovies: 0,
         totalWatchedSeries: 0,
@@ -994,7 +987,7 @@ const authService = {
       const data = await response.json();
       return (data.data as number[]) || [0, 0, 0, 0, 0, 0, 0];
     } catch (error) {
-      console.error('Error fetching user weekly activity:', error);
+
       return [0, 0, 0, 0, 0, 0, 0];
     }
   },
@@ -1012,7 +1005,7 @@ const authService = {
       const data = await response.json();
       return (data.data as unknown[]) || [];
     } catch (error) {
-      console.error('Error fetching user genre distribution:', error);
+
       return [];
     }
   },
@@ -1044,7 +1037,7 @@ const authService = {
       const data = await response.json();
       return (data.data as { achievements: unknown[]; stats: Record<string, unknown> }) || emptyResponse;
     } catch (error) {
-      console.error('Error fetching user achievements:', error);
+
       return emptyResponse;
     }
   },

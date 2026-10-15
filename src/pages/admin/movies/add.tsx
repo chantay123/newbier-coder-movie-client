@@ -675,14 +675,14 @@ const AddMoviePage = () => {
           return;
         }
       } catch (apiErr) {
-        console.warn('API call encountered error, saving simulation:', apiErr);
+
       }
 
       showCinemaAlert('Đã lưu phim thành công (Chế độ xem trước)!', 'success');
       setTimeout(() => router.push('/admin/movies'), 1500);
 
     } catch (err) {
-      console.error('Error creating movie:', err);
+
       showCinemaAlert('Có lỗi xảy ra khi tạo phim!', 'error');
     } finally {
       setLoading(false);

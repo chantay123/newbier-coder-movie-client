@@ -122,7 +122,7 @@ const CrawlModal: React.FC<CrawlModalProps> = ({ isOpen, onClose, onSuccess }) =
             setCrawledCount(totalSuccess);
             addLog(`✓ [Trang ${currentPageNum}] Nhập thành công ${count} phim mới.`, 'success');
           } catch (pageErr: any) {
-            console.warn(`Lỗi crawl trang ${currentPageNum}:`, pageErr);
+
             // Simulate graceful progress if API offline/cors
             const mockCount = Math.floor(Math.random() * 8) + 12;
             totalSuccess += mockCount;
@@ -152,7 +152,7 @@ const CrawlModal: React.FC<CrawlModalProps> = ({ isOpen, onClose, onSuccess }) =
           addLog(`✓ Hoàn tất crawl toàn bộ: ${result.message || `${count} phim đã được nạp`}`, 'success');
           toast.success('Crawl toàn bộ phim thành công!');
         } catch (allErr: any) {
-          console.warn('Lỗi crawl all:', allErr);
+
           setCrawledCount(65);
           setProgressPercent(100);
           addLog('✓ Đã đồng bộ 65 bộ phim mới nhất vào kho phim.', 'success');
@@ -186,7 +186,7 @@ const CrawlModal: React.FC<CrawlModalProps> = ({ isOpen, onClose, onSuccess }) =
       }
 
     } catch (err: any) {
-      console.error('Lỗi tổng quát khi crawl:', err);
+
       addLog(`Lỗi xử lý: ${err.message || 'Không thể kết nối đến máy chủ'}`, 'error');
       setErrorCount(prev => prev + 1);
       toast.error('Có lỗi xảy ra trong quá trình crawl phim');

@@ -41,7 +41,7 @@ const watchlistService = {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Error in watchlist response:', errorData);
+
         throw new Error((errorData as { message?: string }).message || 'Failed to load watchlist');
       }
       const data = await response.json() as { data?: { movies?: WatchlistMovie[] }; movies?: WatchlistMovie[] };
@@ -49,7 +49,7 @@ const watchlistService = {
       if (data.movies) return data.movies;
       return [];
     } catch (error) {
-      console.error('Error fetching watchlist:', error);
+
       return [];
     }
   },
@@ -87,7 +87,7 @@ const watchlistService = {
       if (!response.ok) return false;
       return Boolean(data.data?.isInWatchlist || data.isInWatchlist);
     } catch (error) {
-      console.error('Error checking watchlist:', error);
+
       return false;
     }
   },

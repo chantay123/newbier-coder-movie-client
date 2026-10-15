@@ -129,7 +129,7 @@ export default function AdminSearchPage(): ReactElement | null {
       }
       setInitialLoad(false);
     } catch (err) {
-      console.error('Lỗi khi tìm kiếm phim:', err);
+
       setError(`Lỗi khi tìm kiếm phim: ${(err as Error).message}`);
       setMovies([]);
       setInitialLoad(false);
@@ -316,7 +316,7 @@ export default function AdminSearchPage(): ReactElement | null {
         await Swal.fire({ title: 'Đã xóa!', text: `Đã xóa ${selectedMovies.length} phim thành công`, icon: 'success', confirmButtonColor: '#28a745' });
         fetchMovies(query, page);
       } catch (err) {
-        console.error('Lỗi khi xóa phim:', err);
+
         await Swal.fire({ title: 'Lỗi', text: 'Đã xảy ra lỗi khi xóa phim', icon: 'error', confirmButtonColor: '#dc3545' });
       }
     }

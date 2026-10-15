@@ -3,9 +3,9 @@ import {
   FaEye, FaGlobe, FaLock, FaCopy, FaCheck,
   FaExternalLinkAlt, FaCalendarAlt
 } from 'react-icons/fa';
-import MovieCardVertical from '@/components/common/MovieCard/MovieCardVertical';
+import MovieCardVertical from '@/features/shared/components/MovieCard/MovieCardVertical';
 import TrailerModal from '@/features/client/components/detail/components/TrailerModal';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 import styles from '@/styles/AdminAddMovie.module.css';
 
 const MovieCardVerticalAny = MovieCardVertical as any;
@@ -155,7 +155,7 @@ export const MovieWebSimulation: React.FC<MovieWebSimulationProps> = ({
       try {
         sessionStorage.setItem('admin_movie_preview_draft', JSON.stringify(draftPayload));
       } catch (err) {
-        console.error('SessionStorage setItem failed', err);
+
       }
     }
 

@@ -11,6 +11,88 @@ import {
   resolveCategoryTaxonomy
 } from '@/config/taxonomyConfig';
 
+// Lazy import authService để tránh circular dependency giữa auth và movie.
+const getAuthService = async (): Promise<{
+  refreshToken: () => Promise<string>;
+  logout: () => Promise<void>;
+} | null> => {
+  try {
+    const mod = await import('./authService');
+    return (mod.default || mod) as { refreshToken: () => Promise<string>; logout: () => Promise<void> };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Decode JWT exp (chỉ đọc payload, KHÔNG verify signature).
+ * Trả về timestamp (ms) khi token hết hạn, hoặc null nếu không parse được.
+ */
+const readJwtExp = (token: string | null): number | null => {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64);
+    const payload = JSON.parse(json) as { exp?: number };
+    return payload?.exp ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Đảm bảo token còn hạn trước khi gửi request.
+ * - Token còn > 60s: trả về ngay
+ * - Token sắp hết hạn (≤ 60s): gọi refresh TRƯỚC
+ * - Single-flight: nếu nhiều request cùng lúc, chỉ refresh 1 lần
+ * - Refresh fail: trả token cũ (để request fail tự nhiên với 401)
+ */
+let _tokenRefreshInFlight: Promise<string | null> | null = null;
+
+const ensureFreshToken = async (): Promise<string | null> => {
+  if (typeof window === 'undefined') return null;
+
+  const token =
+    localStorage.getItem('auth_token')
+    || localStorage.getItem('token')
+    || (window.sessionStorage && window.sessionStorage.getItem('auth_token'))
+    || (window.sessionStorage && window.sessionStorage.getItem('token'))
+    || null;
+
+  if (!token) return null;
+
+  const exp = readJwtExp(token);
+  if (!exp) return token;
+
+  const msUntilExpiry = exp - Date.now();
+  if (msUntilExpiry > 60_000) return token;
+
+  if (_tokenRefreshInFlight) return _tokenRefreshInFlight;
+
+  const refreshPromise = (async (): Promise<string | null> => {
+    const auth = await getAuthService();
+    if (!auth) return token;
+    try {
+      return await auth.refreshToken();
+    } catch (refreshErr) {
+      const err = refreshErr as { code?: string; message?: string };
+      if (SYSTEM_CONFIG.debugMovies) {
+        // eslint-disable-next-line no-console
+
+      }
+      return token;
+    }
+  })();
+
+  _tokenRefreshInFlight = refreshPromise.finally(() => {
+    _tokenRefreshInFlight = null;
+  });
+
+  return _tokenRefreshInFlight;
+};
+
 /** Movie entity thô từ backend */
 export interface RawMovie {
   [key: string]: unknown;
@@ -49,17 +131,39 @@ export const extractMovieList = (json: unknown): RawMovie[] => {
   if (!json) return [];
   if (Array.isArray(json)) return json as RawMovie[];
 
-  const env = json as EnvelopeResponse<unknown>;
+  const env = json as Record<string, unknown>;
 
-  if (Array.isArray(env.responseData)) return env.responseData as RawMovie[];
-  if (Array.isArray((env.responseData as { data?: unknown[] } | undefined)?.data)) {
-    return (env.responseData as { data: unknown[] }).data as RawMovie[];
+  const tryArray = (v: unknown): RawMovie[] | null =>
+    Array.isArray(v) ? (v as RawMovie[]) : null;
+
+  // 1. Direct envelope arrays
+  let found = tryArray(env.responseData)
+    || tryArray((env.responseData as { data?: unknown[] } | undefined)?.data)
+    || tryArray((env.responseData as { items?: unknown[] } | undefined)?.items)
+    || tryArray((env.responseData as { movies?: unknown[] } | undefined)?.movies)
+    || tryArray((env.responseData as { results?: unknown[] } | undefined)?.results)
+    || tryArray((env.data as { data?: unknown[] } | undefined)?.data)
+    || tryArray((env.data as { items?: unknown[] } | undefined)?.items)
+    || tryArray((env.data as { movies?: unknown[] } | undefined)?.movies)
+    || tryArray((env.data as { results?: unknown[] } | undefined)?.results)
+    || tryArray(env.data)
+    || tryArray(env.movies)
+    || tryArray(env.items)
+    || tryArray(env.results);
+  if (found) return found;
+
+  // 2. Sometimes the API returns the array directly nested one level deep
+  //    under responseData (e.g. { responseData: { items: [...] } })
+  for (const key of Object.keys(env)) {
+    const v = (env as Record<string, unknown>)[key];
+    if (v && typeof v === 'object') {
+      const arr = tryArray((v as { data?: unknown[] }).data)
+        || tryArray((v as { items?: unknown[] }).items)
+        || tryArray((v as { movies?: unknown[] }).movies)
+        || tryArray((v as { results?: unknown[] }).results);
+      if (arr) return arr;
+    }
   }
-  if (Array.isArray((env.data as { movies?: unknown[] } | undefined)?.movies)) {
-    return (env.data as { movies: unknown[] }).movies as RawMovie[];
-  }
-  if (Array.isArray(env.data)) return env.data as RawMovie[];
-  if (Array.isArray(env.movies)) return env.movies as RawMovie[];
   return [];
 };
 
@@ -91,10 +195,12 @@ export async function safeFetchJson<T = unknown>(
     const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => controller.abort(), timeoutMs);
     const signal = options.signal || controller.signal;
 
-    // Đọc token một lần. Multi-storage lookup sẽ lãng phí và có thể chặn UI.
-    const token = (typeof window !== 'undefined')
-      ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
-      : null;
+    // Đảm bảo token còn hạn trước khi gửi (proactive refresh).
+    // - Đọc từ localStorage + sessionStorage (authService.login lưu vào
+    //   sessionStorage khi user KHÔNG tick Remember me).
+    // - Nếu token sắp hết hạn (≤ 60s) → gọi /auth/refresh-token TRƯỚC.
+    // - Nếu refresh fail → trả token cũ, request sẽ fail tự nhiên với 401.
+    const token = await ensureFreshToken();
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -112,10 +218,11 @@ export async function safeFetchJson<T = unknown>(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // Controlled diagnostic
-      if (SYSTEM_CONFIG.debugMovies && endpoint.includes('/movies')) {
+      // Controlled diagnostic - log an toàn (endpoint, status, message),
+      // TUYỆT ĐỐI không log token/cookie/header Authorization.
+      if (SYSTEM_CONFIG.debugMovies) {
         // eslint-disable-next-line no-console
-        console.log('[debug-movies] NON-OK', url, 'status', response.status);
+
       }
       return fallback;
     }
@@ -124,35 +231,14 @@ export async function safeFetchJson<T = unknown>(
 
     if (SYSTEM_CONFIG.debugMovies && /\/movies(\?|$|\/)/.test(endpoint)) {
       // eslint-disable-next-line no-console
-      console.log('[debug-movies] RESPONSE', {
-        endpoint,
-        url,
-        topLevelKeys: json && typeof json === 'object' ? Object.keys(json) : null,
-        envelopeResponseData: json?.responseData
-          ? {
-              type: Array.isArray(json.responseData) ? 'array' : typeof json.responseData,
-              keys: Array.isArray(json.responseData) ? null : Object.keys(json.responseData)
-            }
-          : null,
-        count: Array.isArray(json?.responseData)
-          ? json.responseData.length
-          : (Array.isArray((json?.responseData as { data?: unknown[] } | undefined)?.data)
-              ? ((json.responseData as { data: unknown[] }).data).length
-              : null),
-        firstMovie: ((json?.responseData as unknown[] | undefined)?.[0]
-          ?? (json?.responseData as { data?: unknown[] } | undefined)?.data?.[0]
-          ?? (json?.data as unknown[] | undefined)?.[0]
-          ?? (json?.movies as unknown[] | undefined)?.[0]
-          ?? (Array.isArray(json) ? (json as unknown[])[0] : null)
-          ?? null) as RawMovie | null
-      });
+
     }
 
     return json as unknown as T;
   } catch (err) {
     if (SYSTEM_CONFIG.debugMovies && endpoint.includes('/movies')) {
       // eslint-disable-next-line no-console
-      console.log('[debug-movies] FETCH ERROR', url, (err as Error)?.message || err);
+
     }
     return fallback;
   }
@@ -262,8 +348,10 @@ const movieService = {
   /**
    * Lấy phim theo slug thể loại với fallback đa tầng:
    * 1. Query slug backend đã đăng ký từ taxonomyConfig
-   * 2. Search keyword fallback
-   * 3. Legacy endpoint: `/movies/category/${slug}`
+   * 2. Search keyword fallback từ taxonomyConfig
+   * 3. (REMOVED) Legacy endpoint `/movies/category/${slug}` - backend trả 404
+   *    cho route này, gây log lỗi không cần thiết. Nếu cả Tier 1 và Tier 2
+   *    không trả về phim, trả [] thay vì gọi thêm endpoint không tồn tại.
    */
   getMoviesByCategory: async (categorySlug: string, limit = 20, signal?: AbortSignal): Promise<RawMovie[]> => {
     if (!categorySlug) return [];
@@ -292,8 +380,9 @@ const movieService = {
       if (Array.isArray(searchList) && searchList.length > 0) return searchList;
     }
 
-    // Tier 3: Legacy endpoint fallback
-    return safeFetchMovieList(`/movies/category/${categorySlug}`, limit, { signal });
+    // Không fallback sang /movies/category/${slug} nữa - endpoint đó 404
+    // trên backend. Trả về mảng rỗng cho an toàn.
+    return [];
   },
 
   /** Lấy chi tiết phim theo slug */

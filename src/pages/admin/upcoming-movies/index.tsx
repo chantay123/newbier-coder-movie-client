@@ -44,7 +44,7 @@ const UpcomingMoviesPage: React.FC = () => {
         setError('Không có dữ liệu phim sắp ra mắt');
       }
     } catch (err: any) {
-      console.error('Error fetching upcoming movies:', err);
+
       setError('Lỗi khi tải dữ liệu phim sắp ra mắt');
     } finally {
       setLoading(false);
@@ -79,7 +79,7 @@ const UpcomingMoviesPage: React.FC = () => {
       alert('Xoá phim sắp ra mắt thành công!');
       setRefreshData(!refreshData);
     } catch (err) {
-      console.error('Error deleting upcoming movie:', err);
+
       alert('Lỗi khi xóa phim sắp ra mắt');
     }
   };
@@ -103,7 +103,7 @@ const UpcomingMoviesPage: React.FC = () => {
         setRefreshData(!refreshData);
       }
     } catch (err) {
-      console.error('Error releasing movie:', err);
+
       alert('Lỗi khi chuyển trạng thái phim');
     }
   };

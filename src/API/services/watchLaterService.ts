@@ -105,7 +105,7 @@ const watchLaterService = {
   getWatchLaterList: async (): Promise<WatchLaterMovie[]> => {
     const token = getAuthToken();
     if (!token) {
-      console.error('[SERVICE] No auth token. Cannot call watch-later list API.');
+
       return [];
     }
     try {
@@ -119,7 +119,7 @@ const watchLaterService = {
       }
       return [];
     } catch (error) {
-      console.error('[SERVICE] Failed to fetch watch-later list:', error);
+
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
         const res = await fetch(`${apiUrl}/watchlater`, {
@@ -138,7 +138,7 @@ const watchLaterService = {
         }
         return [];
       } catch (fetchError) {
-        console.error('[SERVICE] Both methods failed:', fetchError);
+
         return [];
       }
     }
@@ -194,7 +194,7 @@ const watchLaterService = {
       }
       return false;
     } catch (error) {
-      console.error('Check watch-later status failed:', error);
+
       return false;
     }
   },
@@ -202,7 +202,7 @@ const watchLaterService = {
   getWatchLaterListDirect: async (): Promise<WatchLaterMovie[]> => {
     const token = getAuthToken();
     if (!token) {
-      console.error('No auth token. Cannot call watch-later list API.');
+
       return [];
     }
     try {
@@ -221,7 +221,7 @@ const watchLaterService = {
       if (data.success) return (data.data || []).map(mapMovie) as unknown as WatchLaterMovie[];
       return [];
     } catch (error) {
-      console.error('Direct watch-later fetch failed:', error);
+
       return [];
     }
   }

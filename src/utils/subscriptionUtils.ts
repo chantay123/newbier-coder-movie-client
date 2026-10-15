@@ -15,7 +15,7 @@ export const checkPaymentSent = async (userId: string): Promise<boolean> => {
     const data = await response.json() as { hasPending?: boolean };
     return data.hasPending ?? false;
   } catch (error) {
-    console.error('Không thể kiểm tra trạng thái đăng ký:', error);
+
     return false;
   }
 };
@@ -69,7 +69,7 @@ interface SubscriptionItem {
 /** Kiểm tra package có phải subscription đang active không */
 export const isCurrentSubscribedPackage = (pkg: PackageItem, subscription: SubscriptionItem): boolean => {
   if (!pkg || pkg._id === undefined || pkg._id === null) {
-    console.error('[isCurrentSubscribedPackage] pkg không hợp lệ hoặc thiếu _id', pkg);
+
     return false;
   }
   if (!subscription || !subscription.hasActiveSubscription || !subscription.subscription) {
@@ -96,7 +96,7 @@ export const isCurrentSubscribedPackage = (pkg: PackageItem, subscription: Subsc
 /** Kiểm tra package có đang chờ duyệt không */
 export const isPendingSubscribedPackage = (pkg: PackageItem, pendingSubscription: SubscriptionItem): boolean => {
   if (!pkg || pkg._id === undefined || pkg._id === null) {
-    console.error('[isPendingSubscribedPackage] pkg không hợp lệ hoặc thiếu _id', pkg);
+
     return false;
   }
   if (!pendingSubscription || !pendingSubscription.hasPendingSubscription || !pendingSubscription.pendingSubscription) {

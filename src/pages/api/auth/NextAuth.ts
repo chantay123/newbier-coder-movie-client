@@ -64,7 +64,7 @@ const authOptions: NextAuthOptions = {
           }
           return false;
         } catch (err) {
-          console.error('Error with Google login backend:', err);
+
           return false;
         }
       }
@@ -88,7 +88,7 @@ const authOptions: NextAuthOptions = {
           }
           return false;
         } catch (err) {
-          console.error('Error with Facebook login backend:', err);
+
           return false;
         }
       }

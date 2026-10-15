@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  FaBars,  
-  FaCog, 
-  FaUser, 
-  FaSignOutAlt 
+import {
+  FaBars,
+  FaCog,
+  FaUser,
+  FaSignOutAlt
 } from 'react-icons/fa';
 import styles from '@/styles/AdminHeader.module.css';
 import { useRouter } from 'next/router';
@@ -68,24 +68,24 @@ const AdminHeader = () => {
     const handleOutsideClick = (event: MouseEvent) => {
       // Close user dropdown if clicked outside
       if (
-        showDropdown && 
-        userDropdownRef.current && 
+        showDropdown &&
+        userDropdownRef.current &&
         !userDropdownRef.current.contains(event.target as Node)
       ) {
         setShowDropdown(false);
       }
-      
+
       // Close notification dropdown if clicked outside
       if (
-        showNotifications && 
-        notificationBtnRef.current && 
+        showNotifications &&
+        notificationBtnRef.current &&
         !notificationBtnRef.current.contains(event.target as Node) &&
         !(event.target as Element).closest(`.${styles.notificationDropdown}`)
       ) {
         setShowNotifications(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleOutsideClick);
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
@@ -108,7 +108,7 @@ const AdminHeader = () => {
         // 401 is handled inside the interceptor (refresh-then-retry,
         // or full logout). Skip the user-facing log to avoid noise.
         // eslint-disable-next-line no-console
-        console.warn('[AdminHeader] Could not refresh unread count');
+
       }
     }
   };
@@ -123,7 +123,7 @@ const AdminHeader = () => {
         router.push('/auth/login');
       }
     } catch (error) {
-      console.error('Logout failed:', error);
+
     }
   };
 
@@ -153,7 +153,7 @@ const AdminHeader = () => {
     <header className={styles.header}>
       <div className={styles.headerInner}>
         <div className={styles.headerLeft}>
-          <button 
+          <button
             className={styles.menuToggle}
             onClick={toggleSidebar}
             aria-label="Toggle Sidebar"
@@ -165,9 +165,8 @@ const AdminHeader = () => {
 
         <div className={styles.headerRight}>
 
-
           <div className={styles.userDropdown} ref={userDropdownRef}>
-            <button 
+            <button
               className={styles.userButton}
               onClick={toggleUserDropdown}
               aria-expanded={showDropdown}
@@ -205,21 +204,21 @@ const AdminHeader = () => {
             </button>
 
             {showDropdown && (
-              <div 
+              <div
                 className={styles.dropdownMenu}
                 role="menu"
                 aria-orientation="vertical"
               >
-                <Link 
-                  href="/admin/profile" 
+                <Link
+                  href="/admin/profile"
                   className={styles.dropdownItem}
                   role="menuitem"
                 >
                   <FaUser />
                   <span>Profile</span>
                 </Link>
-                <Link 
-                  href="/admin/settings" 
+                <Link
+                  href="/admin/settings"
                   className={styles.dropdownItem}
                   role="menuitem"
                 >
@@ -227,7 +226,7 @@ const AdminHeader = () => {
                   <span>Settings</span>
                 </Link>
                 <div className={styles.dropdownDivider} role="separator" />
-                <button 
+                <button
                   className={styles.dropdownItem}
                   onClick={handleLogout}
                   role="menuitem"

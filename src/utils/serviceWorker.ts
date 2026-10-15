@@ -23,7 +23,7 @@ export function registerServiceWorker(): void {
         }
       })
       .catch((err) => {
-        console.error('Service Worker registration failed:', err);
+
       });
 
     setInterval(() => {

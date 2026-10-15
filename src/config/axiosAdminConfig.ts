@@ -13,8 +13,27 @@ const axiosInstance = axios.create({
   withCredentials: true
 });
 
+/**
+ * Read the access token from EVERY storage location the auth flow can use.
+ * authService.login() persists the token to:
+ *  - localStorage (when rememberMe = true)
+ *  - sessionStorage (when rememberMe = false)
+ * If we only read localStorage, session-only logins would silently send
+ * no Authorization header and the backend would 401 every request.
+ */
+const readAccessTokenFromAnyStorage = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return (
+    localStorage.getItem('auth_token')
+    || localStorage.getItem('token')
+    || (window.sessionStorage ? window.sessionStorage.getItem('auth_token') : null)
+    || (window.sessionStorage ? window.sessionStorage.getItem('token') : null)
+    || null
+  );
+};
+
 axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+  const token = readAccessTokenFromAnyStorage();
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -27,7 +46,7 @@ axiosInstance.interceptors.request.use((config) => {
 
   return config;
 }, (error) => {
-  console.error('[Admin API Request Error]', error);
+
   return Promise.reject(error);
 });
 
@@ -36,18 +55,21 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Log 401 an toàn - KHÔNG log token/cookie. Chỉ log endpoint + status.
     if (error.response && error.response.status === 401) {
-      console.error('[Admin API] Unauthorized access. Redirecting to login...');
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('token');
+      const url = error.config?.url || '<unknown>';
+      const method = (error.config?.method || 'get').toUpperCase();
+      // eslint-disable-next-line no-console
 
-        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-      }
+      // Theo yêu cầu #9: KHÔNG tự động xóa token/redirect login khi lỗi
+      // có thể do endpoint public, lỗi mạng, hoặc token hết hạn cần refresh.
+      // Để AuthContext (useAuth) quyết định khi nào cần logout dựa trên
+      // trạng thái session tổng thể.
     }
 
     if (error.response && error.response.status === 403) {
-      console.error('[Admin API] Forbidden access.');
+      // eslint-disable-next-line no-console
+
     }
 
     return Promise.reject(error);

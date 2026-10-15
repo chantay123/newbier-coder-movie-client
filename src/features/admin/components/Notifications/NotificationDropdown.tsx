@@ -41,7 +41,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
       setError(null);
     } catch (err) {
       setError('Failed to load notifications');
-      console.error('Error fetching notifications:', err);
+
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
         )
       );
     } catch (err) {
-      console.error('Error marking notification as read:', err);
+
     }
   };
 
@@ -67,7 +67,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
         prevNotifications.filter(notification => notification._id !== id)
       );
     } catch (err) {
-      console.error('Error deleting notification:', err);
+
     }
   };
 
@@ -119,7 +119,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
         prevNotifications.map(notification => ({ ...notification, isRead: true }))
       );
     } catch (err) {
-      console.error('Error marking all notifications as read:', err);
+
     }
   };
 

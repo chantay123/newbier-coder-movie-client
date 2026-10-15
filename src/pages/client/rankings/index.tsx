@@ -68,7 +68,7 @@ export default function RankingsPage() {
       })) as RankedMovie[];
       setMovies(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Failed to load rankings:', err);
+
       setMovies([]);
     } finally {
       setLoading(false);

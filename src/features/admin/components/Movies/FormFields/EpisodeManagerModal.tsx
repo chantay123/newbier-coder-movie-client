@@ -30,7 +30,7 @@ import {
   FaSquare
 } from 'react-icons/fa';
 import styles from '@/styles/EpisodeManager.module.css';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 export type EpisodeStatus = 'ACTIVE' | 'PROCESSING' | 'ERROR' | 'DISABLED';
 

@@ -97,7 +97,7 @@ const PendingSubscriptionsPage: React.FC = () => {
         setPagination(response.pagination || { page: 1, pages: 1, total: 0 });
       }
     } catch (err) {
-      console.error('Error fetching pending subscriptions:', err);
+
       toast.error('Không thể tải danh sách đăng ký chờ duyệt. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
@@ -153,7 +153,7 @@ const PendingSubscriptionsPage: React.FC = () => {
       setSelectedSubscription(null);
       setRejectionReason('');
     } catch (err) {
-      console.error(`Error ${modalAction}:`, err);
+
       toast.error(
         `Không thể ${modalAction === 'approve' ? 'phê duyệt' : 'từ chối'} đăng ký. Vui lòng thử lại sau.`
       );
@@ -174,7 +174,7 @@ const PendingSubscriptionsPage: React.FC = () => {
         setPagination(response.pagination || { page: 1, pages: 1, total: 0 });
       }
     } catch (err) {
-      console.error('Error fetching pending subscriptions:', err);
+
       toast.error('Không thể tải danh sách đăng ký chờ duyệt. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);

@@ -65,7 +65,7 @@ const UserRatingDetails: React.FC<UserRatingDetailsProps> = ({ movieSlug }) => {
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        console.error('Error fetching user ratings:', err);
+
         setError(message);
       } finally {
         setLoading(false);

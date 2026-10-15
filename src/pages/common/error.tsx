@@ -11,10 +11,10 @@ interface ErrorPageProps {
   message?: string;
 }
 
-export default function ErrorPage({ 
-  statusCode = 500, 
-  title = 'Lỗi Server', 
-  message = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau.' 
+export default function ErrorPage({
+  statusCode = 500,
+  title = 'Lỗi Server',
+  message = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau.'
 }: ErrorPageProps) {
   return (
     <>

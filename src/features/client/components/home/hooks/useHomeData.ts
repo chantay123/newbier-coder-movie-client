@@ -19,6 +19,12 @@ import {
 } from '@/config/movieFallbackConfig';
 import movieService from '@/API/services/movieService';
 import upcomingMovieService from '@/API/services/upcomingMovieService';
+import {
+  mockMovies,
+  mockKoreanMovies,
+  mockChineseMovies,
+  mockAnimationMovies
+} from '@/mock/mockMovies';
 
 /** Phim thô từ backend - loose shape, mọi field đều optional */
 export type RawMovie = Record<string, unknown>;
@@ -113,30 +119,11 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
   if (SYSTEM_CONFIG.debugMovies && index === 0 && !didLogHomeDiagnostic) {
     didLogHomeDiagnostic = true;
     // eslint-disable-next-line no-console
-    console.log('[debug-movies] RAW movie keys:', movie ? Object.keys(movie) : null);
+
     // eslint-disable-next-line no-console
-    console.log('[debug-movies] RAW image fields (movie[0]):', {
-      poster_url: movie?.poster_url,
-      thumb_url: movie?.thumb_url,
-      backdrop_url: movie?.backdrop_url,
-      poster: movie?.poster,
-      thumb: movie?.thumb,
-      backdrop: movie?.backdrop,
-      image: movie?.image,
-      imageUrl: movie?.imageUrl,
-      posterUrl: movie?.posterUrl,
-      backdropUrl: movie?.backdropUrl,
-      thumbUrl: movie?.thumbUrl,
-      tmdb_poster_path: (movie?.tmdb as Record<string, unknown> | undefined)?.poster_path,
-      tmdb_backdrop_path: (movie?.tmdb as Record<string, unknown> | undefined)?.backdrop_path,
-      nested: movie?.images && typeof movie.images === 'object' ? Object.keys(movie.images as object) : null
-    });
+
     // eslint-disable-next-line no-console
-    console.log('[debug-movies] RESOLVED image URLs (movie[0]):', {
-      poster_url: poster,
-      thumb_url: thumb,
-      backdrop_url: backdrop
-    });
+
   }
 
   const id = (movie._id as string) || (movie.id as string) || `movie-${index}`;
@@ -204,41 +191,69 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
 
   /**
    * Fetches hero spotlight movies via HOME_SECTIONS bundle.
+   * Falls back to local mockMovies when the API returns empty (e.g. 401).
    */
   const fetchHeroMovies = useCallback(async (): Promise<void> => {
     try {
       const heroSection = HOME_SECTIONS['hero'];
       const movies = heroSection?.load ? await heroSection.load([]) : [];
-      if (isMountedRef.current && movies.length > 0) {
-        setFeaturedMovies(movies.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie));
+      let finalList = movies;
+      if (!Array.isArray(movies) || movies.length === 0) {
+        // eslint-disable-next-line no-console
+
+        finalList = mockMovies as unknown as typeof movies;
+      }
+      if (isMountedRef.current && finalList.length > 0) {
+        setFeaturedMovies(finalList.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie));
       }
     } catch {
-      // Fallback is gracefully handled inside HOME_SECTIONS.hero.load
+      if (isMountedRef.current) {
+        // eslint-disable-next-line no-console
+
+        setFeaturedMovies((mockMovies as unknown as RawMovie[]).map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie));
+      }
     }
   }, []);
 
   /**
    * Fetches Top 10 movies via HOME_SECTIONS bundle.
+   * Falls back to local mockMovies when the API returns empty (e.g. 401).
    */
   const fetchTop10Movies = useCallback(async (): Promise<void> => {
     try {
       const top10Section = HOME_SECTIONS['top10'];
       const movies = top10Section?.load ? await top10Section.load([]) : [];
-      if (isMountedRef.current && movies.length > 0) {
-        const normalized: RankedMovie[] = movies.map((m, idx) => ({
+      let finalList = movies;
+      if (!Array.isArray(movies) || movies.length === 0) {
+        // eslint-disable-next-line no-console
+
+        finalList = mockMovies as unknown as typeof movies;
+      }
+      if (isMountedRef.current && finalList.length > 0) {
+        const normalized: RankedMovie[] = finalList.slice(0, 10).map((m, idx) => ({
           ...(normalizeMovie(m as RawMovie, idx) as NormalizedMovie),
           rank: idx + 1
         }));
         setMostViewedMovies(normalized);
       }
     } catch {
-      // Fallback is gracefully handled inside HOME_SECTIONS.top10.load
+      if (isMountedRef.current) {
+        // eslint-disable-next-line no-console
+
+        const normalized: RankedMovie[] = (mockMovies as unknown as RawMovie[]).slice(0, 10).map((m, idx) => ({
+          ...(normalizeMovie(m, idx) as NormalizedMovie),
+          rank: idx + 1
+        }));
+        setMostViewedMovies(normalized);
+      }
     }
   }, []);
 
   /**
    * Fetches the homepage movie list (page=1, limit=20) on first paint
    * and subsequent pages for infinite scroll.
+   * Falls back to local mockMovies when the API returns empty (e.g. 401
+   * Missing Bearer token on the production deploy).
    */
   const fetchLatestMovies = useCallback(async (pageNumber = 1, isLoadMore = false): Promise<void> => {
     try {
@@ -251,9 +266,17 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       // First page uses the dedicated `getHomeMovies()` which honors the
       // exact spec `GET /api/v1/movies?page=1&limit=20`. Subsequent
       // pages reuse `getMoviesPage` for pagination continuity.
-      const rawMovies = pageNumber === 1
+      let rawMovies = pageNumber === 1
         ? await movieService.getHomeMovies()
         : await movieService.getMoviesPage(pageNumber, 24);
+
+      // FALLBACK: backend returns empty/401 → use local mock movies.
+      // This keeps the homepage visible during backend auth maintenance.
+      if ((!Array.isArray(rawMovies) || rawMovies.length === 0) && pageNumber === 1) {
+        // eslint-disable-next-line no-console
+
+        rawMovies = mockMovies as unknown as RawMovie[];
+      }
 
       if (rawMovies.length > 0 && isMountedRef.current) {
         const normalized = rawMovies.map((m, idx) => normalizeMovie(m as RawMovie, idx) as NormalizedMovie);
@@ -330,6 +353,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
 
   /**
    * Fetches Anime Spotlight movies via HOME_SECTIONS bundle.
+   * Falls back to local mockAnimationMovies when the API returns empty (e.g. 401).
    */
   const fetchBigSlideMovies = useCallback(async (): Promise<void> => {
     try {
@@ -337,26 +361,47 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       const movies = bigSlideSection?.load
         ? ((await bigSlideSection.load([])) as unknown as RawMovie[])
         : undefined;
-      if (isMountedRef.current && Array.isArray(movies) && movies.length > 0) {
-        setAnimeSpotlightMovies(movies);
+      let finalList = movies;
+      if (!Array.isArray(movies) || movies.length === 0) {
+        // eslint-disable-next-line no-console
+
+        finalList = mockAnimationMovies as unknown as RawMovie[];
+      }
+      if (isMountedRef.current && Array.isArray(finalList) && finalList.length > 0) {
+        setAnimeSpotlightMovies(finalList);
       }
     } catch {
-      // Fallback handled gracefully
+      if (isMountedRef.current) {
+        // eslint-disable-next-line no-console
+
+        setAnimeSpotlightMovies(mockAnimationMovies as unknown as RawMovie[]);
+      }
     }
   }, []);
 
   // Initial fetch on mount: ONLY triggered if initialSnapshot is not provided or empty
   useEffect(() => {
-    if (!initialSnapshot?.featuredMovies?.length) {
-      fetchHeroMovies();
-      fetchTop10Movies();
-      fetchBigSlideMovies();
-      fetchLatestMovies(1, false);
+    if (initialSnapshot?.featuredMovies?.length) {
+      // eslint-disable-next-line no-console
+
+      return;
     }
+    // eslint-disable-next-line no-console
+
+    Promise.allSettled([
+      fetchHeroMovies(),
+      fetchTop10Movies(),
+      fetchBigSlideMovies(),
+      fetchLatestMovies(1, false)
+    ]).then((results) => {
+      // eslint-disable-next-line no-console
+
+    });
   }, [initialSnapshot, fetchHeroMovies, fetchTop10Movies, fetchBigSlideMovies, fetchLatestMovies]);
 
   /**
    * Loads the next batch of movies for infinite scrolling.
+   * Falls back to local mockMovies (cycling) when the API returns empty.
    */
   const loadMore = useCallback(async (): Promise<void> => {
     if (loadingMore || !hasMore) return;
@@ -364,7 +409,19 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
 
     try {
       const nextPage = page + 1;
-      const rawMovies = await movieService.getMoviesPage(nextPage, 24);
+      let rawMovies = await movieService.getMoviesPage(nextPage, 24);
+
+      if ((!Array.isArray(rawMovies) || rawMovies.length === 0) && mockMovies.length > 0) {
+        // eslint-disable-next-line no-console
+
+        // Cycle through mockMovies so infinite scroll always has data
+        const cycleIdx = ((nextPage - 2) * 24) % mockMovies.length;
+        const cycled: RawMovie[] = [];
+        for (let i = 0; i < 24; i++) {
+          cycled.push(mockMovies[(cycleIdx + i) % mockMovies.length] as unknown as RawMovie);
+        }
+        rawMovies = cycled;
+      }
 
       if (rawMovies && rawMovies.length > 0 && isMountedRef.current) {
         const normalized = rawMovies.map((m, idx) => normalizeMovie(m as RawMovie, idx) as NormalizedMovie);

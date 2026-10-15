@@ -9,7 +9,7 @@ export const sendMaintenanceNotification = async (data: Record<string, unknown>)
     const response = await axios.post('/admin/notifications/send-maintenance', data);
     return response.data;
   } catch (error) {
-    console.error('Error sending maintenance notification:', error);
+
     throw error;
   }
 };
@@ -19,7 +19,7 @@ export const sendCustomNotification = async (data: Record<string, unknown>): Pro
     const response = await axios.post('/admin/notifications/send-custom', data);
     return response.data;
   } catch (error) {
-    console.error('Error sending custom notification:', error);
+
     throw error;
   }
 };
@@ -54,7 +54,7 @@ export const getNotificationHistory = async (
     }
     return data;
   } catch (error) {
-    console.error('Error fetching notification history:', error);
+
     throw error;
   }
 };

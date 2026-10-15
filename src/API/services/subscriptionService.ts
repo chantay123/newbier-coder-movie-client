@@ -78,7 +78,7 @@ const subscriptionService = {
       const response = await api.get('/subscription/packages');
       return (response.data as { data: SubscriptionPackage[] }).data;
     } catch (error) {
-      console.error('Error fetching subscription packages:', error);
+
       throw error;
     }
   },
@@ -88,7 +88,7 @@ const subscriptionService = {
       const response = await api.get(`/subscription/packages/${packageId}`);
       return (response.data as { data: SubscriptionPackage }).data;
     } catch (error) {
-      console.error('Error fetching package details:', error);
+
       throw error;
     }
   },
@@ -103,7 +103,7 @@ const subscriptionService = {
       return { ...(response.data as object), success: true, _originalSuccess: (response.data as { success?: boolean }).success, _formatted: true };
     } catch (error) {
       const err = error as { response?: { status?: number; data?: { error?: string; details?: unknown } }; message?: string };
-      console.error('Error subscribing package:', err);
+
       if (err.response && err.response.status === 200 && err.response.data) {
         return { ...(err.response.data as object), success: true, _errorButSuccess: true, _formatted: true };
       }
@@ -122,7 +122,7 @@ const subscriptionService = {
       return response.data as Record<string, unknown>;
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
-      console.error('Error confirming payment:', err);
+
       return {
         success: false,
         message: err.response?.data?.message || 'Could not confirm payment, but the subscription was created.',
@@ -136,7 +136,7 @@ const subscriptionService = {
       const response = await api.post('/subscription/cancel');
       return response.data;
     } catch (error) {
-      console.error('Error canceling subscription:', error);
+
       throw error;
     }
   },
@@ -152,7 +152,7 @@ const subscriptionService = {
         isExpired: data.isExpired || false
       };
     } catch (error) {
-      console.error('Error fetching current subscription:', error);
+
       return emptyCurrent();
     }
   },
@@ -191,7 +191,7 @@ const subscriptionService = {
     } catch (error) {
       const err = error as { response?: { status?: number } };
       if (err?.response?.status === 401 || err?.response?.status === 403) {
-        console.warn('[AdBenefits] Authentication error detected');
+
         return { ...emptyAdBenefits(true) };
       }
       return { ...emptyAdBenefits(false) };
@@ -203,7 +203,7 @@ const subscriptionService = {
       const response = await api.get('/subscription/history');
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching subscription history:', error);
+
       throw error;
     }
   },
@@ -213,7 +213,7 @@ const subscriptionService = {
       const response = await api.put('/subscription/auto-renewal', { autoRenewal });
       return response.data;
     } catch (error) {
-      console.error('Error updating auto renewal:', error);
+
       throw error;
     }
   },
@@ -223,7 +223,7 @@ const subscriptionService = {
       const response = await api.get('/subscription/pending');
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching pending subscription:', error);
+
       throw error;
     }
   },
@@ -281,7 +281,7 @@ const subscriptionService = {
       };
     } catch (error) {
       const err = error as Error;
-      console.error('Error fetching pending subscriptions for admin:', err);
+
       return {
         success: false,
         message: err.message,
@@ -296,7 +296,7 @@ const subscriptionService = {
       ? (localStorage.getItem('auth_token') || localStorage.getItem('authToken'))
       : null;
     if (!token) {
-      console.error('No authentication token found');
+
       return 0;
     }
     try {
@@ -308,7 +308,7 @@ const subscriptionService = {
       const data = await res.json() as { success?: boolean; data?: { count?: number } };
       return data.success ? (data.data?.count || 0) : 0;
     } catch (error) {
-      console.error('Error fetching pending subscriptions count:', error);
+
       return 0;
     }
   },
@@ -319,7 +319,7 @@ const subscriptionService = {
       const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
       return all.filter((s) => s.status === 'approved' || s.status === 'active');
     } catch (error) {
-      console.error('Error fetching approved subscriptions for admin:', error);
+
       throw error;
     }
   },
@@ -330,7 +330,7 @@ const subscriptionService = {
       const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
       return all.filter((s) => s.status === 'rejected');
     } catch (error) {
-      console.error('Error fetching rejected subscriptions for admin:', error);
+
       throw error;
     }
   },
@@ -340,7 +340,7 @@ const subscriptionService = {
       const response = await api.post(`/subscription/admin/approve/${subscriptionId}`);
       return response.data;
     } catch (error) {
-      console.error('Error approving subscription:', error);
+
       throw error;
     }
   },
@@ -350,7 +350,7 @@ const subscriptionService = {
       const response = await api.post(`/subscription/admin/reject/${subscriptionId}`, { reason });
       return response.data;
     } catch (error) {
-      console.error('Error rejecting subscription:', error);
+
       throw error;
     }
   }

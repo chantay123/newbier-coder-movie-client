@@ -330,7 +330,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
           });
         }
       } catch (err) {
-        console.error('Test API Error:', err);
+
       }
     };
 
@@ -394,7 +394,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         } else if (responseData.data?.docs) {
           subscriptionList = responseData.data.docs;
         } else {
-          console.error('Cannot find subscriptions array in response:', responseData);
+
           subscriptionList = [];
         }
 
@@ -406,7 +406,6 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
           if (normalizedStatus === 'rejected') return 'rejected';
           if (normalizedStatus === 'cancelled') return 'cancelled';
 
-          console.warn(`Unknown status: ${status}, defaulting to 'pending'`);
           return 'pending';
         };
 
@@ -486,7 +485,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         setSubscriptions([]);
       }
     } catch (err: unknown) {
-      console.error('Error fetching subscriptions:', err);
+
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError('Failed to fetch subscriptions: ' + errorMessage);
       toast.error('Lỗi khi tải dữ liệu: ' + errorMessage);
@@ -556,7 +555,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Error response (${response.status}):`, errorText);
+
         toast.dismiss(toastId);
         toast.error(`Lỗi khi duyệt đăng ký: ${response.status} - ${errorText || 'Không có thông tin lỗi'}`);
         throw new Error(`API request failed with status ${response.status}: ${errorText}`);
@@ -580,7 +579,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         toast.error('Không thể duyệt đăng ký: ' + (responseData.message || 'Lỗi không xác định'));
       }
     } catch (err: any) {
-      console.error('Error approving subscription:', err);
+
       toast.error('Lỗi khi duyệt đăng ký: ' + (err.message || 'Lỗi không xác định'));
     } finally {
       setActionInProgress(false);
@@ -638,7 +637,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
 
       if (!response.ok) {
         const errorData = await response.text();
-        console.error('Error rejection response:', errorData);
+
         toast.error(`Lỗi khi từ chối: ${response.status} - ${errorData || 'Không có thông tin lỗi'}`);
         throw new Error(`API request failed with status ${response.status}`);
       }
@@ -658,7 +657,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         toast.error('Không thể từ chối đăng ký: ' + (responseData.message || 'Lỗi không xác định'));
       }
     } catch (err: any) {
-      console.error('Error rejecting subscription:', err);
+
       toast.error('Lỗi khi từ chối đăng ký: ' + (err.message || 'Lỗi không xác định'));
     } finally {
       setActionInProgress(false);
@@ -723,9 +722,9 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         try {
           const errorData = await response.text();
           errorMessage = errorData;
-          console.error('Error response body:', errorData);
+
         } catch (err) {
-          console.error('Error parsing error response:', err);
+
         }
 
         toast.error(`Lỗi khi hủy gói: ${response.status} - ${errorMessage || 'Không có thông tin lỗi'}`);
@@ -745,7 +744,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         toast.error('Không thể hủy gói Premium: ' + (responseData.message || 'Lỗi không xác định'));
       }
     } catch (err: any) {
-      console.error('Error canceling subscription:', err);
+
       toast.error('Lỗi khi hủy gói Premium: ' + (err.message || 'Lỗi không xác định'));
     } finally {
       setActionInProgress(false);
@@ -803,7 +802,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         toast.error('Không thể lấy thông tin người dùng: ' + (data.message || 'Lỗi không xác định'));
       }
     } catch (error: unknown) {
-      console.error('Error fetching user details:', error);
+
       const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
       toast.error('Lỗi khi lấy thông tin người dùng: ' + errorMessage);
     }
@@ -836,8 +835,6 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
             </div>
           </div>
         </section>
-
-
 
         <section className="content">
           <div className="container-fluid p-0">

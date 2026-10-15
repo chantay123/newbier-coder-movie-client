@@ -122,7 +122,7 @@ const FeedbackForm = forwardRef<HTMLDivElement, FeedbackFormProps>(
         }
       } catch (err) {
         const axiosErr = err as AxiosError<{ message?: string }>;
-        console.error('Error submitting feedback:', err);
+
         setFormError(
           axiosErr.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại sau'
         );

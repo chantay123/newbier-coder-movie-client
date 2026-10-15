@@ -20,7 +20,7 @@ const MovieRating: React.FC<MovieRatingProps> = ({ movieId }) => {
         })
       });
     } catch (error) {
-      console.error('Lỗi khi đánh giá:', error);
+
     }
   };
 

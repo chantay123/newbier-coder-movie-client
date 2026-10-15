@@ -28,7 +28,7 @@ export default function ForgotPassword() {
       if (response.data.success) setSuccess(true);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
-      console.error('Forgot password error:', err);
+
       setError(axiosErr.response?.data?.message || 'Failed to send reset email. Please try again.');
     } finally {
       setIsLoading(false);

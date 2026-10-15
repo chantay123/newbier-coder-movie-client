@@ -112,7 +112,7 @@ function NotificationContent() {
         toast.error(response.message || 'Không thể tải lịch sử thông báo');
       }
     } catch (error: any) {
-      console.error('Error fetching notification history:', error);
+
       toast.error('Không thể tải lịch sử thông báo: ' + (error.message || 'Đã xảy ra lỗi'));
     } finally {
       setIsLoadingHistory(false);
@@ -247,7 +247,7 @@ Trân trọng,
         toast.error(response.message || 'Có lỗi xảy ra khi gửi thông báo');
       }
     } catch (error: any) {
-      console.error('Error sending maintenance notification:', error);
+
       toast.error('Có lỗi xảy ra: ' + (error.message || 'Không thể gửi thông báo'));
     } finally {
       setIsLoading(false);
@@ -287,7 +287,7 @@ Trân trọng,
         toast.error(response.message || 'Có lỗi xảy ra khi gửi thông báo');
       }
     } catch (error: any) {
-      console.error('Error sending custom notification:', error);
+
       toast.error('Có lỗi xảy ra: ' + (error.message || 'Không thể gửi thông báo'));
     } finally {
       setIsLoading(false);

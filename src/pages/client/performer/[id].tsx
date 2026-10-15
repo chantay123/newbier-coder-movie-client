@@ -159,7 +159,7 @@ const PerformerDetail: React.FC = () => {
         setLoading(false);
       } catch (err) {
         const e = err as Error;
-        console.error('Error fetching performer data:', e);
+
         setError('Could not load performer data. Please try again later.');
         setLoading(false);
       }

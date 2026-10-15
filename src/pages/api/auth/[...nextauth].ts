@@ -85,11 +85,11 @@ const authOptions: NextAuthOptions = {
             }
             return true;
           }
-          console.error('Backend response invalid:', response.data);
+
           return false;
         } catch (err) {
           const e = err as { response?: { data?: unknown }; message?: string };
-          console.error('Error with Google login backend:', e.response?.data || e.message);
+
           return false;
         }
       }
@@ -111,11 +111,11 @@ const authOptions: NextAuthOptions = {
             acc.backendUser = data.user;
             return true;
           }
-          console.error('Backend response invalid:', response.data);
+
           return false;
         } catch (err) {
           const e = err as { response?: { data?: unknown }; message?: string };
-          console.error('Error with Facebook login backend:', e.response?.data || e.message);
+
           return false;
         }
       }

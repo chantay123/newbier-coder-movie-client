@@ -170,7 +170,7 @@ export default function ProfilePage() {
       setStats(combinedStats);
       setTabDataLoaded(prev => ({ ...prev, stats: true }));
     } catch (statsError) {
-      console.error("Lỗi khi lấy dữ liệu thống kê:", statsError);
+
       toast.error("Không thể lấy dữ liệu thống kê. Vui lòng thử lại sau.");
     }
   }, []);
@@ -231,7 +231,7 @@ export default function ProfilePage() {
               setTabDataLoaded(prev => ({ ...prev, favorites: true }));
             })
             .catch(error => {
-              console.error("Error loading favorites data:", error);
+
               setFavoritesData([]);
             })
         );
@@ -244,7 +244,7 @@ export default function ProfilePage() {
               setTabDataLoaded(prev => ({ ...prev, watchlater: true }));
             })
             .catch(error => {
-              console.error("Error loading watchlist data:", error);
+
               setWatchLaterData([]);
             })
         );
@@ -258,10 +258,10 @@ export default function ProfilePage() {
         setTabDataLoaded(prev => ({ ...prev, profile: true }));
 
       } catch (apiError) {
-        console.error("Lỗi khi gọi API:", apiError);
+
       }
     } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu người dùng:", error);
+
       toast.error("Không thể lấy thông tin cá nhân. Vui lòng thử lại sau.");
     } finally {
       setLoadingProfile(false);
@@ -306,7 +306,7 @@ export default function ProfilePage() {
         const subscriptionData = await subscriptionService.getCurrentSubscription();
         setCurrentSubscription(subscriptionData);
       } catch (error) {
-        console.error("Failed to fetch premium status:", error);
+
       }
     }
   }, [user]);
@@ -358,7 +358,7 @@ export default function ProfilePage() {
       const featured = await authService.getFeaturedContent();
       setFeaturedContent(featured || []);
     } catch (error) {
-      console.error("Error fetching featured content:", error);
+
       setFeaturedContent([]);
     }
   };
@@ -376,7 +376,7 @@ export default function ProfilePage() {
       // Format as YYYY-MM-DD for input type="date"
       return date.toISOString().split('T')[0];
     } catch (e) {
-      console.error("Error formatting date for input:", e);
+
       return '';
     }
   };
@@ -422,11 +422,11 @@ export default function ProfilePage() {
 
         toast.success("Avatar đã được cập nhật thành công!");
       } else {
-        console.error("Upload succeeded but response indicates failure:", response);
+
         toast.error("Không thể tải lên avatar. Vui lòng thử lại sau!");
       }
     } catch (error) {
-      console.error("Error uploading avatar:", error);
+
       toast.error(error.message || "Không thể tải lên avatar. Vui lòng thử lại sau!");
     } finally {
       setIsUploading(false);
@@ -473,7 +473,7 @@ export default function ProfilePage() {
         confirmPassword: ''
       });
     } catch (error) {
-      console.error("Error changing password:", error);
+
       toast.error(error.response?.data?.message || "Không thể đổi mật khẩu. Vui lòng thử lại sau!");
     } finally {
       setIsSaving(false);
@@ -485,7 +485,7 @@ export default function ProfilePage() {
       await authService.logout();
       router.push('/auth/login');
     } catch (error) {
-      console.error('Error during logout:', error);
+
       router.push('/auth/login');
     }
   };
@@ -549,7 +549,7 @@ export default function ProfilePage() {
         setHasChanges(false);
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
+
       toast.error('Không thể cập nhật thông tin! Vui lòng thử lại sau.');
     } finally {
       setIsSaving(false);
@@ -567,7 +567,7 @@ export default function ProfilePage() {
       });
       toast.success("Cập nhật thông tin thành công!");
     } catch (error) {
-      console.error("Error updating profile:", error);
+
       toast.error("Cập nhật thông tin thất bại. Vui lòng thử lại!");
     } finally {
       setIsSaving(false);
@@ -618,7 +618,7 @@ export default function ProfilePage() {
       setFavoritesData(prev => prev.filter(movie => movie.id !== movieId));
       toast.success("Phim đã được xóa khỏi danh sách yêu thích!");
     } catch (error) {
-      console.error("Error removing favorite:", error);
+
       toast.error("Không thể xóa phim khỏi danh sách yêu thích. Vui lòng thử lại sau!");
     }
   };
@@ -636,7 +636,7 @@ export default function ProfilePage() {
         toast.error(result.message || "Không thể xóa phim khỏi danh sách xem sau.");
       }
     } catch (error) {
-      console.error("Error removing from watchlist:", error);
+
       toast.error("Không thể xóa phim khỏi danh sách xem sau. Vui lòng thử lại sau!");
     }
   };
@@ -650,7 +650,7 @@ export default function ProfilePage() {
       setActivityData(prev => prev.filter(history => (history._id || history.id) !== historyId));
       toast.success("Phim đã được xóa khỏi lịch sử xem!");
     } catch (error) {
-      console.error("Error removing history:", error);
+
       toast.error("Không thể xóa lịch sử xem phim. Vui lòng thử lại sau!");
     }
   };
@@ -665,7 +665,7 @@ export default function ProfilePage() {
         setActivityData([]);
         toast.success("Đã xóa toàn bộ lịch sử xem phim!");
       } catch (error) {
-        console.error("Error clearing history:", error);
+
         toast.error("Không thể xóa toàn bộ lịch sử xem phim. Vui lòng thử lại sau!");
       }
     }

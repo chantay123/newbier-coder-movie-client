@@ -134,7 +134,7 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
         router.push(result.url);
       }
     } catch (err) {
-      console.error('Google sign in error:', err);
+
       setError(t.social.googleConnectError);
     } finally {
       setSocialLoading(null);

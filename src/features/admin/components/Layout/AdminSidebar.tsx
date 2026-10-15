@@ -57,7 +57,7 @@ const AdminSidebar = () => {
           setUnreadFeedbackCount(response.data.data.count);
         }
       } catch (error) {
-        console.error('Error fetching unread feedback count:', error);
+
       }
     };
 
@@ -86,16 +86,16 @@ const AdminSidebar = () => {
             const subscriptions = data.data?.subscriptions || [];
             setPendingPremiumCount(subscriptions.length);
           } else {
-            console.error('API returned success: false', data);
+
             setPendingPremiumCount(0);
           }
         } else {
-          console.error(`API request failed with status ${response.status}`);
+
           setPendingPremiumCount(0);
         }      } catch (error: any) {
-        console.error('Error fetching pending premium count:', error);
+
         if (error.response) {
-          console.error('Response error:', error.response.status, error.response.data);
+
         }
         setPendingPremiumCount(0);
       }

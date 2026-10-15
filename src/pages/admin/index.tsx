@@ -192,7 +192,7 @@ const AdminDashboardPage: NextPageWithLayout = () => {
           setIsOfflinePreview(true);
         }
       } catch (error) {
-        console.error('Error fetching dashboard data, falling back to mock:', error);
+
         setStatistics(MOCK_DASHBOARD_STATS);
         setAnalyticsData(MOCK_ANALYTICS_DATA);
         setFeedbackData(MOCK_FEEDBACK_DATA);

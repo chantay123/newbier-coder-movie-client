@@ -58,7 +58,7 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
           setDraftMovie(normalized as any);
         }
       } catch (e) {
-        console.error('Failed to parse admin preview draft', e);
+
       }
     }
   }, [isPreview, slug]);

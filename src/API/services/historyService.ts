@@ -109,7 +109,7 @@ const historyService = {
       const response = await axiosInstance.post('/history', movieData);
       return response.data;
     } catch (error) {
-      console.error('Error adding movie to history:', error);
+
       throw error;
     }
   },
@@ -120,7 +120,7 @@ const historyService = {
       const response = await axiosInstance.post(`/history/${movieId}`, additionalData);
       return response.data;
     } catch (error) {
-      console.error('Error adding movie to history by ID:', error);
+
       throw error;
     }
   },
@@ -135,7 +135,7 @@ const historyService = {
       const response = await axiosInstance.get(url);
       return normalizeList(response.data, page);
     } catch (error) {
-      console.error('Error fetching user history:', error);
+
       return { total: 0, page: 1, pages: 0, histories: [] };
     }
   },
@@ -147,7 +147,7 @@ const historyService = {
       const response = await axiosInstance.get(url);
       return normalizeList(response.data, page);
     } catch (error) {
-      console.error('Error fetching user history by ID:', error);
+
       return { total: 0, page: 1, pages: 0, histories: [] };
     }
   },
@@ -158,7 +158,7 @@ const historyService = {
       const response = await axiosInstance.delete(`/history/${historyId}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting history:', error);
+
       throw error;
     }
   },
@@ -169,7 +169,7 @@ const historyService = {
       const response = await axiosInstance.delete('/history/clear');
       return response.data;
     } catch (error) {
-      console.error('Error clearing history:', error);
+
       throw error;
     }
   },
@@ -180,7 +180,7 @@ const historyService = {
       const response = await axiosInstance.post('/history/watch-session/start', data);
       return response.data;
     } catch (error) {
-      console.error('Error starting watch session:', error);
+
       throw error;
     }
   },
@@ -191,7 +191,7 @@ const historyService = {
       const response = await axiosInstance.post('/history/watch-session/end', data);
       return response.data;
     } catch (error) {
-      console.error('Error ending watch session:', error);
+
       throw error;
     }
   },
@@ -202,7 +202,7 @@ const historyService = {
       const response = await axiosInstance.put('/history/watch-session/update', data);
       return response.data;
     } catch (error) {
-      console.error('Error updating watch position:', error);
+
       throw error;
     }
   },
@@ -215,7 +215,7 @@ const historyService = {
       const response = await axiosInstance.get('/history/total-watch-time');
       return (response.data as { data: TotalWatchTime }).data;
     } catch (error) {
-      console.error('Error getting total watch time:', error);
+
       return {
         totalWatchTimeSeconds: 0,
         totalWatchTimeFormatted: '0h 0m 0s',

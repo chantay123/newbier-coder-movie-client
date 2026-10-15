@@ -146,7 +146,7 @@ export default function PremiumPage() {
         setPendingSubscription(null);
       }
     } catch (err) {
-      console.error('Error refreshing subscription data:', err);
+
     } finally {
       setLoading(false);
     }
@@ -168,11 +168,11 @@ export default function PremiumPage() {
               setPendingSubscription(pendingData);
             }
           } catch (err) {
-            console.error('Không thể lấy thông tin đăng ký:', err);
+
           }
         }
       } catch (err) {
-        console.error('Lỗi khi lấy dữ liệu:', err);
+
         setPackages(DEFAULT_PACKAGES);
         toast.error('Không thể tải thông tin gói Premium từ server. Hiển thị dữ liệu mặc định.');
       } finally {
@@ -211,7 +211,7 @@ export default function PremiumPage() {
       setSelectedPackage(pkg);
       setShowPaymentModal(true);
     } catch (err) {
-      console.error('Lỗi khi kiểm tra trạng thái đăng ký:', err);
+
       toast.error('Có lỗi xảy ra khi kiểm tra trạng thái đăng ký. Vui lòng thử lại.');
     }
   };
@@ -299,7 +299,7 @@ export default function PremiumPage() {
         toast.error(errorMsg, { autoClose: 8000 });
       }
     } catch (err) {
-      console.error('Lỗi trong quá trình đăng ký:', err);
+
       toast.dismiss('processing-subscription');
       toast.error('Có lỗi xảy ra: ' + ((err as Error).message || 'Vui lòng thử lại sau'), { autoClose: 8000 });
       const confEl = document.getElementById('confirmation-status');
@@ -325,7 +325,7 @@ export default function PremiumPage() {
         toast.error(response?.message || 'Hủy đăng ký không thành công. Vui lòng thử lại!');
       }
     } catch (err) {
-      console.error('Error canceling subscription:', err);
+
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message || 'Có lỗi xảy ra khi hủy đăng ký. Vui lòng thử lại sau!');
     } finally {
@@ -345,7 +345,7 @@ export default function PremiumPage() {
         toast.error(response?.message || 'Hủy yêu cầu không thành công. Vui lòng thử lại!');
       }
     } catch (err) {
-      console.error('Error canceling pending request:', err);
+
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message || 'Có lỗi xảy ra khi hủy yêu cầu đăng ký. Vui lòng thử lại sau!');
     } finally {

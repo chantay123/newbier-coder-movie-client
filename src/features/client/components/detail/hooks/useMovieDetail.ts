@@ -20,6 +20,7 @@ import {
   MOVIE_FALLBACK_DEFAULTS
 } from '@/config/movieFallbackConfig';
 import { getClientSnapshot } from '@/utils/dashboardSnapshot';
+import { mockMovies } from '@/mock/mockMovies';
 
 const API_BASE = MOVIE_CONFIG.apiBaseUrl;
 
@@ -209,14 +210,40 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
 
   /**
    * Fetches full movie details by slug.
+   * Strategy:
+   *   1. Try the public API first (no auth header) so we respect the
+   *      backend's actual auth posture.
+   *   2. If 401/403, retry once with the auth token from localStorage.
+   *   3. If still failing, fall back to dashboard snapshot cache.
+   *   4. If nothing works, fall back to local mockMovies (last resort).
+   *   Mock data is ONLY used as a true last-resort, not for auth failures
+   *   when the user is logged in.
    */
   const fetchMovie = useCallback(async (): Promise<void> => {
     if (!slug) return;
     setLoading(true);
     setError(null);
 
+    const tryFetch = async (withAuth: boolean): Promise<Response> => {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (withAuth && typeof window !== 'undefined') {
+        const token = localStorage.getItem('auth_token')
+          || localStorage.getItem('token')
+          || localStorage.getItem('authToken');
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+      return fetch(`${API_BASE}/movies/${slug}`, { headers });
+    };
+
     try {
-      const res = await fetch(`${API_BASE}/movies/${slug}`);
+      // Attempt 1: public (no auth) — most public endpoints work this way
+      let res = await tryFetch(false);
+      if (res.status === 401 || res.status === 403) {
+        // Attempt 2: with auth token (in case the user is logged in
+        // and the endpoint is private)
+        res = await tryFetch(true);
+      }
+
       if (!res.ok) {
         throw new Error(`Movie not found (${res.status})`);
       }
@@ -226,16 +253,32 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         || (json.data as RawMovie | undefined)
         || json;
 
-      if (raw && isMountedRef.current) {
+      if (!raw || typeof raw !== 'object') {
+        throw new Error('Empty response from server');
+      }
+
+      if (isMountedRef.current) {
         const normalized = normalizeMovieDetail(raw, slug);
-        if (normalized) setMovie(normalized);
+        if (normalized) {
+          setMovie(normalized);
+          setError(null);
+          return;
+        }
+        throw new Error('Unable to normalize movie data');
       }
     } catch (err) {
       if (isMountedRef.current) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        // eslint-disable-next-line no-console
+
+
+        // Try dashboard snapshot cache (from ISR)
         try {
           const snapshot = await getClientSnapshot() as { moviesDetail?: Record<string, RawMovie> } | null;
           const cachedMovie = snapshot?.moviesDetail?.[slug];
           if (cachedMovie) {
+            // eslint-disable-next-line no-console
+
             const normalized = normalizeMovieDetail(cachedMovie, slug);
             if (normalized) {
               setMovie(normalized);
@@ -246,7 +289,27 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         } catch {
           // ignore
         }
-        setError('Không tìm thấy thông tin phim hoặc phim đã bị xóa.');
+
+        // Last-resort fallback: only when this is NOT an auth error
+        // AND we have nothing else. Mock data is never preferred over
+        // a real backend response.
+        const isAuthError = /401|403|Authentication/i.test(errorMessage);
+        if (!isAuthError) {
+          const mock = mockMovies.find((m) => m.slug === slug) || mockMovies[0];
+          if (mock) {
+            // eslint-disable-next-line no-console
+
+            const normalized = normalizeMovieDetail(mock as unknown as RawMovie, slug);
+            if (normalized) {
+              setMovie(normalized);
+              setError(null);
+              return;
+            }
+          }
+        }
+        setError(isAuthError
+          ? 'Vui lòng đăng nhập để xem chi tiết phim.'
+          : 'Không tìm thấy thông tin phim hoặc phim đã bị xóa.');
         setMovie(null);
       }
     } finally {
@@ -258,11 +321,38 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
 
   /**
    * Fetches related movie recommendations.
+   * Same auth strategy as fetchMovie: try public first, then with auth,
+   * then fall back to mockMovies (slice) only on real failure.
    */
   const fetchRelated = useCallback(async (): Promise<void> => {
     if (!slug) return;
+    const tryFetch = async (withAuth: boolean): Promise<Response> => {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (withAuth && typeof window !== 'undefined') {
+        const token = localStorage.getItem('auth_token')
+          || localStorage.getItem('token')
+          || localStorage.getItem('authToken');
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+      return fetch(`${API_BASE}/movies/related/${slug}`, { headers });
+    };
+
+    const applyMockFallback = (): void => {
+      if (!isMountedRef.current) return;
+      setRelatedMovies(
+        mockMovies
+          .slice(0, 6)
+          .map((m, idx) => normalizeMovieDetail(m as unknown as RawMovie, m.slug || `rel-${idx}`))
+          .filter((m): m is NormalizedMovieDetail => m !== null)
+      );
+    };
+
     try {
-      const res = await fetch(`${API_BASE}/movies/related/${slug}`);
+      // Try public first, then with auth
+      let res = await tryFetch(false);
+      if (res.status === 401 || res.status === 403) {
+        res = await tryFetch(true);
+      }
       if (res.ok) {
         const json = await res.json();
         const list = (json.responseData as unknown[])
@@ -278,13 +368,11 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           return;
         }
       }
-      if (isMountedRef.current) {
-        setRelatedMovies([]);
-      }
+      // Real API returned empty/error -> mock fallback
+      applyMockFallback();
     } catch {
-      if (isMountedRef.current) {
-        setRelatedMovies([]);
-      }
+      // Network error -> mock fallback
+      applyMockFallback();
     }
   }, [slug]);
 

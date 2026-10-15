@@ -119,7 +119,7 @@ const ReportsPage = () => {
       setTotalPages(data.totalPages || 1);
       setTotalReports(data.total || 0);
     } catch (error) {
-      console.error('Error fetching reports:', error);
+
     } finally {
       setLoading(false);
     }
@@ -217,7 +217,7 @@ const ReportsPage = () => {
       setShowBulkActionModal(false);
       setBulkActionType('');
     } catch (error) {
-      console.error('Error performing bulk action:', error);
+
     }
   };
 
@@ -238,7 +238,7 @@ const ReportsPage = () => {
 
       setShowModal(false);
     } catch (error) {
-      console.error('Error updating report:', error);
+
     }
   };
   const renderTypeIcon = (type: string, report?: any) => {

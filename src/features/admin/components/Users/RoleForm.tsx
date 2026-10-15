@@ -15,7 +15,7 @@ const createRoleByAdmin = async (roleData: { name: string; description: string; 
     const response = await axiosInstance.post(`${API_URL}/admin/roles`, roleData);
     return response.data;
   } catch (error) {
-    console.error('Error creating role:', error);
+
     throw error;
   }
 };
@@ -25,7 +25,7 @@ const updateRoleByAdmin = async (id: string, roleData: { name: string; descripti
     const response = await axiosInstance.put(`${API_URL}/admin/roles/${id}`, roleData);
     return response.data;
   } catch (error) {
-    console.error('Error updating role:', error);
+
     throw error;
   }
 };

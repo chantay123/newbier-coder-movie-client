@@ -126,7 +126,7 @@ const FeedbackDetailPage = () => {
         setFeedback(mockItem as FeedbackDetail);
         setResponseStatus(mockItem.status || 'processed');
       } catch (err) {
-        console.error('Error in detail fetch:', err);
+
       } finally {
         setLoading(false);
       }
@@ -160,7 +160,7 @@ const FeedbackDetailPage = () => {
             timeout: 4000
           });
         } catch (apiErr) {
-          console.warn('API error, saving locally:', apiErr);
+
         }
       }
 
@@ -186,7 +186,7 @@ const FeedbackDetailPage = () => {
         setSuccess(null);
       }, 3500);
     } catch (err) {
-      console.error('Error submitting response:', err);
+
       setError('Đã xảy ra lỗi khi gửi phản hồi. Vui lòng thử lại sau.');
     } finally {
       setSubmitting(false);
@@ -208,13 +208,13 @@ const FeedbackDetailPage = () => {
             timeout: 4000
           });
         } catch (apiErr) {
-          console.warn('API delete error, proceeding with redirect:', apiErr);
+
         }
       }
 
       router.push('/admin/feedback');
     } catch (err) {
-      console.error('Error deleting feedback:', err);
+
       setError('Đã xảy ra lỗi khi xóa góp ý.');
       setConfirmDelete(false);
     } finally {

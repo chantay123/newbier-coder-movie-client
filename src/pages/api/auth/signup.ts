@@ -55,7 +55,7 @@ export default async function handler(
     try {
       data = JSON.parse(responseText) as Record<string, unknown>;
     } catch {
-      console.error('Error parsing JSON response');
+
       if (responseText.includes('<!DOCTYPE')) {
         return res.status(500).json({ message: 'Lỗi kết nối máy chủ. Vui lòng kiểm tra lại API URL.' });
       }
@@ -73,7 +73,7 @@ export default async function handler(
       data
     });
   } catch (error) {
-    console.error('Registration error:', error);
+
 
     const axiosLike = error as { response?: { status: number; data: { message?: string } } };
     if (axiosLike.response) {
