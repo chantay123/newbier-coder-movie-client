@@ -57,7 +57,8 @@ const authOptions: NextAuthOptions = {
       clientSecret: process.env.FACEBOOK_SECRET || ''
     })
   ],
-  debug: process.env.NODE_ENV === 'development',
+
+  debug: process.env.NEXTAUTH_DEBUG === 'true',
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
     async signIn({ user, account, profile }): Promise<boolean> {
