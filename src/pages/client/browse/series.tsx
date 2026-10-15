@@ -188,7 +188,7 @@ export default function Series() {
         setHasMore(false);
       }
     } catch (err) {
-      console.error('Error fetching series:', err);
+
       if (pageNum === 1) setSeries([]);
       setHasMore(false);
     } finally {

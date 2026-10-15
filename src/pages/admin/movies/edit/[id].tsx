@@ -451,7 +451,7 @@ const EditMoviePage = () => {
           showCinemaAlert('Không tìm thấy dữ liệu phim', 'warning');
         }
       } catch (err) {
-        console.warn('API error fetching movie, using mock fallback:', err);
+
         const mockMatch = MOCK_ADMIN_MOVIES.find(
           m => m._id === currentId || (m as any).id === currentId || m.slug === currentId
         );
@@ -788,13 +788,13 @@ const EditMoviePage = () => {
       try {
         await axios.put(`/admin/movies/${movieId || id}`, payload);
       } catch (apiErr) {
-        console.warn('API update failed, saving simulation mode:', apiErr);
+
       }
 
       showCinemaAlert(`Đã lưu thay đổi phim "${name}" thành công!`, 'cinema');
       setTimeout(() => router.push('/admin/movies'), 1000);
     } catch (err: any) {
-      console.error('Error updating movie:', err);
+
       showCinemaAlert(err?.response?.data?.message || 'Có lỗi xảy ra khi cập nhật phim!', 'error');
     } finally {
       setLoading(false);

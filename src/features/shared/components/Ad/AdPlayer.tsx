@@ -73,7 +73,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({
           onAdComplete();
         }
       } catch (error) {
-        console.error('Error fetching video ad:', error);
+
         onAdComplete();
       } finally {
         setLoading(false);
@@ -96,7 +96,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({
           await trackingService.trackAdImpression(ad._id);
           setAdTracked(true);
         } catch (error) {
-          console.error('Error tracking ad impression:', error);
+
         }
       }
     };
@@ -110,7 +110,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({
 
     const handleCanPlay = (): void => {
       videoElement.play().catch((err) => {
-        console.error('Error playing video ad:', err);
+
         onAdComplete();
       });
     };
@@ -154,7 +154,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({
     try {
       await trackingService.trackAdSkip(ad._id);
     } catch (error) {
-      console.error('Error tracking ad skip:', error);
+
     }
     onAdComplete();
   };
@@ -169,7 +169,7 @@ const AdPlayer: React.FC<AdPlayerProps> = ({
         videoRef.current.pause();
       }
     } catch (error) {
-      console.error('Error tracking ad click:', error);
+
       window.open(ad.link, '_blank');
     }
   };

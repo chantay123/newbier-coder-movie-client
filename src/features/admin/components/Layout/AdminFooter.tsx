@@ -4,7 +4,7 @@ import React from 'react';
 const AdminFooter = () => {
   return (
     <footer className="main-footer" style={{
-      backgroundColor: '#0e131d', 
+      backgroundColor: '#0e131d',
       color: '#64748b',
       padding: '14px 24px',
       borderTop: '1px solid rgba(255, 255, 255, 0.07)',

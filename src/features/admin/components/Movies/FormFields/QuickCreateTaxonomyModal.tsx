@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaPlus, FaTags, FaGlobeAmericas, FaUserTie } from 'react-icons/fa';
 import styles from '@/styles/AdminTaxonomies.module.css';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 export type QuickCreateType = 'category' | 'country' | 'actor' | 'director';
 

@@ -42,7 +42,7 @@ const UpcomingMovieDetail: React.FC = () => {
         setError('Không thể tải thông tin phim');
       }
     } catch (err) {
-      console.error('Error fetching movie:', err);
+
       setError('Đã xảy ra lỗi khi tải thông tin phim');
     } finally {
       setLoading(false);
@@ -56,7 +56,7 @@ const UpcomingMovieDetail: React.FC = () => {
       await deleteUpcomingMovie(id as string);
       router.push('/admin/upcoming-movies');
     } catch (err) {
-      console.error('Error deleting movie:', err);
+
       setError('Đã xảy ra lỗi khi xóa phim');
     }
   };
@@ -75,7 +75,7 @@ const UpcomingMovieDetail: React.FC = () => {
         router.push('/admin/upcoming-movies');
       }
     } catch (err: any) {
-      console.error('Error releasing movie:', err);
+
       setError(err.response?.data?.message || 'Đã xảy ra lỗi khi chuyển trạng thái phim');
     }
   };

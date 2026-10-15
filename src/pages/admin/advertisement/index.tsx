@@ -90,7 +90,7 @@ const AdvertisementPage = () => {
 
         if (!connectionTest.ok) throw new Error('API server connection failed');
       } catch (connectionError) {
-        console.warn('API server may be down:', connectionError);
+
         // Continue with the request anyway, but we've logged the potential issue
       }
 
@@ -113,15 +113,15 @@ const AdvertisementPage = () => {
         setTotalPages(result.totalPages || 1);
       } else {
         // Handle case where result exists but success is false
-        console.error('Error in API response:', result);
+
         toast.error('Có lỗi khi tải dữ liệu quảng cáo');
         // Try to provide more helpful error message
         if (result && result.error) {
-          console.error('Error details:', result.error);
+
         }
       }
     } catch (error) {
-      console.error('Error fetching advertisements:', error);
+
       toast.error('Có lỗi khi tải dữ liệu quảng cáo');
       setAdvertisements([]); // Set empty array to avoid undefined errors
       setTotalPages(1);
@@ -222,7 +222,7 @@ const AdvertisementPage = () => {
           fetchAdvertisements();
         } else {
           toast.error('Có lỗi khi cập nhật quảng cáo');
-          console.error('Error in update response:', result);
+
         }
       } else {
         // Create new ad
@@ -233,11 +233,11 @@ const AdvertisementPage = () => {
           fetchAdvertisements();
         } else {
           toast.error('Có lỗi khi tạo quảng cáo mới');
-          console.error('Error in create response:', result?.error || 'Unknown error');
+
         }
       }
     } catch (error) {
-      console.error('Error saving advertisement:', error);
+
       toast.error('Có lỗi khi lưu quảng cáo');
     }
   };
@@ -256,11 +256,11 @@ const AdvertisementPage = () => {
         setDeleteModalOpen(false);
         fetchAdvertisements();
       } else {
-        console.error('Error in delete response:', result);
+
         toast.error('Có lỗi khi xóa quảng cáo');
       }
     } catch (error) {
-      console.error('Error deleting advertisement:', error);
+
       toast.error('Có lỗi khi xóa quảng cáo');
     }
   };
@@ -931,4 +931,4 @@ const AdvertisementPage = () => {
   );
 };
 
-export default AdvertisementPage; 
+export default AdvertisementPage;

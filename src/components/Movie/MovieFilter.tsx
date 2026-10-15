@@ -347,7 +347,7 @@ const MovieFilter: React.FC<MovieFilterProps> = ({
       {/* 2. Main Filter Card Panel */}
       <div className={`${styles.filterCard} ${!isOpen ? styles.filterCardCollapsed : ''}`}>
         {/* Integrated Card Header (Never leaves the button lonely!) */}
-        <div 
+        <div
           className={`${styles.filterCardHeader} ${isOpen ? styles.filterHeaderWithBorder : ''}`}
           onClick={() => setIsOpen(!isOpen)}
         >

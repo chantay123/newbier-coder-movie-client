@@ -59,7 +59,7 @@ const AccountLockedPage: NextPage = () => {
           try {
             window.location.href = '/auth/login?locked=true';
           } catch (error) {
-            console.error('Error redirecting with window.location:', error);
+
             const link = document.createElement('a');
             link.href = '/auth/login?locked=true';
             link.setAttribute('data-redirect', 'forced');
@@ -69,7 +69,7 @@ const AccountLockedPage: NextPage = () => {
         }, 300);
       }
     } catch (error) {
-      console.error('Error during logout:', error);
+
       alert('Có lỗi xảy ra khi đăng xuất. Vui lòng tải lại trang.');
     }
   };
@@ -130,7 +130,7 @@ const AccountLockedPage: NextPage = () => {
           requestLog[domain] = (requestLog[domain] || 0) + 1;
 
           if (requestLog[domain] > 10) {
-            console.warn('Phát hiện spam từ domain:', domain);
+
             showRateLimitMessage();
           }
 

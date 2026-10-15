@@ -236,7 +236,7 @@ const UserForm: React.FC<UserFormProps> = ({
             avatarUrl = response.avatarUrl;
           }
         } catch (error) {
-          console.error('Upload avatar error:', error);
+
           setErrors(prev => ({
             ...prev,
             avatar: 'Không thể tải lên avatar. Vui lòng thử lại.'

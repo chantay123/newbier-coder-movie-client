@@ -57,7 +57,7 @@ const WatchLater = ({ inProfilePage = false }: { inProfilePage?: boolean }) => {
       const watchlistMovies = (await watchlistService.getWatchlist()) as WatchLaterMovie[];
       setMovies(watchlistMovies);
     } catch (err) {
-      console.error('Error fetching watchlist:', err);
+
       toast.error('Không thể tải danh sách xem sau');
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ const WatchLater = ({ inProfilePage = false }: { inProfilePage?: boolean }) => {
         toast.error(result.message || 'Không thể xóa phim khỏi danh sách xem sau');
       }
     } catch (err) {
-      console.error('Error removing movie from watchlist:', err);
+
       toast.error('Có lỗi xảy ra khi xóa phim khỏi danh sách xem sau');
     }
   };
@@ -89,7 +89,7 @@ const WatchLater = ({ inProfilePage = false }: { inProfilePage?: boolean }) => {
         toast.error(result.message || 'Không thể xóa danh sách xem sau');
       }
     } catch (err) {
-      console.error('Error clearing watchlist:', err);
+
       toast.error('Có lỗi xảy ra khi xóa danh sách xem sau');
     } finally {
       setConfirmClearModal(false);
@@ -120,7 +120,7 @@ const WatchLater = ({ inProfilePage = false }: { inProfilePage?: boolean }) => {
       toast.success(`Đã xóa ${selectedMovies.length} phim khỏi danh sách xem sau`);
       if (selectedMovies.length === movies.length) setMultiSelectMode(false);
     } catch (err) {
-      console.error('Error removing multiple movies:', err);
+
       toast.error('Có lỗi xảy ra khi xóa các phim đã chọn');
     }
   };

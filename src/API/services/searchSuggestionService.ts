@@ -25,7 +25,7 @@ const searchSuggestionService = {
       }
       return { success: false, suggestions: [] };
     } catch (error) {
-      console.error('Error fetching search suggestions:', error);
+
       const err = error as { response?: { data?: unknown }; message?: string };
       return { success: false, suggestions: [], error: err.response?.data || err.message };
     }

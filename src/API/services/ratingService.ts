@@ -57,7 +57,7 @@ const ratingService = {
       if (!res.ok) throw new Error(`Failed to fetch user ratings: ${res.status}`);
       return await res.json() as RatingServiceResponse<UserRatingItem[]>;
     } catch (error) {
-      console.error('Error fetching user ratings:', error);
+
       return { success: false, message: (error as Error).message, data: [] };
     }
   },
@@ -77,7 +77,7 @@ const ratingService = {
       if (!res.ok) throw new Error(`Failed to fetch user movie rating: ${res.status}`);
       return await res.json() as RatingServiceResponse<{ rating: number }>;
     } catch (error) {
-      console.error('Error fetching user movie rating:', error);
+
       return { success: false, message: (error as Error).message, data: { rating: 0 } };
     }
   },
@@ -94,7 +94,7 @@ const ratingService = {
       if (!res.ok) throw new Error(`Failed to create/update rating: ${res.status}`);
       return await res.json() as RatingServiceResponse;
     } catch (error) {
-      console.error('Error creating/updating rating:', error);
+
       return { success: false, message: (error as Error).message };
     }
   },
@@ -110,7 +110,7 @@ const ratingService = {
       if (!res.ok) throw new Error(`Failed to delete rating: ${res.status}`);
       return await res.json() as RatingServiceResponse;
     } catch (error) {
-      console.error('Error deleting rating:', error);
+
       return { success: false, message: (error as Error).message };
     }
   },
@@ -124,7 +124,7 @@ const ratingService = {
       if (!res.ok) throw new Error(`Failed to fetch rating stats: ${res.status}`);
       return await res.json() as RatingServiceResponse<MovieRatingStats>;
     } catch (error) {
-      console.error('Error fetching rating stats:', error);
+
       return { success: false, message: (error as Error).message, data: { averageRating: 0, ratingCount: 0 } };
     }
   },
@@ -138,7 +138,7 @@ const ratingService = {
       if (!res.ok) throw new Error(`Failed to fetch movie ratings: ${res.status}`);
       return await res.json() as RatingServiceResponse<UserRatingItem[]>;
     } catch (error) {
-      console.error('Error fetching movie ratings:', error);
+
       return { success: false, message: (error as Error).message, data: [] };
     }
   }

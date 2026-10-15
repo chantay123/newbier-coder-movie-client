@@ -22,7 +22,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({ movieId }) => {
       });
       setShowModal(false);
     } catch (error) {
-      console.error('Lỗi khi báo cáo:', error);
+
     }
   };
 

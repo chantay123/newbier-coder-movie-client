@@ -82,7 +82,7 @@ export function SearchHistoryContent({
         setSearchHistory([]);
       }
     } catch (err) {
-      console.error('Error fetching search history:', err);
+
       setError('Không thể tải lịch sử tìm kiếm. Vui lòng thử lại sau!');
       setSearchHistory([]);
     } finally {
@@ -102,7 +102,7 @@ export function SearchHistoryContent({
         setSearchHistory((prev) => prev.filter((item) => item._id !== id));
       }
     } catch (err) {
-      console.error('Error deleting search history item:', err);
+
       alert('Không thể xóa mục lịch sử. Vui lòng thử lại!');
     } finally {
       setIsDeleting(false);
@@ -119,7 +119,7 @@ export function SearchHistoryContent({
       };
       if (response && (response.success || response.statusCode === 200)) setSearchHistory([]);
     } catch (err) {
-      console.error('Error clearing search history:', err);
+
       alert('Không thể xóa toàn bộ lịch sử. Vui lòng thử lại!');
     } finally {
       setIsDeleting(false);

@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { FaTimes, FaTrophy, FaPlus, FaTrash } from 'react-icons/fa';
 import styles from '@/styles/AdminPeople.module.css';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 export interface AwardItem {
   id: string;

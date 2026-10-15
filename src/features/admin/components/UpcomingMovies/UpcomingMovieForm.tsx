@@ -96,7 +96,7 @@ const UpcomingMovieForm: React.FC<UpcomingMovieFormProps> = ({
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     if (!token) {
       setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.');
-      console.error('Authentication token missing. User might need to log in again.');
+
     }
   }, [movie]);
 

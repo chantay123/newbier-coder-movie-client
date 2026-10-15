@@ -11,7 +11,7 @@ import '../styles/animation.css';
 import '../styles/subscription-details.css';
 import '../styles/feedbackAdmin.css';
 import { SessionProvider } from 'next-auth/react';
-import { AuthProvider, withAccountStatus } from '@/utils/auth';
+import { AuthProvider, withAccountStatus, withAuth } from '@/utils/auth';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/layouts/ClientLayout';
@@ -88,7 +88,7 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
         try {
           setUser(JSON.parse(userData));
         } catch (err) {
-          console.error('Error parsing user data:', err);
+
         }
       }
       setIsInitialized(true);
@@ -103,6 +103,25 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
   const isAuthPage = router.pathname.startsWith(ROUTES.AUTH_PREFIX);
   const isSearchPage = router.pathname === ROUTES.SEARCH;
 
+  // Routes that must be reachable WITHOUT being logged in. Everything
+  // else is gated by `withAuth`, which redirects to /auth/login when
+  // the AuthContext reports no user. This prevents the home (and any
+  // other client-side page) from rendering the mock-movie fallback
+  // before login.
+  const PUBLIC_ROUTE_PREFIXES = [
+    ROUTES.AUTH_PREFIX,
+    ROUTES.ADMIN_PREFIX,
+    ROUTES.ACCOUNT_PREFIX,
+    ROUTES.PAYMENT_PREFIX,
+    ROUTES.NO_ACCESS,
+    ROUTES.NOT_FOUND,
+    ROUTES.MAINTENANCE,
+    ROUTES.SERVICE_UNAVAILABLE
+  ] as const;
+  const isPublicRoute = PUBLIC_ROUTE_PREFIXES.some((prefix) =>
+    router.pathname.startsWith(prefix)
+  );
+
   const PageWithLayout = Component as unknown as PageWithLayout;
 
   const getLayout = useCallback((page: ReactNode): ReactNode => {
@@ -115,8 +134,10 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
     const component = getLayout(<Component {...pageProps} />);
     if (isAuthPage || isAdminPage || isSearchPage) return component;
     const AccountStatusWrapper = withAccountStatus((): ReactNode => component);
-    return <AccountStatusWrapper />;
-  }, [Component, pageProps, getLayout, isAuthPage, isAdminPage, isSearchPage]);
+    if (isPublicRoute) return <AccountStatusWrapper />;
+    const AuthWrapper = withAuth((): ReactNode => <AccountStatusWrapper />);
+    return <AuthWrapper />;
+  }, [Component, pageProps, getLayout, isAuthPage, isAdminPage, isSearchPage, isPublicRoute]);
 
   return (
     <SessionProvider session={session as never}>

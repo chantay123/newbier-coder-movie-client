@@ -69,7 +69,7 @@ export const AdminNotificationsProvider: React.FC<AdminNotificationsProviderProp
       setNotifications(fetched);
       setUnreadCount(fetched.filter((n) => !n.isRead).length);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export const AdminNotificationsProvider: React.FC<AdminNotificationsProviderProp
       setNotifications((prev) => prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+
     }
   };
 
@@ -91,7 +91,7 @@ export const AdminNotificationsProvider: React.FC<AdminNotificationsProviderProp
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+
     }
   };
 

@@ -224,7 +224,7 @@ const MoviesAdmin = () => {
         setElasticsearchStatus(status);
         setEsStatusChecked(true);
       } catch (error) {
-        console.error('Error checking Elasticsearch status:', error);
+
         setElasticsearchStatus({
           status: 'error',
           message: 'Không thể kết nối tới Elasticsearch'
@@ -279,7 +279,7 @@ const MoviesAdmin = () => {
           return;
         }
       } catch (apiError) {
-        console.warn('Backend search API unreachable, filtering in mock movies dataset:', apiError);
+
       }
 
       // Fallback search in mock dataset
@@ -310,7 +310,7 @@ const MoviesAdmin = () => {
       setTotalPages(Math.max(1, Math.ceil(filtered.length / moviesPerPage)));
       setLoading(false);
     } catch (error) {
-      console.error('Error searching movies:', error);
+
       setLoading(false);
     }
   };
@@ -347,7 +347,7 @@ const MoviesAdmin = () => {
           return;
         }
       } catch (apiError) {
-        console.warn('Backend getMoviesForAdmin unreachable, using mock movies dataset:', apiError);
+
       }
 
       // Fallback to rich mock dataset
@@ -372,7 +372,7 @@ const MoviesAdmin = () => {
       setTotalPages(Math.max(1, Math.ceil(filtered.length / moviesPerPage)));
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching movies:', error);
+
       setLoading(false);
     }
   }, [searchQuery, moviesPerPage, sortField, sortDirection, selectedCategory,
@@ -416,7 +416,7 @@ const MoviesAdmin = () => {
           setTotalMovies(pagination.totalItems || 0);
           setTotalPages(pagination.totalPages || 1);
         } else {
-          console.warn('No movies array in response after clearing search:', response);
+
           setMovies([]);
           setTotalMovies(0);
           setTotalPages(1);
@@ -424,7 +424,7 @@ const MoviesAdmin = () => {
 
         setLoading(false);
       }).catch(error => {
-        console.error('Error fetching movies after clearing search:', error);
+
         toast.error('Không thể tải danh sách phim');
         setLoading(false);
         setMovies([]);
@@ -452,7 +452,7 @@ const MoviesAdmin = () => {
           return;
         }
       } catch (error) {
-        console.warn('Backend categories API unavailable, using mock categories:', error);
+
       }
       setCategories(INITIAL_CATEGORIES as any);
     };
@@ -491,7 +491,7 @@ const MoviesAdmin = () => {
         fetchMovies(currentPage);
         setDeleteModal({ isOpen: false, movie: null });
       } catch (error) {
-        console.error('Error deleting movie:', error);
+
         toast.error('Không thể xóa phim');
       }
     }
@@ -500,7 +500,7 @@ const MoviesAdmin = () => {
   const handleToggleStatus = async (movie: Movie) => {
     try {
       if (!movie || !movie._id) {
-        console.error('Invalid movie object or missing ID');
+
         toast.error('Không thể cập nhật trạng thái - Thiếu thông tin phim');
         return;
       }
@@ -508,7 +508,7 @@ const MoviesAdmin = () => {
       const movieId = String(movie._id).trim();
 
       if (!movieId || movieId.length < 24) {
-        console.error('Invalid movie ID:', movieId, 'Expected a 24-character MongoDB ObjectId');
+
         toast.error('ID phim không hợp lệ, không thể cập nhật trạng thái');
         return;
       }
@@ -528,7 +528,7 @@ const MoviesAdmin = () => {
         )
       );
     } catch (error) {
-      console.error('Error updating movie visibility:', error);
+
       toast.error('Không thể cập nhật trạng thái hiển thị phim');
     }
   };
@@ -563,7 +563,7 @@ const MoviesAdmin = () => {
       // Refresh movie data to show updated ratings
       fetchMovies(currentPage);
     } catch (error) {
-      console.error('Lỗi khi đồng bộ tất cả đánh giá:', error);
+
       toast.error('Không thể đồng bộ đánh giá');
     } finally {
       setSyncingAllRatings(false);

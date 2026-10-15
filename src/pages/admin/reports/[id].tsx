@@ -4,9 +4,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import styles from '@/styles/AdminReportDetail.module.css';
 import AdminLayout from '@/layouts/AdminLayout';
-import { 
-  FaArrowLeft, FaCheck, FaTimes, FaClock, FaExclamationTriangle, 
-  FaUser, FaFilm, FaExclamationCircle, FaEdit, FaTrash, 
+import {
+  FaArrowLeft, FaCheck, FaTimes, FaClock, FaExclamationTriangle,
+  FaUser, FaFilm, FaExclamationCircle, FaEdit, FaTrash,
   FaEnvelope, FaLink, FaCommentAlt, FaPlayCircle
 } from 'react-icons/fa';
 import { getReportById, updateReport } from '@/features/admin/services/reportService';
@@ -47,7 +47,7 @@ interface Report {
 const ReportDetailPage = () => {
   const router = useRouter();
   const { id } = router.query;
-  
+
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,14 +55,14 @@ const ReportDetailPage = () => {
   const [newStatus, setNewStatus] = useState<string>('');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [updateLoading, setUpdateLoading] = useState<boolean>(false);
-  
+
   // Fetch report data
   useEffect(() => {
     if (id) {
       fetchReportData();
     }
   }, [id]);
-  
+
   const fetchReportData = async () => {
     try {
       setLoading(true);
@@ -71,23 +71,23 @@ const ReportDetailPage = () => {
       setAdminNotes(data.adminNotes || '');
       setNewStatus(data.status);
     } catch (error) {
-      console.error('Error fetching report:', error);
+
       setError('Không thể tải thông tin báo cáo. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
   };
-  
+
   // Update report status
   const handleUpdateReport = async () => {
     try {
       setUpdateLoading(true);
-      
+
       await updateReport(id as string, {
         status: newStatus,
         adminNotes: adminNotes
       });
-      
+
       // Update local state
       if (report) {
         setReport({
@@ -97,16 +97,16 @@ const ReportDetailPage = () => {
           updatedAt: new Date().toISOString()
         });
       }
-      
+
       setIsEditing(false);
     } catch (error) {
-      console.error('Error updating report:', error);
+
       setError('Không thể cập nhật báo cáo. Vui lòng thử lại sau.');
     } finally {
       setUpdateLoading(false);
     }
   };
-  
+
   const renderTypeIcon = (type: string) => {
     switch(type) {
       case 'movie':
@@ -119,7 +119,7 @@ const ReportDetailPage = () => {
         return <FaExclamationTriangle className={styles.typeIcon} />;
     }
   };
-  
+
   const renderTypeText = (type: string) => {
     switch(type) {
       case 'movie':
@@ -132,7 +132,7 @@ const ReportDetailPage = () => {
         return 'Báo cáo khác';
     }
   };
-  
+
   const renderStatusBadge = (status: string) => {
     switch(status) {
       case 'pending':
@@ -147,7 +147,7 @@ const ReportDetailPage = () => {
         return <span className={`${styles.statusBadge} ${styles.pending}`}>Chưa xác định</span>;
     }
   };
-  
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('vi-VN', {
@@ -158,13 +158,13 @@ const ReportDetailPage = () => {
       minute: '2-digit'
     });
   };
-  
+
   return (
     <AdminLayout>
       <Head>
         <title>Chi tiết báo cáo - Admin Panel</title>
       </Head>
-      
+
       <div className={styles.container}>
         {/* Back button */}
         <div className={styles.backButton}>
@@ -172,7 +172,7 @@ const ReportDetailPage = () => {
             <FaArrowLeft /> Quay lại danh sách báo cáo
           </Link>
         </div>
-        
+
         {loading ? (
           <div className={styles.loadingContainer}>
             <div className={styles.loadingSpinner}></div>
@@ -182,7 +182,7 @@ const ReportDetailPage = () => {
           <div className={styles.errorContainer}>
             <FaExclamationTriangle className={styles.errorIcon} />
             <p className={styles.errorMessage}>{error}</p>
-            <button 
+            <button
               className={styles.retryButton}
               onClick={fetchReportData}
             >
@@ -220,13 +220,13 @@ const ReportDetailPage = () => {
                 {renderStatusBadge(report.status)}
               </div>
             </div>
-            
+
             <div className={styles.reportContent}>
               {/* Left column - Report details */}
               <div className={styles.reportDetailsColumn}>
                 <div className={styles.reportCard}>
                   <h2 className={styles.cardTitle}>Thông tin báo cáo</h2>
-                  
+
                   <div className={styles.reportField}>
                     <div className={styles.fieldLabel}>Người báo cáo:</div>
                     <div className={styles.fieldValue}>
@@ -238,7 +238,7 @@ const ReportDetailPage = () => {
                           <div className={styles.userEmail}>{report.userId.email}</div>
                         </div>
                       </div>
-                      <Link 
+                      <Link
                         href={`/admin/users/edit/${report.userId._id}`}
                         className={styles.viewUserLink}
                       >
@@ -246,14 +246,14 @@ const ReportDetailPage = () => {
                       </Link>
                     </div>
                   </div>
-                  
+
                   <div className={styles.reportField}>
                     <div className={styles.fieldLabel}>Lý do báo cáo:</div>
                     <div className={styles.fieldValue}>
                       <div className={styles.reasonText}>{report.reason}</div>
                     </div>
                   </div>
-                  
+
                   <div className={styles.reportField}>
                     <div className={styles.fieldLabel}>Mô tả chi tiết:</div>
                     <div className={styles.fieldValue}>
@@ -262,7 +262,7 @@ const ReportDetailPage = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className={styles.reportField}>
                     <div className={styles.fieldLabel}>Ngày cập nhật:</div>
                     <div className={styles.fieldValue}>
@@ -270,16 +270,16 @@ const ReportDetailPage = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Admin actions card */}
                 <div className={styles.reportCard}>
                   <h2 className={styles.cardTitle}>Thao tác xử lý</h2>
-                  
+
                   {isEditing ? (
                     <div className={styles.editForm}>
                       <div className={styles.formGroup}>
                         <label htmlFor="status" className={styles.formLabel}>Trạng thái:</label>
-                        <select 
+                        <select
                           id="status"
                           className={styles.formSelect}
                           value={newStatus}
@@ -291,10 +291,10 @@ const ReportDetailPage = () => {
                           <option value="rejected">Từ chối</option>
                         </select>
                       </div>
-                      
+
                       <div className={styles.formGroup}>
                         <label htmlFor="adminNotes" className={styles.formLabel}>Ghi chú của admin:</label>
-                        <textarea 
+                        <textarea
                           id="adminNotes"
                           className={styles.formTextarea}
                           value={adminNotes}
@@ -303,16 +303,16 @@ const ReportDetailPage = () => {
                           placeholder="Nhập ghi chú xử lý..."
                         />
                       </div>
-                      
+
                       <div className={styles.buttonGroup}>
-                        <button 
+                        <button
                           className={styles.saveButton}
                           onClick={handleUpdateReport}
                           disabled={updateLoading}
                         >
                           {updateLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
                         </button>
-                        <button 
+                        <button
                           className={styles.cancelButton}
                           onClick={() => {
                             setIsEditing(false);
@@ -333,7 +333,7 @@ const ReportDetailPage = () => {
                           {renderStatusBadge(report.status)}
                         </div>
                       </div>
-                      
+
                       <div className={styles.reportField}>
                         <div className={styles.fieldLabel}>Ghi chú của admin:</div>
                         <div className={styles.fieldValue}>
@@ -342,8 +342,8 @@ const ReportDetailPage = () => {
                           </div>
                         </div>
                       </div>
-                      
-                      <button 
+
+                      <button
                         className={styles.editButton}
                         onClick={() => setIsEditing(true)}
                       >
@@ -351,21 +351,21 @@ const ReportDetailPage = () => {
                       </button>
                     </>
                   )}
-                  
+
                   <div className={styles.quickActions}>
                     <h3 className={styles.quickActionsTitle}>Thao tác nhanh</h3>
                     <div className={styles.quickActionButtons}>
                       {report.type === 'movie' && report.movieInfo && (
                         <>
-                          <Link 
-                            href={`/admin/movies/edit/${report.movieInfo.id}`} 
+                          <Link
+                            href={`/admin/movies/edit/${report.movieInfo.id}`}
                             className={`${styles.quickActionButton} ${styles.editContentButton}`}
                           >
                             <FaEdit /> Sửa phim
                           </Link>
-                          <a 
-                            href={`/movies/${report.movieInfo.slug}`} 
-                            target="_blank" 
+                          <a
+                            href={`/movies/${report.movieInfo.slug}`}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className={`${styles.quickActionButton} ${styles.viewContentButton}`}
                           >
@@ -373,18 +373,18 @@ const ReportDetailPage = () => {
                           </a>
                         </>
                       )}
-                      
+
                       {report.type === 'user' && report.contentId && (
-                        <Link 
-                          href={`/admin/users/edit/${report.contentId._id}`} 
+                        <Link
+                          href={`/admin/users/edit/${report.contentId._id}`}
                           className={`${styles.quickActionButton} ${styles.editContentButton}`}
                         >
                           <FaEdit /> Sửa người dùng
                         </Link>
                       )}
-                      
+
                       {report.type === 'comment' && report.contentId && (
-                        <button 
+                        <button
                           className={`${styles.quickActionButton} ${styles.deleteContentButton}`}
                           onClick={() => {
                             // Implement delete comment functionality
@@ -395,8 +395,8 @@ const ReportDetailPage = () => {
                           <FaTrash /> Xóa bình luận
                         </button>
                       )}
-                      
-                      <a 
+
+                      <a
                         href={`mailto:${report.userId.email}?subject=Phản hồi báo cáo: ${report._id}&body=Kính gửi ${report.userId.name},%0A%0AChúng tôi đã nhận được báo cáo của bạn và đang xử lý.%0A%0AThông tin báo cáo:%0A- Loại: ${renderTypeText(report.type)}%0A- Lý do: ${report.reason}%0A%0ACảm ơn bạn đã gửi báo cáo này.%0A%0ATrân trọng,%0AĐội ngũ MovieStreaming`}
                         className={`${styles.quickActionButton} ${styles.contactButton}`}
                       >
@@ -406,19 +406,19 @@ const ReportDetailPage = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Right column - Content details */}
               <div className={styles.contentDetailsColumn}>
                 <div className={styles.reportCard}>
                   <h2 className={styles.cardTitle}>Chi tiết nội dung được báo cáo</h2>
-                  
+
                   {report.type === 'movie' && report.movieInfo ? (
                     <div className={styles.movieContentDetails}>
                       {report.movieInfo.thumb && (
                         <div className={styles.movieThumbnailContainer}>
-                          <img 
-                            src={report.movieInfo.thumb} 
-                            alt={report.movieInfo.name} 
+                          <img
+                            src={report.movieInfo.thumb}
+                            alt={report.movieInfo.name}
                             className={styles.movieThumbnail}
                           />
                           {report.movieInfo.episode && (
@@ -428,23 +428,23 @@ const ReportDetailPage = () => {
                           )}
                         </div>
                       )}
-                      
+
                       <div className={styles.movieInfoList}>
                         <div className={styles.movieInfoItem}>
                           <div className={styles.infoLabel}>Tên phim:</div>
                           <div className={styles.infoValue}>{report.movieInfo.name}</div>
                         </div>
-                        
+
                         <div className={styles.movieInfoItem}>
                           <div className={styles.infoLabel}>ID phim:</div>
                           <div className={styles.infoValue}>{report.movieInfo.id}</div>
                         </div>
-                        
+
                         <div className={styles.movieInfoItem}>
                           <div className={styles.infoLabel}>Slug:</div>
                           <div className={styles.infoValue}>{report.movieInfo.slug}</div>
                         </div>
-                        
+
                         {report.movieInfo.episode && (
                           <div className={styles.movieInfoItem}>
                             <div className={styles.infoLabel}>Tập phim:</div>
@@ -452,16 +452,16 @@ const ReportDetailPage = () => {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className={styles.contentActions}>
-                        <Link 
+                        <Link
                           href={`/admin/movies/edit/${report.movieInfo.id}`}
                           className={styles.contentActionLink}
                         >
                           <FaEdit /> Chỉnh sửa phim
                         </Link>
-                        
-                        <a 
+
+                        <a
                           href={`/movies/${report.movieInfo.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -469,8 +469,8 @@ const ReportDetailPage = () => {
                         >
                           <FaLink /> Xem trang phim
                         </a>
-                        
-                        <a 
+
+                        <a
                           href={`/watch/${report.movieInfo.slug}${report.movieInfo.episode ? `/${report.movieInfo.episode}` : ''}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -486,9 +486,9 @@ const ReportDetailPage = () => {
                         <h3 className={styles.userName}>{report.contentId.name}</h3>
                         <div className={styles.userIdBadge}>ID: {report.contentId._id}</div>
                       </div>
-                      
+
                       <div className={styles.contentActions}>
-                        <Link 
+                        <Link
                           href={`/admin/users/edit/${report.contentId._id}`}
                           className={styles.contentActionLink}
                         >
@@ -501,16 +501,16 @@ const ReportDetailPage = () => {
                       <div className={styles.commentText}>
                         {report.contentId.text || 'Không có nội dung bình luận'}
                       </div>
-                      
+
                       <div className={styles.commentMeta}>
                         <div className={styles.commentId}>
                           <span className={styles.metaLabel}>ID bình luận:</span>
                           <span className={styles.metaValue}>{report.contentId._id}</span>
                         </div>
                       </div>
-                      
+
                       <div className={styles.contentActions}>
-                        <button 
+                        <button
                           className={`${styles.contentActionButton} ${styles.deleteButton}`}
                           onClick={() => {
                             // Implement delete comment functionality

@@ -21,7 +21,7 @@ export function rateLimiter(limit = 30) {
 
     // Get current count for this IP and endpoint
     const currentRequests = rateLimit.get(key) as number || 0;
-    
+
     // Check if the IP has exceeded the limit
     if (currentRequests >= limit) {
       return res.status(429).json({
@@ -29,10 +29,10 @@ export function rateLimiter(limit = 30) {
         message: 'Too many requests, please try again later.'
       });
     }
-    
+
     // Increment the count
     rateLimit.set(key, currentRequests + 1);
-    
+
     // Continue to the actual API handler
     if (next) next();
     return true;

@@ -115,7 +115,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           setUser(JSON.parse(storedUser));
         } catch (err) {
-          console.error('Error parsing user from localStorage:', err);
+
         }
       } else {
         setUser(null);
@@ -179,14 +179,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           try {
             setUser(JSON.parse(storedUser));
           } catch (err) {
-            console.error('Error parsing user from localStorage:', err);
+
           }
         } else {
           const currentUser = authService.getCurrentUser() as AuthUser | null;
           if (currentUser) setUser(currentUser);
         }
       } catch (err) {
-        console.error('Error checking authentication:', err);
+
         setError('Could not check authentication status');
       } finally {
         setLoading(false);
@@ -242,15 +242,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           window.sessionStorage.setItem('accountStatusDisabled', '1');
           if (!window.sessionStorage.getItem('accountStatusDisabledLogged')) {
             window.sessionStorage.setItem('accountStatusDisabledLogged', '1');
-            console.info(
-              '[Auth] checkAccountStatus is disabled (no verified endpoint). ' +
-              'Lock notifications still come from the WebSocket channel and the 403 isAccountLocked signal on other API calls.'
-            );
+
           }
         }
         return;
       }
-      console.warn('Account status check skipped:', e?.message || e);
+
     } finally {
       clearTimeout(timeoutId);
       if (abortControllerRef.current === controller) {
@@ -301,9 +298,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const wsUrl = buildWsUrl();
     if (!wsUrl) {
-      console.info(
-        '[WS] disabled (no resolvable host). Real-time lock notifications rely on this channel; verify backend support.'
-      );
+
       return undefined;
     }
 
@@ -316,7 +311,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const delay = Math.min(30000, 2000 * Math.pow(2, Math.min(attempts, 4)));
       attempts += 1;
       if (attempts > 8) {
-        console.warn(`${logScope} giving up after ${attempts} attempts.`);
+
         return;
       }
       reconnectTimer = setTimeout(() => {
@@ -331,20 +326,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ws = new WebSocket(wsUrl);
         wsRef.current = ws;
       } catch (err) {
-        console.warn(`${logScope} failed to construct WebSocket:`, (err as Error)?.message);
+
         scheduleReconnect();
         return;
       }
 
       ws.onopen = () => {
         attempts = 0;
-        console.info(`${logScope} connected: ${wsUrl}`);
+
         const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
         if (token && ws && ws.readyState === WebSocket.OPEN) {
           try {
             ws.send(JSON.stringify({ type: 'authenticate', token }));
           } catch (sendErr) {
-            console.warn(`${logScope} failed to send authenticate:`, (sendErr as Error)?.message);
+
           }
         }
       };
@@ -365,18 +360,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           }
         } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
+
         }
       };
 
       ws.onerror = () => {
-        console.warn(`${logScope} error event received (url=${wsUrl}, readyState=${ws?.readyState})`);
+
       };
 
       ws.onclose = (event) => {
-        console.info(
-          `${logScope} closed (code=${event?.code}, reason="${event?.reason || ''}", wasClean=${event?.wasClean})`
-        );
+
         if (cancelled) return;
         if (!user || !user._id) return;
         if (document.visibilityState === 'hidden') return;
@@ -434,7 +427,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Use warn (no stack trace) so the dev console is not spammed every
       // time someone mistypes a password. Server/network errors still log
       // as warn below without a stack trace.
-      console.warn('Login failed:', error?.message || err);
+
       if (error.response?.data?.isAccountLocked) {
         setIsAccountLocked(true);
         const message = 'Your account has been locked. Please contact an administrator.';
@@ -457,7 +450,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return { success: true, data };
     } catch (err) {
       const error = err as { message?: string };
-      console.error('Registration error in auth context:', error);
+
       setError(error.message || 'Registration failed');
       return { success: false, error: error.message || 'Registration failed' };
     }
@@ -471,13 +464,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           await signOut({ redirect: false });
         } catch (nextAuthError) {
-          console.warn('NextAuth signOut failed (continuing):', (nextAuthError as Error)?.message);
+
         }
       }
       try {
         await authService.logout();
       } catch (logoutError) {
-        console.warn('authService.logout failed (clearing local state anyway):', (logoutError as Error)?.message);
+
       }
 
       localStorage.removeItem('lastAccountStatusCheck');
@@ -499,12 +492,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         await authService.logout();
       } catch (logoutCleanupError) {
-        console.warn('authService.logout cleanup error:', (logoutCleanupError as Error)?.message);
+
       }
 
       router.push(LOGIN_ROUTE);
     } catch (err) {
-      console.error('Logout error:', err);
+
       setError('Logout failed');
     } finally {
       logoutInFlightRef.current = false;
@@ -519,7 +512,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return { success: true, user: result.user };
     } catch (err) {
       const error = err as { response?: { data?: { isAccountLocked?: boolean } }; message?: string };
-      console.error('Profile update error:', error);
+
       if (error.response?.data?.isAccountLocked) {
         setIsAccountLocked(true);
         const message = 'Your account has been locked. Please contact an administrator.';
@@ -538,7 +531,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return { success: true, avatarUrl: result.avatarUrl };
     } catch (err) {
       const error = err as { response?: { data?: { isAccountLocked?: boolean } }; message?: string };
-      console.error('Avatar upload error:', error);
+
       if (error.response?.data?.isAccountLocked) {
         setIsAccountLocked(true);
         return {
@@ -561,7 +554,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return null;
     } catch (err) {
       const error = err as { response?: { status?: number; data?: { isAccountLocked?: boolean } } };
-      console.error('Error refreshing user data:', error);
+
       if (error.response?.status === 403 && error.response?.data?.isAccountLocked) {
         setIsAccountLocked(true);
         setError('Your account has been locked. Please contact an administrator.');
@@ -597,7 +590,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshUser,
     updateAvatarInUI,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin' || user?.isAdmin === true,
+    isAdmin: user?.role?.toLowerCase() === 'admin' || user?.isAdmin === true,
     isAccountLocked,
     showAccountLockedBanner,
     hideAccountLockedBanner: () => setShowAccountLockedBanner(false),
@@ -708,3 +701,14 @@ export const withAccountStatus = <P extends Record<string, unknown>>(Component: 
 };
 
 export default useAuth;
+
+/**
+ * Helper: xác định user có phải admin hay không.
+ * Dùng cho cả client-side (ẩn/hiện UI) lẫn guard route. Nguồn dữ liệu là
+ * AuthContext → user.role / user.isAdmin. Tuyệt đối không hardcode email
+ * hay so sánh tên tài khoản ở frontend.
+ */
+export const isAdminUser = (user: AuthUser | null | undefined): boolean => {
+  if (!user) return false;
+  return user?.role?.toLowerCase() === 'admin' || user?.isAdmin === true;
+};

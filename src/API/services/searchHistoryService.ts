@@ -40,7 +40,7 @@ const searchHistoryService = {
       }
       return response.data;
     } catch (error) {
-      console.error('Error saving search history:', error);
+
       const err = error as { response?: { data?: unknown }; message?: string };
       return { success: false, error: err.response?.data || err.message };
     }
@@ -58,7 +58,7 @@ const searchHistoryService = {
       }
       return { success: false, searchHistory: [] };
     } catch (error) {
-      console.error('Error fetching search history:', error);
+
       return { success: false, searchHistory: [] };
     }
   },
@@ -68,7 +68,7 @@ const searchHistoryService = {
       const response = await axiosInstance.delete(`/search-history/${id}`);
       return response.data;
     } catch (error) {
-      console.error('Error deleting search history item:', error);
+
       const err = error as { response?: { data?: unknown }; message?: string };
       return { success: false, error: err.response?.data || err.message };
     }
@@ -79,7 +79,7 @@ const searchHistoryService = {
       const response = await axiosInstance.delete('/search-history');
       return response.data;
     } catch (error) {
-      console.error('Error clearing search history:', error);
+
       const err = error as { response?: { data?: unknown }; message?: string };
       return { success: false, error: err.response?.data || err.message };
     }

@@ -9,7 +9,7 @@ import {
   ReleaseDescTemplate,
   PRESET_RELEASE_DESC_TEMPLATES
 } from '@/config/addMovieConfig';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 interface UpcomingMovieModalProps {
   isOpen: boolean;

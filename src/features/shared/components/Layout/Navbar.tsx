@@ -12,11 +12,12 @@ import {
   FaUserCircle,
   FaUserPlus,
   FaTimesCircle,
-  FaChevronDown
+  FaChevronDown,
+  FaCog
 } from 'react-icons/fa';
 import { useRouter } from 'next/router';
 // .js deps - cast for strict TS
-import { useAuth as useAuthRaw } from '@/utils/auth';
+import { useAuth as useAuthRaw, isAdminUser } from '@/utils/auth';
 const { useAuth } = { useAuth: useAuthRaw as unknown as () => AuthApi };
 import searchHistoryServiceRaw from '@/API/services/searchHistoryService';
 const searchHistoryService = searchHistoryServiceRaw as unknown as {
@@ -47,6 +48,8 @@ interface AuthUser {
   fullname?: string;
   name?: string;
   email?: string;
+  role?: string;
+  isAdmin?: boolean;
   [key: string]: unknown;
 }
 
@@ -122,7 +125,9 @@ interface CinemaAvatarSvgProps {
 }
 
 /**
- * Modern vector SVG Cinema Avatar matching the dark aesthetic.
+ * Modern vector SVG Cinema Avatar — bright, colorful gradient so the
+ * default placeholder never looks "đen thui" against dark navbar.
+ * Uses the signature cinema palette (warm amber → coral → magenta).
  */
 export const CinemaAvatarSvg: React.FC<CinemaAvatarSvgProps> = ({ size = 32, className = '' }) => (
   <svg
@@ -137,15 +142,16 @@ export const CinemaAvatarSvg: React.FC<CinemaAvatarSvgProps> = ({ size = 32, cla
   >
     <defs>
       <linearGradient id="cinemaAvatarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#252d3d" />
-        <stop offset="100%" stopColor="#0f141f" />
+        <stop offset="0%" stopColor="#f59e0b" />
+        <stop offset="55%" stopColor="#ef4444" />
+        <stop offset="100%" stopColor="#ec4899" />
       </linearGradient>
       <linearGradient id="cinemaAvatarIconGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#e2e8f0" />
-        <stop offset="100%" stopColor="#94a3b8" />
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="100%" stopColor="#fff7ed" />
       </linearGradient>
     </defs>
-    <circle cx="18" cy="18" r="17.5" fill="url(#cinemaAvatarGrad)" stroke="rgba(255, 255, 255, 0.12)" strokeWidth="1" />
+    <circle cx="18" cy="18" r="17.5" fill="url(#cinemaAvatarGrad)" stroke="rgba(255, 255, 255, 0.25)" strokeWidth="1" />
     <circle cx="18" cy="13" r="5.25" fill="url(#cinemaAvatarIconGrad)" />
     <path
       d="M8.5 28.5C8.5 23.5 12.2 20.5 18 20.5C23.8 20.5 27.5 23.5 27.5 28.5C27.5 29.5 26.8 30 25.8 30H10.2C9.2 30 8.5 29.5 8.5 28.5Z"
@@ -386,7 +392,7 @@ const Navbar: React.FC = () => {
         setSearchActorsResult(Array.isArray(tmdbActors) ? tmdbActors : []);
       }
     } catch (err) {
-      console.error('Error fetching live search:', err);
+
     } finally {
       setSearchDropdownLoading(false);
     }
@@ -528,7 +534,7 @@ const Navbar: React.FC = () => {
     try {
       await searchHistoryService.saveSearchHistory(query.trim(), filters);
     } catch (error) {
-      console.error('Error saving search history:', error);
+
     }
   };
 
@@ -920,6 +926,16 @@ const Navbar: React.FC = () => {
               </Link>
               {isAuthenticated ? (
                 <>
+                  {isAdminUser(user) && (
+                    <Link
+                      href="/admin"
+                      className="nav-link admin-mobile-item py-2"
+                      onClick={closeMenu}
+                    >
+                      <FaCog className="me-2" /> Trang quản lý
+                      <span className="admin-badge ms-2">ADMIN</span>
+                    </Link>
+                  )}
                   <Link href="/profile" className="nav-link text-light py-2" onClick={closeMenu}>
                     <FaUserCircle className="me-2 text-primary" /> Hồ sơ của tôi
                   </Link>
@@ -1005,6 +1021,20 @@ const Navbar: React.FC = () => {
                 </div>
               </div>
               <hr className="dropdown-divider my-2" />
+              {/* Admin: Trang quản lý */}
+              {isAdminUser(user) && (
+                <>
+                  <Link
+                    href="/admin"
+                    className="dropdown-item admin-item"
+                    onClick={() => setShowUserMenu(false)}
+                  >
+                    <FaCog className="me-2" /> Trang quản lý
+                    <span className="admin-badge">ADMIN</span>
+                  </Link>
+                  <hr className="dropdown-divider my-2" />
+                </>
+              )}
               <button
                 className="dropdown-item"
                 onClick={() => {
@@ -1709,8 +1739,62 @@ const Navbar: React.FC = () => {
           color: #ffffff;
         }
 
+        .dropdown-item.admin-item {
+          position: relative;
+          background: linear-gradient(135deg, rgba(229, 9, 20, 0.12) 0%, rgba(229, 9, 20, 0.04) 100%);
+          border: 1px solid rgba(229, 9, 20, 0.25);
+          color: #ff6b6b;
+          font-weight: 600;
+          padding: 10px 12px;
+          margin: 2px 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          transition: all 0.2s ease;
+        }
+
+        .dropdown-item.admin-item:hover {
+          background: linear-gradient(135deg, rgba(229, 9, 20, 0.25) 0%, rgba(229, 9, 20, 0.1) 100%);
+          border-color: rgba(229, 9, 20, 0.5);
+          color: #ffffff;
+          transform: translateX(2px);
+          box-shadow: 0 4px 12px rgba(229, 9, 20, 0.25);
+        }
+
+        .dropdown-item.admin-item .me-2 {
+          color: #e50914;
+        }
+
+        .admin-badge {
+          background: linear-gradient(90deg, #e50914, #ff4d58);
+          color: #ffffff;
+          font-size: 9px;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 4px;
+          letter-spacing: 0.5px;
+          box-shadow: 0 2px 6px rgba(229, 9, 20, 0.4);
+        }
+
         .dropdown-divider {
           border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .admin-mobile-item {
+          color: #ff6b6b !important;
+          font-weight: 600;
+          background: linear-gradient(135deg, rgba(229, 9, 20, 0.12) 0%, rgba(229, 9, 20, 0.04) 100%);
+          border: 1px solid rgba(229, 9, 20, 0.25);
+          border-radius: 6px;
+          margin: 4px 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .admin-mobile-item:hover {
+          color: #ffffff !important;
+          background: linear-gradient(135deg, rgba(229, 9, 20, 0.25) 0%, rgba(229, 9, 20, 0.1) 100%);
         }
 
         @media (min-width: 992px) and (max-width: 1199px) {

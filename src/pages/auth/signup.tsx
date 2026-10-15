@@ -80,7 +80,7 @@ export default function Signup() {
         }
       } catch (apiError) {
         const err = apiError as Error;
-        console.error('API call error:', apiError);
+
         if (err.message.includes('Failed to fetch')) {
           setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và cài đặt API.');
         } else if (err.message.includes('<!DOCTYPE') || err.message.includes('Unexpected token')) {
@@ -95,7 +95,7 @@ export default function Signup() {
       }
     } catch (err) {
       const _err = err as Error;
-      console.error('Signup error:', err);
+
       setError('Lỗi đăng ký: ' + (_err.message || 'Đã xảy ra lỗi không xác định'));
     } finally {
       setIsLoading(false);

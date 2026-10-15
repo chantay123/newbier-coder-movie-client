@@ -41,7 +41,7 @@ export default async function handler(
 
     return res.status(200).json(data);
   } catch (error) {
-    console.error('Login error:', error);
+
 
     const axiosLike = error as { response?: { status: number; data: { error?: string; message?: string } } };
     if (axiosLike.response) {

@@ -61,7 +61,7 @@ const favoritesService = {
       ? localStorage.getItem('auth_token') || localStorage.getItem('token')
       : null;
     if (!token) {
-      console.error('[SERVICE] No auth token. Cannot call favorites list API.');
+
       return [];
     }
     try {
@@ -71,13 +71,13 @@ const favoritesService = {
         if (payload.statusCode === 200) {
           return (payload.data || []).map(mapFavorite);
         }
-        console.warn('[SERVICE] API returned an error:', payload.message);
+
         return [];
       }
-      console.warn('[SERVICE] Unexpected status:', response.status);
+
       return [];
     } catch (error) {
-      console.error('[SERVICE] Failed to fetch favorites:', error);
+
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
         const res = await fetch(`${apiUrl}/favorites`, {
@@ -96,7 +96,7 @@ const favoritesService = {
         }
         return [];
       } catch (fetchError) {
-        console.error('[SERVICE] Both methods failed:', fetchError);
+
         return [];
       }
     }
@@ -118,7 +118,7 @@ const favoritesService = {
       };
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } }; message?: string };
-      console.error('Add to favorites failed:', err);
+
       return {
         success: false,
         message: err.response?.data?.message || 'Could not add to favorites',
@@ -137,7 +137,7 @@ const favoritesService = {
       };
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } }; message?: string };
-      console.error('Remove from favorites failed:', err);
+
       return {
         success: false,
         message: err.response?.data?.message || 'Could not remove from favorites'
@@ -154,7 +154,7 @@ const favoritesService = {
       }
       return false;
     } catch (error) {
-      console.error('Check favorite status failed:', error);
+
       return false;
     }
   },
@@ -164,7 +164,7 @@ const favoritesService = {
       ? localStorage.getItem('auth_token') || localStorage.getItem('token')
       : null;
     if (!token) {
-      console.error('No auth token. Cannot call favorites list API.');
+
       return [];
     }
     try {
@@ -185,7 +185,7 @@ const favoritesService = {
       }
       return [];
     } catch (error) {
-      console.error('Direct favorites fetch failed:', error);
+
       return [];
     }
   }

@@ -344,7 +344,7 @@ const FeedbackPage = () => {
             { headers: { Authorization: `Bearer ${token}` }, timeout: 4000 }
           );
         } catch (apiErr) {
-          console.warn('API update failed, updating local state:', apiErr);
+
         }
       }
 
@@ -354,7 +354,7 @@ const FeedbackPage = () => {
 
       showToast(`Đã chuyển trạng thái sang "${getStatusText(newStatus)}"`, 'success');
     } catch (error) {
-      console.error('Error updating status:', error);
+
       showToast('Có lỗi xảy ra khi cập nhật trạng thái', 'error');
     } finally {
       setUpdatingStatus(null);
@@ -377,7 +377,7 @@ const FeedbackPage = () => {
             timeout: 4000
           });
         } catch (apiErr) {
-          console.warn('API delete failed, updating local state:', apiErr);
+
         }
       }
 
@@ -387,7 +387,7 @@ const FeedbackPage = () => {
       setFeedbackToDelete(null);
       showToast('Đã xóa góp ý thành công', 'success');
     } catch (error) {
-      console.error('Error deleting feedback:', error);
+
       showToast('Có lỗi xảy ra khi xóa góp ý', 'error');
     } finally {
       setDeleteInProgress(false);

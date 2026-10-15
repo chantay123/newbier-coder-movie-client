@@ -194,7 +194,7 @@ export default function Movies() {
         setTotalMovies(0);
       }
     } catch (err) {
-      console.error('Error fetching movies via search API:', err);
+
       if (pageNumber === 1 || refreshing) setMovies([]);
       setHasMore(false);
       setTotalMovies(0);

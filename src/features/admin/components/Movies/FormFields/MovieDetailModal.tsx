@@ -27,7 +27,7 @@ import {
   FaUsers
 } from 'react-icons/fa';
 import styles from '@/styles/MovieDetailModal.module.css';
-import { showCinemaAlert } from '@/components/UI/CinemaAlert';
+import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
 interface MovieDetailModalProps {
   isOpen: boolean;

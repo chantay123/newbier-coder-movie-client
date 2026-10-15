@@ -19,7 +19,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/watch-stats`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching watch stats:', error);
+
       return null;
     }
   },
@@ -29,7 +29,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/weekly-activity`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching weekly activity:', error);
+
       return null;
     }
   },
@@ -39,7 +39,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/genre-distribution`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching genre distribution:', error);
+
       return null;
     }
   },
@@ -49,7 +49,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/daily-viewing-time`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching daily viewing time:', error);
+
       return null;
     }
   },
@@ -59,7 +59,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/series-progress/${seriesId}`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching series progress:', error);
+
       return null;
     }
   },
@@ -69,7 +69,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/in-progress-series`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching in-progress series:', error);
+
       return null;
     }
   },
@@ -79,7 +79,7 @@ const statsService = {
       const response = await axios.get(`${API_URL}/user-stats/achievements`, { headers: getAuthHeader() });
       return (response.data as { data: unknown }).data;
     } catch (error) {
-      console.error('Error fetching achievements:', error);
+
       return null;
     }
   },
@@ -93,10 +93,10 @@ const statsService = {
       const response = await axios.get(`${API_URL}/ratings/user`, { headers });
       const data = response.data as { success?: boolean; message?: string; data?: unknown };
       if (data.success) return data.data || null;
-      console.warn('API responded with error:', data.message);
+
       return null;
     } catch (error) {
-      console.error('Error fetching user rated movies:', error);
+
       return null;
     }
   }

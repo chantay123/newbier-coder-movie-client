@@ -62,12 +62,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         const data = JSON.parse(event.data) as WebSocketMessage;
         setLastMessage(data);
       } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
+
       }
     };
 
     ws.onclose = (): void => setIsConnected(false);
-    ws.onerror = (event: Event): void => console.error('WebSocket error:', event);
+    ws.onerror = (): void => undefined;
     setSocket(ws);
 
     return () => {

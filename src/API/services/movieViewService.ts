@@ -10,7 +10,7 @@ const movieViewService = {
       const response = await axiosClient.post('/movie-views/record', { movieId });
       return response.data;
     } catch (error) {
-      console.error('Error recording movie view:', error);
+
       throw error;
     }
   },
@@ -20,7 +20,7 @@ const movieViewService = {
       const response = await axiosClient.get(`/movie-views/most-viewed?days=${days}&limit=${limit}`);
       return response.data;
     } catch (error) {
-      console.error('Error getting most viewed movies:', error);
+
       throw error;
     }
   },
@@ -30,7 +30,7 @@ const movieViewService = {
       const response = await axiosClient.get(`/movie-views/stats/${movieId}`);
       return response.data;
     } catch (error) {
-      console.error('Error getting movie view stats:', error);
+
       throw error;
     }
   }

@@ -19,7 +19,7 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     const response = await axiosInstance.get('/admin/dashboard/stats');
     return response.data as DashboardStats;
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+
     throw error;
   }
 };

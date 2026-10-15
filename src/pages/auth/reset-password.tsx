@@ -53,7 +53,7 @@ export default function ResetPassword() {
       if (response.data.success) setSuccess(true);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
-      console.error('Reset password error:', err);
+
       setError(axiosErr.response?.data?.message || 'Đặt lại mật khẩu thất bại. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);

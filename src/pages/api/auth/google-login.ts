@@ -36,7 +36,7 @@ export default async function handler(
 
     return res.status(200).json(response.data as Record<string, unknown>);
   } catch (error) {
-    console.error('Google login error:', error);
+
 
     const axiosError = error as { response?: { status: number; data: { message?: string } } };
     if (axiosError.response) {

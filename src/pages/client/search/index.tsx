@@ -142,7 +142,7 @@ export default function SearchPage() {
       }
       setInitialLoad(false);
     } catch (err) {
-      console.error('Lỗi khi tìm kiếm phim:', err);
+
       setError(`Lỗi khi tìm kiếm phim: ${(err as Error).message}`);
       if (!isLoadMore) setMovies([]);
       setInitialLoad(false);

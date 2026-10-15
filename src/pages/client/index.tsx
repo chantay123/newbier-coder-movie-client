@@ -148,14 +148,34 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
     }
   }, [isAuthenticated, isAccountLocked]);
 
-  // Redirect unauthenticated users to login
+  const [renderTimedOut, setRenderTimedOut] = useState<boolean>(false);
+
+  // Safety net: if `loading` from useHomeData() stays true for more than
+  // 12 seconds, force-render sections so the page never appears "stuck"
+  // even if the underlying API is hung / blocked by middleware.
   useEffect(() => {
-    if (!authLoading && !isAuthenticated && typeof window !== 'undefined') {
-      const currentPath = window.location.pathname;
-      const loginUrl = `/auth/login${currentPath !== '/' ? `?redirect=${currentPath}` : ''}`;
-      window.location.href = loginUrl;
+    // eslint-disable-next-line no-console
+
+    if (!loading) {
+      setRenderTimedOut(false);
+      return;
     }
-  }, [authLoading, isAuthenticated]);
+    const timer = setTimeout(() => {
+      // eslint-disable-next-line no-console
+
+      setRenderTimedOut(true);
+    }, 12000);
+    return () => clearTimeout(timer);
+  }, [loading, featuredMovies.length, topMovies.length, latestMovies.length, mostViewedMovies.length, animeSpotlightMovies.length]);
+
+  const effectiveLoading = loading && !renderTimedOut;
+
+  // Note: Homepage is public — do NOT redirect unauthenticated users to /auth/login
+  // from this effect. The header already exposes login/register buttons and the
+  // <withAuth> HOC handles protected routes. Previously this effect caused the
+  // home to "spin forever" when useAuth() was still resolving (stuck loading)
+  // OR when the user simply hadn't logged in yet.
+  // See bug report: "sao trang home tui van loading".
 
   const handlePlayTrailer = (movie: DetailTrailerMovie): void => setActiveTrailerMovie(movie);
   const handleCloseTrailer = (): void => setActiveTrailerMovie(null);
@@ -166,28 +186,28 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
     let content: ReactNode = null;
     switch (sectionId) {
       case 'hero':
-        content = <HeroBanner movies={featuredMovies} loading={loading} onPlayTrailer={handlePlayTrailer} />;
+        content = <HeroBanner movies={featuredMovies} loading={effectiveLoading} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'carousel_3d':
-        content = <FeaturedCarousel3D movies={featuredMovies} loading={loading} onPlayTrailer={handlePlayTrailer} />;
+        content = <FeaturedCarousel3D movies={featuredMovies} loading={effectiveLoading} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'recommended':
-        content = <TopRecommendedSection movies={topMovies} cardSize={config.cardSize} loading={loading} onPlayTrailer={handlePlayTrailer} />;
+        content = <TopRecommendedSection movies={topMovies} cardSize={config.cardSize} loading={effectiveLoading} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'top10':
-        content = <TrendingTop10Section movies={mostViewedMovies} cardSize={config.cardSize} badge={config.badge} loading={loading} onPlayTrailer={handlePlayTrailer} />;
+        content = <TrendingTop10Section movies={mostViewedMovies} cardSize={config.cardSize} badge={config.badge} loading={effectiveLoading} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'country':
         content = <CountryMoviesSection cardSize={config.cardSize} rails={config.rails} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'big_slide':
-        content = <BigSlideBanner title={config.title} badge={config.badge} viewAllHref={config.viewAllHref} autoPlayInterval={config.autoPlayInterval} movies={animeSpotlightMovies} loading={loading} onPlayTrailer={handlePlayTrailer} />;
+        content = <BigSlideBanner title={config.title} badge={config.badge} viewAllHref={config.viewAllHref} autoPlayInterval={config.autoPlayInterval} movies={animeSpotlightMovies} loading={effectiveLoading} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'animation':
         content = <AnimationMoviesSection cardSize={config.cardSize} title={config.title} badge={config.badge} viewAllHref={config.viewAllHref} load={config.load} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'latest':
-        content = <LatestMoviesGridSection movies={latestMovies} cardSize={config.cardSize} loading={loading} onPlayTrailer={handlePlayTrailer} />;
+        content = <LatestMoviesGridSection movies={latestMovies} cardSize={config.cardSize} loading={effectiveLoading} onPlayTrailer={handlePlayTrailer} />;
         break;
       case 'radar':
         if (!config.enabled) return null;

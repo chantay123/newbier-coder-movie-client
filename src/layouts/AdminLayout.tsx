@@ -32,7 +32,7 @@ const AdminLayout = ({ children, skipHeader = false }: { children: React.ReactNo
           JQueryScript
         ]);
       } catch (error) {
-        console.error('Error loading admin scripts:', error);
+
       }
     };
 

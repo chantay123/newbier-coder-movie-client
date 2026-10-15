@@ -24,7 +24,6 @@ const AddUpcomingMoviePage: React.FC = () => {
       alert('Phim sắp ra mắt đã được tạo thành công!');
       router.push('/admin/upcoming-movies');
     } catch (error: any) {
-      console.error("Error creating upcoming movie:", error);
 
       if (error.response && error.response.data && error.response.data.message) {
         setError(error.response.data.message);

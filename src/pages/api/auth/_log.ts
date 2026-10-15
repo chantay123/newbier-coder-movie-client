@@ -17,10 +17,10 @@ export default function handler(
   }
 
   try {
-    console.error('Auth log:', req.body);
+
     return res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Error logging auth event:', error);
+
     return res.status(500).json({ message: 'Internal server error' });
   }
 }

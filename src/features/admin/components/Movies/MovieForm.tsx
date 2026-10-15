@@ -26,7 +26,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     country: [],
     episodes: [{ server_name: 'Server #1', server_data: [] }]
   });
-  
+
   const [thumbnailPreview, setThumbnailPreview] = useState<string>(formData.thumb_url || '');
   const [posterPreview, setPosterPreview] = useState<string>(formData.poster_url || '');
   const [activeTab, setActiveTab] = useState('basic');
@@ -39,12 +39,12 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
       setThumbnailPreview(movie.thumb_url || '');
       setPosterPreview(movie.poster_url || '');
     }
-    
+
     // Check for authentication token
     const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     if (!token) {
       setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.');
-      console.error('Authentication token missing. User might need to log in again.');
+
     }
   }, [movie]);
 
@@ -102,7 +102,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const fileUrl = URL.createObjectURL(file);
-      
+
       // Here we would normally upload the file to a server,
       // but for now we'll just use the local URL for preview
       if (field === 'thumb_url') {
@@ -148,15 +148,15 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                     <Nav.Link eventKey="preview" className="mb-2">Xem trước</Nav.Link>
                   </Nav.Item>
                 </Nav>
-                
+
                 {(thumbnailPreview || posterPreview) && (
                   <Card className="mt-4">
                     <Card.Header className="bg-light">Xem nhanh</Card.Header>
                     <Card.Body className="text-center">
                       {thumbnailPreview && (
-                        <Image 
-                          src={thumbnailPreview} 
-                          alt="Thumbnail preview" 
+                        <Image
+                          src={thumbnailPreview}
+                          alt="Thumbnail preview"
                           style={{ maxWidth: '100%', height: 'auto', maxHeight: '150px' }}
                           className="mb-2"
                         />
@@ -165,7 +165,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                   </Card>
                 )}
               </Col>
-              
+
               <Col md={9}>
                 <Form onSubmit={handleSubmit}>
                   <Tab.Content>
@@ -369,8 +369,8 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     onChange={handleInputChange}
                                     placeholder="URL hình thumbnail"
                                   />
-                                  <Button 
-                                    variant="outline-secondary" 
+                                  <Button
+                                    variant="outline-secondary"
                                     onClick={() => fileInputRefThumb.current?.click()}
                                     className="ms-2"
                                   >
@@ -407,8 +407,8 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     onChange={handleInputChange}
                                     placeholder="URL hình poster"
                                   />
-                                  <Button 
-                                    variant="outline-secondary" 
+                                  <Button
+                                    variant="outline-secondary"
                                     onClick={() => fileInputRefPoster.current?.click()}
                                     className="ms-2"
                                   >
@@ -435,7 +435,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                               </Form.Group>
                             </Col>
                           </Row>
-                          
+
                           <Form.Group className="mb-3">
                             <Form.Label>Trailer URL</Form.Label>
                             <Form.Control
@@ -475,9 +475,9 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                     />
                                   </Form.Group>
                                   {formData.episodes && formData.episodes.length > 1 && (
-                                    <Button 
-                                      variant="outline-danger" 
-                                      size="sm" 
+                                    <Button
+                                      variant="outline-danger"
+                                      size="sm"
                                       className="ms-2 align-self-end"
                                       onClick={() => handleRemoveServer(serverIndex)}
                                     >
@@ -526,8 +526,8 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                             </Form.Group>
                                           </Col>
                                           <Col md={1} className="d-flex align-items-end justify-content-center">
-                                            <Button 
-                                              variant="outline-danger" 
+                                            <Button
+                                              variant="outline-danger"
                                               size="sm"
                                               onClick={() => handleRemoveEpisode(serverIndex, episodeIndex)}
                                             >
@@ -603,7 +603,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                             <Col md={8}>
                               <h4>{formData.name || 'Chưa có tên phim'}</h4>
                               <p className="text-muted">{formData.origin_name || 'Chưa có tên gốc'}</p>
-                              
+
                               <div className="mb-3">
                                 <strong>Năm phát hành:</strong> {formData.year}<br/>
                                 <strong>Loại phim:</strong> {formData.type === 'single' ? 'Phim lẻ' : 'Phim bộ'}<br/>
@@ -612,7 +612,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                 <strong>Ngôn ngữ:</strong> {formData.lang}<br/>
                                 {formData.time && <><strong>Thời lượng:</strong> {formData.time}<br/></>}
                               </div>
-                              
+
                               <div className="mb-3">
                                 {formData.category && formData.category.length > 0 && (
                                   <div><strong>Thể loại:</strong> {formData.category.map(c => c.name).join(', ')}</div>
@@ -627,7 +627,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                                   <div><strong>Đạo diễn:</strong> {formData.director.map(d => d.name).join(', ')}</div>
                                 )}
                               </div>
-                              
+
                               {formData.description && (
                                 <div className="mb-3">
                                   <strong>Mô tả ngắn:</strong>
@@ -636,7 +636,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                               )}
                             </Col>
                           </Row>
-                          
+
                           {formData.content && (
                             <Row className="mt-3">
                               <Col>
@@ -645,7 +645,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                               </Col>
                             </Row>
                           )}
-                          
+
                           {formData.trailer_url && formData.trailer_url.includes('youtube') && (
                             <Row className="mt-3">
                               <Col>
@@ -661,7 +661,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                               </Col>
                             </Row>
                           )}
-                          
+
                           {formData.type === 'series' && formData.episodes && (
                             <Row className="mt-3">
                               <Col>
@@ -690,9 +690,9 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
                       </Card>
                     </Tab.Pane>
                   </Tab.Content>
-                  
+
                   {errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
-                  
+
                   <div className="d-flex justify-content-end mt-4">
                     <Button variant="secondary" onClick={onCancel} className="me-2">Hủy</Button>
                     <Button type="submit" variant="primary">{movie ? 'Cập nhật' : 'Thêm phim'}</Button>

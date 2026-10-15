@@ -111,12 +111,12 @@ const AuthForm: React.FC<AuthFormProps> = ({
       });
 
       if (result?.error) {
-        console.error('Google sign-in error:', result.error);
+
         alert(`Đăng nhập Google thất bại: ${result.error}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Google sign in error:', err);
+
       alert(`Đăng nhập Google thất bại: ${message}`);
     } finally {
       setSocialLoading((prev) => ({ ...prev, google: false }));

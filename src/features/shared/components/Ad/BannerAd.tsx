@@ -45,7 +45,7 @@ const BannerAd: React.FC<BannerAdProps> = ({ position = 'top', maxAds = 3 }) => 
         const ad = await fetchOne;
         if (ad) setAds([ad]);
       } catch (error) {
-        console.error(`Error fetching ${position} banner ads:`, error);
+
       }
     };
     fetchAds();
@@ -59,7 +59,7 @@ const BannerAd: React.FC<BannerAdProps> = ({ position = 'top', maxAds = 3 }) => 
             await trackingService.trackAdImpression(ad._id);
             setAdsTracked((prev) => ({ ...prev, [ad._id]: true }));
           } catch (error) {
-            console.error('Error tracking ad impression:', error);
+
           }
         }
       }
@@ -74,7 +74,7 @@ const BannerAd: React.FC<BannerAdProps> = ({ position = 'top', maxAds = 3 }) => 
       await trackingService.trackAdClick(ad._id);
       window.open(ad.link, '_blank');
     } catch (error) {
-      console.error('Error tracking ad click:', error);
+
       window.open(ad.link, '_blank');
     }
   };

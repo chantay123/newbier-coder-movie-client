@@ -80,8 +80,8 @@ const MovieTable: React.FC<MovieTableProps> = ({ movies, onEdit, onDelete }) => 
               <tr key={movie._id}>
                 <td>{index + 1}</td>
                 <td>
-                  <img 
-                    src={movie.thumb_url || movie.poster_url} 
+                  <img
+                    src={movie.thumb_url || movie.poster_url}
                     alt={movie.name}
                     style={{ width: '50px', height: '75px', objectFit: 'cover' }}
                   />
@@ -99,16 +99,16 @@ const MovieTable: React.FC<MovieTableProps> = ({ movies, onEdit, onDelete }) => 
                 <td>{movie.lang}</td>
                 <td>{movie.status}</td>
                 <td>
-                  <Button 
-                    variant="info" 
-                    size="sm" 
+                  <Button
+                    variant="info"
+                    size="sm"
                     className="me-1"
                     onClick={() => onEdit?.(movie._id)}
                   >
                     Sửa
                   </Button>
-                  <Button 
-                    variant="danger" 
+                  <Button
+                    variant="danger"
                     size="sm"
                     onClick={() => onDelete?.(movie._id)}
                   >
@@ -124,7 +124,7 @@ const MovieTable: React.FC<MovieTableProps> = ({ movies, onEdit, onDelete }) => 
           )}
         </tbody>
       </Table>
-      
+
       {/* Back to top button at the bottom of the page */}
       {movies && movies.length > 10 && (
         <Row className="mt-3 mb-4">

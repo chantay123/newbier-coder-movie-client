@@ -90,7 +90,7 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
       try {
         data = JSON.parse(rawText) as FavoritesApiResponse;
       } catch (parseError) {
-        console.error('Error parsing JSON:', parseError);
+
         setError('Lỗi xử lý dữ liệu từ server');
         setLoading(false);
         return;
@@ -128,7 +128,7 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
       }
     } catch (err) {
       const e = err as Error;
-      console.error('Error in fetchFavorites:', err);
+
       setError('Có lỗi xảy ra khi tải danh sách yêu thích: ' + e.message);
       setFavorites([]);
     } finally {
@@ -145,7 +145,7 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
       await fetchFavorites();
       toast.success('Danh sách yêu thích đã được làm mới!');
     } catch (err) {
-      console.error('[FAVORITES] Error refreshing:', err);
+
       toast.error('Không thể làm mới danh sách yêu thích');
     } finally {
       setRefreshing(false);
@@ -169,7 +169,7 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
         fetchFavorites();
       }
     } catch (err) {
-      console.error('[FAVORITES] Error removing movie:', err);
+
       toast.error('Có lỗi xảy ra khi xóa phim khỏi danh sách yêu thích');
       fetchFavorites();
     } finally {
@@ -253,11 +253,11 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
             if (result.success) successCount++;
             else {
               errorCount++;
-              console.error(`Error removing movie ${movieId}:`, result.message);
+
             }
           } catch (err) {
             errorCount++;
-            console.error(`Error removing movie ${movieId}:`, err);
+
           }
         }
         setFavorites((prev) => prev.filter((movie) => !selectedItems.includes(movie.id)));
@@ -270,7 +270,7 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
           toast.error('Không thể xóa các phim đã chọn');
         }
       } catch (err) {
-        console.error('[FAVORITES] Error removing selected movies:', err);
+
         toast.error('Có lỗi xảy ra khi xóa các phim đã chọn');
       } finally {
         setIsDeleting(false);

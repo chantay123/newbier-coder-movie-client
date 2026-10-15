@@ -37,7 +37,7 @@ const EditUpcomingMoviePage: React.FC = () => {
         setError('Không tìm thấy thông tin phim sắp ra mắt');
       }
     } catch (err) {
-      console.error('Error fetching upcoming movie details:', err);
+
       setError('Lỗi khi tải thông tin phim sắp ra mắt');
     } finally {
       setLoading(false);
@@ -54,7 +54,6 @@ const EditUpcomingMoviePage: React.FC = () => {
       alert('Cập nhật phim sắp ra mắt thành công!');
       router.push(`/admin/upcoming-movies/${id as string}`);
     } catch (err: any) {
-      console.error('Error updating upcoming movie:', err);
 
       if (err.response && err.response.data && err.response.data.message) {
         setError(err.response.data.message);

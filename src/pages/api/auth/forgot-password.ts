@@ -39,7 +39,7 @@ export default async function handler(
       success: true
     });
   } catch (error) {
-    console.error('Forgot password error:', error);
+
 
     const axiosError = error as { response?: { status: number; data: { error?: string; message?: string } } };
     if (axiosError.response) {

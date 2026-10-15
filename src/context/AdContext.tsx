@@ -154,14 +154,21 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
           return;
         }
 
-        const benefits = (await subscriptionService.getUserAdBenefits()) as {
-          authError?: boolean;
-          isPremium15k?: boolean;
-          packageType?: string | null;
-          hideHomepageAds?: boolean;
-          hideVideoAds?: boolean;
-          hasActiveSubscription?: boolean;
+        const rawBenefits = await subscriptionService.getUserAdBenefits();
+        const benefits = (rawBenefits && typeof rawBenefits === 'object') ? rawBenefits : {
+          hideHomepageAds: false,
+          hideVideoAds: false,
+          packageType: null as string | null,
+          hasActiveSubscription: false,
+          authError: true
         };
+
+        // Unwrap nested structures defensively
+        const benefitsAny = benefits as {
+          responseData?: Partial<typeof benefits>;
+          data?: Partial<typeof benefits>;
+        };
+        const normalized = benefitsAny.responseData || benefitsAny.data || benefits;
 
         if (!isComponentMounted) {
           isFetchingRef.current = false;
@@ -169,11 +176,11 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
         }
         // The service reports a 401/403 via `authError`. We still allow
         // a few retries in case the token is being refreshed.
-        if (benefits.authError) {
+        if (normalized.authError) {
           // Don't spam the console when the user isn't logged in —
           // that's the expected steady state.
           if (isAuthenticated && retryCount === 0) {
-            console.warn('[AdContext] Authentication error detected, retrying…');
+
           }
           if (retryCount < MAX_RETRIES) {
             retryCount++;
@@ -181,22 +188,22 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
             return;
           } else if (isAuthenticated) {
             // Only log when we actually expected to be authenticated.
-            console.error('[AdContext] Max auth-error retries reached, giving up');
+
           }
         }
 
-        const isPremium15k = benefits.isPremium15k === true
-          || benefits.packageType === '682f7d849c310399aa715c9d';
+        const isPremium15k = normalized.isPremium15k === true
+          || normalized.packageType === '682f7d849c310399aa715c9d';
 
-        const hideHomepageAds = benefits.hideHomepageAds === true || isPremium15k;
-        const hideVideoAds = benefits.hideVideoAds === true || isPremium15k;
-        const hasActiveSubscription = benefits.hasActiveSubscription === true;
+        const hideHomepageAds = normalized.hideHomepageAds === true || isPremium15k;
+        const hideVideoAds = normalized.hideVideoAds === true || isPremium15k;
+        const hasActiveSubscription = normalized.hasActiveSubscription === true;
 
         if (isComponentMounted) {
           setAdSettings({
             hideHomepageAds,
             hideVideoAds,
-            packageType: benefits.packageType ?? null,
+            packageType: normalized.packageType ?? null,
             hasActiveSubscription,
             isLoading: false,
             lastUpdated: new Date().toISOString()
@@ -211,7 +218,6 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
         const err = error as { response?: { status?: number }; message?: string };
         const status = err?.response?.status;
         const isPermanent = status === 404 || status === 400;
-        console.error('[AdContext] Failed to fetch ad benefits:', err?.message || error);
 
         if (isPermanent) {
           isEndpointDisabled = true;
@@ -219,10 +225,7 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
           // we don't keep repeating ourselves on every interval tick.
           if (!endpointDisabledLogRef.current) {
             endpointDisabledLogRef.current = true;
-            console.warn(
-              `[AdContext] Endpoint reported ${status} — stopping further attempts ` +
-              'until the page is reloaded. Ads remain visible by default.'
-            );
+
           }
           if (isComponentMounted) {
             setAdSettings((prev) => ({ ...prev, isLoading: false }));

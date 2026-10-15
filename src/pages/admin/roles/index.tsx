@@ -27,7 +27,7 @@ const deleteRoleByAdmin = async (id: string) => {
     const response = await axiosInstance.delete(`${API_URL}/admin/roles/${id}`);
     return response.data;
   } catch (error) {
-    console.error('Error deleting role:', error);
+
     throw error;
   }
 };
@@ -53,7 +53,7 @@ const AdminRolesPage: NextPageWithLayout = () => {
       setRoles(rolesWithPermissions);
     } catch (err: any) {
       setError(err.message || 'Không thể tải danh sách vai trò');
-      console.error('Error fetching roles:', err);
+
     } finally {
       setLoading(false);
     }
@@ -89,7 +89,7 @@ const AdminRolesPage: NextPageWithLayout = () => {
       setShowDeleteModal(false);
     } catch (err: any) {
       setError(err.message || 'Không thể xóa vai trò');
-      console.error('Error deleting role:', err);
+
     }
   };
 

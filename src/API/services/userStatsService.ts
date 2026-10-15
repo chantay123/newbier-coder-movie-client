@@ -40,7 +40,7 @@ export const getUserWatchStats = async (): Promise<UserWatchStats> => {
     const data = (response.data as { data?: UserWatchStats }).data;
     return data || emptyWatchStats;
   } catch (error) {
-    console.error('Error fetching user watch stats:', error);
+
     return emptyWatchStats;
   }
 };
@@ -51,7 +51,7 @@ export const getUserActivityByWeek = async (): Promise<WeeklyActivity> => {
     const data = (response.data as { data?: WeeklyActivity }).data;
     return data || emptyWeek;
   } catch (error) {
-    console.error('Error fetching user activity by week:', error);
+
     return emptyWeek;
   }
 };
@@ -62,7 +62,7 @@ export const getUserGenreDistribution = async (): Promise<GenreDistribution> => 
     const data = (response.data as { data?: GenreDistribution }).data;
     return data || [];
   } catch (error) {
-    console.error('Error fetching user genre distribution:', error);
+
     return [];
   }
 };
