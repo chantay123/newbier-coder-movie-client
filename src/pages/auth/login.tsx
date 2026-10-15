@@ -193,14 +193,14 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
   // top of an already-authenticated session.
   if (authLoading || (isAuthenticated && !!user)) {
     return (
-      <div className={styles.loginPage}>
+      <div className={styles.loginPage} suppressHydrationWarning>
         <Head>
           <title>{t.meta.title}</title>
           <meta name="description" content={t.meta.description} />
         </Head>
-        <div className={styles.formSide}>
-          <div className={styles.formContainer}>
-            <div className={styles.header}>
+        <div className={styles.formSide} suppressHydrationWarning>
+          <div className={styles.formContainer} suppressHydrationWarning>
+            <div className={styles.header} suppressHydrationWarning>
               <h1 className={styles.title}>{t.header.title}</h1>
               <p className={styles.subtitle}>Đang khôi phục phiên đăng nhập…</p>
             </div>
@@ -211,20 +211,20 @@ const Login: NextPage & { getLayout?: (page: ReactElement) => ReactElement } = (
   }
 
   return (
-    <div className={styles.loginPage}>
+    <div className={styles.loginPage} suppressHydrationWarning>
       <Head>
         <title>{t.meta.title}</title>
         <meta name="description" content={t.meta.description} />
       </Head>
 
-      <div className={styles.formSide}>
+      <div className={styles.formSide} suppressHydrationWarning>
         <Link href="/" className={styles.backHome}>
           <FaArrowLeft size={13} />
           <span>{t.navigation.backHome}</span>
         </Link>
 
-        <div className={styles.formContainer}>
-          <div className={styles.header}>
+        <div className={styles.formContainer} suppressHydrationWarning>
+          <div className={styles.header} suppressHydrationWarning>
             <h1 className={styles.title}>{t.header.title}</h1>
             <p className={styles.subtitle}>{t.header.subtitle}</p>
           </div>

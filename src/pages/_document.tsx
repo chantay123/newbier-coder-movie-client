@@ -59,7 +59,7 @@ export default function Document() {
           }}
         />
       </Head>
-      <body>
+      <body suppressHydrationWarning>
         <Main />
         <NextScript />
       </body>

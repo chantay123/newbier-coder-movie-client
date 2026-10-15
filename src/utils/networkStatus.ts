@@ -1,68 +1,64 @@
-/**
- * @file networkStatus.ts
- * @description Custom hook phát hiện trạng thái mạng (online/offline).
- * Kiểm tra cả navigator.onLine lẫn kết nối thực sự qua API ping.
- */
-
 'use client';
 
 import { useState, useEffect } from 'react';
 
-/**
- * Hook theo dõi trạng thái mạng.
- * @returns True nếu online, False nếu offline
- */
-export const useNetworkStatus = () => {
-  const [isOnline, setIsOnline] = useState<boolean>(
-    typeof window !== 'undefined' ? window.navigator.onLine : true
-  );
+let sharedIsOnline: boolean =
+  typeof window !== 'undefined' ? window.navigator.onLine : true;
+const subscribers = new Set<(value: boolean) => void>();
+let pollIntervalId: ReturnType<typeof setInterval> | null = null;
+let isInitialized = false;
+
+const setSharedOnline = (value: boolean): void => {
+  if (sharedIsOnline === value) return;
+  sharedIsOnline = value;
+  subscribers.forEach((cb) => {
+    try {
+      cb(value);
+    } catch {
+    }
+  });
+};
+
+const checkRealConnectivity = async (): Promise<void> => {
+  if (typeof window === 'undefined') return;
+  try {
+    const response = await fetch(`/api/ping?_=${Date.now()}`, {
+      method: 'GET',
+      cache: 'no-cache',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    setSharedOnline(response.ok);
+  } catch {
+    setSharedOnline(false);
+  }
+};
+
+const initPolling = (): void => {
+  if (typeof window === 'undefined' || isInitialized) return;
+  isInitialized = true;
+
+  sharedIsOnline = window.navigator.onLine;
+
+  window.addEventListener('online', () => setSharedOnline(true));
+  window.addEventListener('offline', () => setSharedOnline(false));
+  window.addEventListener('appOnline', () => setSharedOnline(true));
+  window.addEventListener('appOffline', () => setSharedOnline(false));
+
+  // Kiểm tra lần đầu + interval 30s - chỉ một lần cho cả app
+  void checkRealConnectivity();
+  pollIntervalId = setInterval(() => {
+    void checkRealConnectivity();
+  }, 30000);
+};
+
+export const useNetworkStatus = (): boolean => {
+  const [isOnline, setIsOnline] = useState<boolean>(sharedIsOnline);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    // Custom event từ service worker
-    const handleAppOnline = () => setIsOnline(true);
-    const handleAppOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('appOnline', handleAppOnline);
-    window.addEventListener('appOffline', handleAppOffline);
-
-    // Kiểm tra kết nối thực qua API ping
-    const checkRealConnectivity = async () => {
-      try {
-        const response = await fetch(`/api/ping?_=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-cache',
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (response.ok) {
-          setIsOnline(true);
-        } else {
-          setIsOnline(false);
-        }
-      } catch {
-        setIsOnline(false);
-      }
-    };
-
-    // Kiểm tra lần đầu
-    checkRealConnectivity();
-
-    // Kiểm tra định kỳ mỗi 30 giây
-    const intervalId = setInterval(checkRealConnectivity, 30000);
-
+    initPolling();
+    subscribers.add(setIsOnline);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('appOnline', handleAppOnline);
-      window.removeEventListener('appOffline', handleAppOffline);
-      clearInterval(intervalId);
+      subscribers.delete(setIsOnline);
     };
   }, []);
 

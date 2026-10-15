@@ -1,8 +1,3 @@
-/**
- * @file pages/api/auth/NextAuth.ts
- * @description Legacy NextAuth configuration with Google & Facebook providers,
- * bridging OAuth profile data to the backend authentication service.
- */
 import NextAuth from 'next-auth';
 import type { NextAuthOptions, Account, Profile } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
@@ -118,7 +113,7 @@ const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/login'
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: process.env.NEXTAUTH_DEBUG === 'true',
   secret: process.env.NEXTAUTH_SECRET || 'your-secret-here'
 };
 

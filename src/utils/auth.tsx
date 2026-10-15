@@ -613,7 +613,6 @@ export const useAuth = (): AuthContextValue => {
   return context;
 };
 
-/** HOC: redirects to /auth/login when no user is loaded. */
 export const withAuth = <P extends Record<string, unknown>>(Component: React.ComponentType<P>) => {
   const AuthenticatedComponent: React.FC<P> = (props) => {
     const { user, loading } = useAuth();
@@ -625,14 +624,13 @@ export const withAuth = <P extends Record<string, unknown>>(Component: React.Com
       }
     }, [user, loading, router]);
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <div suppressHydrationWarning>Loading...</div>;
     if (!user) return null;
     return <Component {...props} />;
   };
   return AuthenticatedComponent;
 };
 
-/** HOC: shows a banner + redirect when account is locked. */
 export const withAccountStatus = <P extends Record<string, unknown>>(Component: React.ComponentType<P>) => {
   const WithAccountStatus: React.FC<P> = (props) => {
     const { user, loading, isAccountLocked } = useAuth();
@@ -702,12 +700,6 @@ export const withAccountStatus = <P extends Record<string, unknown>>(Component: 
 
 export default useAuth;
 
-/**
- * Helper: xác định user có phải admin hay không.
- * Dùng cho cả client-side (ẩn/hiện UI) lẫn guard route. Nguồn dữ liệu là
- * AuthContext → user.role / user.isAdmin. Tuyệt đối không hardcode email
- * hay so sánh tên tài khoản ở frontend.
- */
 export const isAdminUser = (user: AuthUser | null | undefined): boolean => {
   if (!user) return false;
   return user?.role?.toLowerCase() === 'admin' || user?.isAdmin === true;
