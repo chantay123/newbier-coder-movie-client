@@ -3,6 +3,7 @@
   min-height: 100vh;
   background: #0a0a0c;
   color: #f1f5f9;
+  overflow-x: hidden;
 }
 
 .contentWrapper {
@@ -12,11 +13,14 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  /* Prevent content from bleeding under the fixed sidebar */
+  max-width: calc(100vw - 250px);
 }
 
 @media (max-width: 768px) {
   .contentWrapper {
     margin-left: 0;
+    max-width: 100vw;
   }
 }
 
