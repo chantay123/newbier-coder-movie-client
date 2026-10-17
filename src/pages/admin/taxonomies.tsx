@@ -25,6 +25,7 @@ import styles from '@/styles/AdminTaxonomies.module.css';
 import TaxonomyFormModal, { TaxonomyItem } from '@/components/Admin/Taxonomies/TaxonomyFormModal';
 import TaxonomyRecalculateModal from '@/components/Admin/Taxonomies/TaxonomyRecalculateModal';
 import TaxonomyDeleteModal from '@/components/Admin/Taxonomies/TaxonomyDeleteModal';
+import CountryFlag from '@/components/Admin/Countries/CountryFlag';
 import CinemaDropdown from '@/features/admin/components/Common/CinemaDropdown';
 import AdminPagination from '@/features/admin/components/Common/AdminPagination';
 import { ADMIN_TAXONOMIES_I18N } from '@/config/i18n/admin';
@@ -37,14 +38,38 @@ import {
 
 type TaxonomyTab = 'categories' | 'countries' | 'formats' | 'years';
 
+const INITIAL_CATEGORIES: TaxonomyItem[] = MOCK_CATEGORIES.map(c => ({
+  ...c,
+  movieCount: c.movieCount ?? 0,
+  isActive: c.isActive ?? true
+})) as TaxonomyItem[];
+
+const INITIAL_COUNTRIES: TaxonomyItem[] = MOCK_COUNTRIES.map(c => ({
+  ...c,
+  movieCount: c.movieCount ?? 0,
+  isActive: c.isActive ?? true
+})) as TaxonomyItem[];
+
+const INITIAL_FORMATS: TaxonomyItem[] = MOCK_FORMATS.map(f => ({
+  ...f,
+  movieCount: f.movieCount ?? 0,
+  isActive: f.isActive ?? true
+})) as TaxonomyItem[];
+
+const INITIAL_YEARS: TaxonomyItem[] = MOCK_YEARS.map(y => ({
+  ...y,
+  movieCount: y.movieCount ?? 0,
+  isActive: y.isActive ?? true
+})) as TaxonomyItem[];
+
 export default function TaxonomiesAdminPage() {
   const [activeTab, setActiveTab] = useState<TaxonomyTab>('categories');
 
   // State collections
-  const [categories, setCategories] = useState<TaxonomyItem[]>(MOCK_CATEGORIES);
-  const [countries, setCountries] = useState<TaxonomyItem[]>(MOCK_COUNTRIES);
-  const [formats, setFormats] = useState<TaxonomyItem[]>(MOCK_FORMATS);
-  const [years, setYears] = useState<TaxonomyItem[]>(MOCK_YEARS);
+  const [categories, setCategories] = useState<TaxonomyItem[]>(INITIAL_CATEGORIES);
+  const [countries, setCountries] = useState<TaxonomyItem[]>(INITIAL_COUNTRIES);
+  const [formats, setFormats] = useState<TaxonomyItem[]>(INITIAL_FORMATS);
+  const [years, setYears] = useState<TaxonomyItem[]>(INITIAL_YEARS);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -339,7 +364,11 @@ export default function TaxonomiesAdminPage() {
                         {/* Name Column */}
                         <td>
                           <div className={styles.primaryCell}>
-                            {item.flag && <span className={styles.flagIcon}>{item.flag}</span>}
+                            {activeTab === 'countries' ? (
+                              <CountryFlag name={item.name} code={item.code} flag={item.flag} />
+                            ) : (
+                              item.flag && <span className={styles.flagIcon}>{item.flag}</span>
+                            )}
                             <div className={styles.nameBlock}>
                               <span className={styles.itemName}>{item.name}</span>
                               <span className={styles.itemSlug}>/{item.slug}</span>
@@ -379,7 +408,7 @@ export default function TaxonomiesAdminPage() {
 
                         {/* Status Toggle Switch */}
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <div className={styles.statusCell}>
                             <label className={styles.toggleSwitch}>
                               <input
                                 type="checkbox"

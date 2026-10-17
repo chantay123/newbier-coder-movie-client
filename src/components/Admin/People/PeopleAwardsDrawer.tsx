@@ -26,7 +26,7 @@ export interface PersonItem {
   isVerified: boolean;
   isActive: boolean;
   awards: AwardItem[];
-  movieCount: number;
+  movieCount?: number;
 }
 
 interface PeopleAwardsDrawerProps {

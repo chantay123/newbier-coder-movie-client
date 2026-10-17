@@ -10,7 +10,13 @@
 
 @media (max-width: 768px) {
   .pageContainer {
-    padding: 1rem 0.75rem;
+    padding: 0.875rem 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .pageContainer {
+    padding: 0.75rem 0.5rem;
   }
 }
 
@@ -71,6 +77,13 @@
   align-items: center;
   gap: 0.65rem;
   flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* Action Buttons */
@@ -188,7 +201,15 @@
 .searchBox {
   position: relative;
   flex: 1;
+  min-width: 0;
   max-width: 380px;
+}
+
+@media (max-width: 767px) {
+  .searchBox {
+    max-width: 100%;
+    width: 100%;
+  }
 }
 
 .searchIcon {
@@ -241,6 +262,17 @@
   align-items: center;
   gap: 0.65rem;
   flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .filterControls {
+    width: 100%;
+  }
+  .filterControls .filterSelect {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .filterSelect {
@@ -270,10 +302,12 @@
 
 .tableResponsive {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dataTable {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -315,6 +349,60 @@
 .flagIcon {
   font-size: 1.15rem;
   line-height: 1;
+}
+
+.flagImgWrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.flagImgWrapper:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.flagImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.flagFallbackBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 20px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.25) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border: 1px solid rgba(229, 9, 20, 0.4);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.flagFallbackBadge:hover {
+  transform: scale(1.08);
+  border-color: #e50914;
 }
 
 .nameBlock {
@@ -396,10 +484,20 @@
   background-color: #ffffff;
 }
 
+/* Status cell wrapper — keeps toggle + label from wrapping */
+.statusCell {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .statusText {
   font-size: 0.76rem;
   font-weight: 600;
-  margin-left: 0.5rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .statusActive {
@@ -408,6 +506,13 @@
 
 .statusInactive {
   color: #9ca3af;
+}
+
+/* Hide the text label on narrow tables — toggle icon is self-explanatory */
+@media (max-width: 960px) {
+  .statusText {
+    display: none;
+  }
 }
 
 /* Action Buttons in Row */
@@ -483,9 +588,18 @@
   border-radius: 14px;
   width: 100%;
   max-width: 520px;
-  overflow: hidden;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.75);
   animation: modalEnter 0.2s ease-out;
+}
+
+@media (max-width: 480px) {
+  .modalContent {
+    border-radius: 10px;
+    max-height: calc(100dvh - 1rem);
+  }
 }
 
 @keyframes modalEnter {

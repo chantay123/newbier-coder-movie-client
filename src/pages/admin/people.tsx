@@ -401,7 +401,7 @@ export default function PeopleAdminPage() {
                             borderRadius: '6px'
                           }}>
                             <FaFilm style={{ color: '#e50914', fontSize: '0.72rem' }} />
-                            <span>{person.movieCount} phim</span>
+                            <span>{person.movieCount ?? 0} phim</span>
                           </span>
                         </td>
 
@@ -422,7 +422,7 @@ export default function PeopleAdminPage() {
 
                         {/* Status Toggle */}
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                          <div className={styles.statusCell}>
                             <label className={styles.toggleSwitch}>
                               <input
                                 type="checkbox"

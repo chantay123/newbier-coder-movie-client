@@ -142,8 +142,24 @@
   .paginationRight {
     width: 100%;
     justify-content: center;
+    flex-wrap: wrap;
   }
   .jumpBox {
     display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .paginationLeft {
+    font-size: 0.76rem;
+    gap: 0.5rem;
+  }
+  .pageSizeWrapper {
+    display: none;
+  }
+  .pageBtn {
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.76rem;
   }
 }
