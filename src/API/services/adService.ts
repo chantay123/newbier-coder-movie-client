@@ -57,84 +57,11 @@ const safeGet = async <T>(url: string, timeout = 1200): Promise<T | null> => {
 };
 
 const adService = {
-  getRandomVideoAd: async (): Promise<Advertisement | null> => {
-    try {
-      const now = Date.now();
-      if (requestCache.videoAd && now - requestCache.videoAdTimestamp < requestCache.cacheDuration) {
-        return requestCache.videoAd;
-      }
-      const data = await safeGet<{ success?: boolean; advertisement?: Advertisement }>(
-        `${API_URL}/advertisements/random?type=video`
-      );
-      if (data?.success && data.advertisement) {
-        requestCache.videoAd = data.advertisement;
-        requestCache.videoAdTimestamp = now;
-        return data.advertisement;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-
-  getTopBannerAd: async (): Promise<Advertisement | null> => {
-    try {
-      const data = await safeGet<{ success?: boolean; advertisement?: Advertisement }>(
-        `${API_URL}/advertisements/random?type=banner_top`
-      );
-      return data?.success && data.advertisement ? data.advertisement : null;
-    } catch {
-      return null;
-    }
-  },
-
-  getBottomBannerAd: async (): Promise<Advertisement | null> => {
-    try {
-      const data = await safeGet<{ success?: boolean; advertisement?: Advertisement }>(
-        `${API_URL}/advertisements/random?type=banner_bottom`
-      );
-      return data?.success && data.advertisement ? data.advertisement : null;
-    } catch {
-      return null;
-    }
-  },
-
-  getMultipleBannerAds: async (position: 'top' | 'bottom' = 'top', limit = 3): Promise<Advertisement[]> => {
-    try {
-      const type = position === 'top' ? 'banner_top' : 'banner_bottom';
-      const data = await safeGet<{ success?: boolean; advertisements?: Advertisement[] }>(
-        `${API_URL}/advertisements/random?type=${type}&limit=${limit}`
-      );
-      if (data?.success && Array.isArray(data.advertisements) && data.advertisements.length > 0) {
-        return data.advertisements;
-      }
-      const single = position === 'top' ? await adService.getTopBannerAd() : await adService.getBottomBannerAd();
-      return single ? [single] : [];
-    } catch {
-      return [];
-    }
-  },
-
-  getMultipleVideoAds: async (limit = 1): Promise<Advertisement[]> => {
-    try {
-      const now = Date.now();
-      if (limit === 1 && requestCache.videoAd && now - requestCache.videoAdTimestamp < requestCache.cacheDuration) {
-        return [requestCache.videoAd];
-      }
-      const data = await safeGet<{ success?: boolean; advertisements?: Advertisement[] }>(
-        `${API_URL}/advertisements/random?type=video&limit=${limit}`
-      );
-      if (data?.success && Array.isArray(data.advertisements) && data.advertisements.length > 0) {
-        requestCache.videoAd = data.advertisements[0];
-        requestCache.videoAdTimestamp = now;
-        return data.advertisements;
-      }
-      const single = await adService.getRandomVideoAd();
-      return single ? [single] : [];
-    } catch {
-      return [];
-    }
-  },
+  getRandomVideoAd: async (): Promise<Advertisement | null> => null,
+  getTopBannerAd: async (): Promise<Advertisement | null> => null,
+  getBottomBannerAd: async (): Promise<Advertisement | null> => null,
+  getMultipleBannerAds: async (_position: 'top' | 'bottom' = 'top', _limit = 3): Promise<Advertisement[]> => [],
+  getMultipleVideoAds: async (_limit = 1): Promise<Advertisement[]> => [],
 
   trackAdImpression: async (adId: string): Promise<boolean> => {
     try {
