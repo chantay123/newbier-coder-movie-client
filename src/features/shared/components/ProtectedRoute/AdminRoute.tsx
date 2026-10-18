@@ -38,12 +38,23 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   // Show loading state while checking auth
   if (!hasChecked || loading) {
     return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '100vh', background: '#0a0e16' }}>
-        <div className="text-center">
-          <div className="spinner-border text-danger mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+      <div
+        className="d-flex justify-content-center align-items-center"
+        style={{ minHeight: '100vh', background: '#0a0e16' }}
+        suppressHydrationWarning
+      >
+        <div className="text-center" suppressHydrationWarning>
+          <div
+            className="spinner-border text-danger mb-3"
+            role="status"
+            style={{ width: '3rem', height: '3rem' }}
+            suppressHydrationWarning
+          >
             <span className="visually-hidden">Đang tải...</span>
           </div>
-          <p className="text-light">Đang xác thực quyền truy cập...</p>
+          <p className="text-light" suppressHydrationWarning>
+            Đang xác thực quyền truy cập...
+          </p>
         </div>
       </div>
     );
