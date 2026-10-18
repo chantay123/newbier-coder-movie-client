@@ -1,19 +1,13 @@
 
 import axiosInstance from '@/API/config/axiosConfig';
+import { MOCK_DASHBOARD_STATS, MOCK_ANALYTICS_DATA, MOCK_FEEDBACK_DATA } from '@/mock/admin';
 
+/**
+ * Retrieves dashboard summary statistics.
+ * @description Endpoint /admin/dashboard/stats is not active on backend. Returns mock dataset directly to eliminate 404 errors.
+ */
 export const getDashboardStats = async () => {
-  try {
-    const response = await axiosInstance.get('/admin/dashboard/stats');
-
-    if (response.data && response.data.data) {
-      return response.data.data;
-    }
-
-    return response.data;
-  } catch (error) {
-    // axiosConfig đã log [API] ... ở interceptor — tránh double log.
-    throw error;
-  }
+  return MOCK_DASHBOARD_STATS;
 };
 
 export const getMovieStatsByPeriod = async (period = 'week') => {
@@ -31,22 +25,15 @@ export const getMovieStatsByPeriod = async (period = 'week') => {
   }
 };
 
+/**
+ * Retrieves user stats by period.
+ * @description Uses mock dataset to avoid 404 errors from discontinued /admin/dashboard/stats endpoint.
+ */
 export const getUserStatsByPeriod = async (period = 'week') => {
-  try {
-    const response = await axiosInstance.get(`/admin/dashboard/stats`);
-
-    if (response.data && response.data.data) {
-      return {
-        labels: ["Hiện tại"],
-        data: [response.data.data.newUsers || 0]
-      };
-    }
-
-    return response.data;
-  } catch (error) {
-    // axiosConfig đã log [API] ... ở interceptor — tránh double log.
-    throw error;
-  }
+  return {
+    labels: ["Hiện tại"],
+    data: [MOCK_DASHBOARD_STATS.newUsers || 0]
+  };
 };
 
 export const getMovieStatsByGenre = async () => {
@@ -64,19 +51,12 @@ export const getMovieStatsByGenre = async () => {
   }
 };
 
+/**
+ * Retrieves cinema analytics data (views by day, genre distribution, recent movies).
+ * @description Endpoint /admin/dashboard/analytics is not active on backend. Returns mock dataset directly to eliminate 404 errors.
+ */
 export const getAnalyticsData = async () => {
-  try {
-    const response = await axiosInstance.get('/admin/dashboard/analytics');
-
-    if (response.data && response.data.data) {
-      return response.data.data;
-    }
-
-    return response.data;
-  } catch (error) {
-    // axiosConfig đã log [API] ... ở interceptor — tránh double log.
-    throw error;
-  }
+  return MOCK_ANALYTICS_DATA;
 };
 
 export const getRecentFeedbacks = async (limit = 5) => {
@@ -94,24 +74,10 @@ export const getRecentFeedbacks = async (limit = 5) => {
   }
 };
 
+/**
+ * Retrieves feedback breakdown statistics.
+ * @description Endpoint /admin/dashboard/feedback-stats is not active on backend. Returns mock dataset directly to eliminate 404 errors.
+ */
 export const getFeedbackStats = async () => {
-  try {
-    const response = await axiosInstance.get('/admin/dashboard/feedback-stats');
-
-    if (response.data && response.data.data) {
-      return response.data.data;
-    }
-
-    return {
-      byType: [],
-      byStatus: [],
-      byDay: {
-        labels: [],
-        data: []
-      }
-    };
-  } catch (error) {
-    // axiosConfig đã log [API] ... ở interceptor — tránh double log.
-    throw error;
-  }
+  return MOCK_FEEDBACK_DATA;
 };
