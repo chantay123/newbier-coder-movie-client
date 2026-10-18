@@ -1,6 +1,4 @@
-// src/pages/admin/index.tsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,12 +16,6 @@ import {
   FaCheckCircle,
   FaExclamationTriangle
 } from 'react-icons/fa';
-import {
-  getDashboardStats,
-  getAnalyticsData,
-  getFeedbackStats
-} from '@/features/admin/services/dashboardService';
-import { getReportStats } from '@/features/admin/services/reportService';
 import {
   MOCK_DASHBOARD_STATS,
   MOCK_ANALYTICS_DATA,
@@ -70,141 +62,15 @@ interface Feedback {
 }
 
 const AdminDashboardPage: NextPageWithLayout = () => {
-  const [statistics, setStatistics] = useState({
-    totalMovies: 0,
-    engagementRate: '0%',
-    newUsers: 0,
-    reports: 0,
-    feedback: {
-      total: 0,
-      unread: 0
-    }
-  });
-
-  const [analyticsData, setAnalyticsData] = useState({
-    viewsByDay: {
-      labels: [] as string[],
-      data: [] as number[]
-    },
-    genreDistribution: {
-      labels: [] as string[],
-      data: [] as number[]
-    },
-    recentMovies: [] as Movie[]
-  });
-
-  const [feedbackData, setFeedbackData] = useState({
-    recent: [] as Feedback[],
-    byType: [] as FeedbackTypeItem[],
-    byStatus: [] as FeedbackStatusItem[],
-    byDay: {
-      labels: [] as string[],
-      data: [] as number[]
-    }
-  });
-
-  const [reportData, setReportData] = useState({
-    total: 0,
-    new: 0,
-    byStatus: {
-      pending: 0,
-      'in-progress': 0,
-      resolved: 0,
-      rejected: 0
-    },
-    byType: {} as Record<string, number>
-  });
+  // All dashboard datasets use local mock data since backend endpoints are not active
+  const [statistics] = useState(MOCK_DASHBOARD_STATS);
+  const [analyticsData] = useState(MOCK_ANALYTICS_DATA);
+  const [feedbackData] = useState(MOCK_FEEDBACK_DATA);
+  const [reportData] = useState(MOCK_REPORT_DATA);
 
   const [activeChartFilter, setActiveChartFilter] = useState('week');
-  const [loading, setLoading] = useState(true);
-  const [isOfflinePreview, setIsOfflinePreview] = useState(false);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Safe parallel fetch with fallbacks - none can crash the entire dashboard
-        const [dashRes, analyticsRes, feedbackRes, reportRes] = await Promise.allSettled([
-          getDashboardStats().catch(() => null),
-          getAnalyticsData().catch(() => null),
-          getFeedbackStats().catch(() => null),
-          getReportStats().catch(() => null)
-        ]);
-
-        let hasRealData = false;
-
-        if (dashRes.status === 'fulfilled' && dashRes.value && (dashRes.value.totalMovies > 0 || dashRes.value.newUsers > 0)) {
-          hasRealData = true;
-          const val = dashRes.value;
-          setStatistics({
-            totalMovies: val.totalMovies ?? 0,
-            engagementRate: val.engagementRate ?? '0%',
-            newUsers: val.newUsers ?? 0,
-            reports: val.reports ?? 0,
-            feedback: {
-              total: val.feedback?.total ?? 0,
-              unread: val.feedback?.unread ?? 0
-            }
-          });
-        } else {
-          setStatistics(MOCK_DASHBOARD_STATS);
-        }
-
-        if (analyticsRes.status === 'fulfilled' && analyticsRes.value && analyticsRes.value.viewsByDay?.data?.length > 0) {
-          hasRealData = true;
-          const val = analyticsRes.value;
-          setAnalyticsData({
-            viewsByDay: val.viewsByDay || { labels: [], data: [] },
-            genreDistribution: val.genreDistribution || { labels: [], data: [] },
-            recentMovies: val.recentMovies || []
-          });
-        } else {
-          setAnalyticsData(MOCK_ANALYTICS_DATA);
-        }
-
-        if (feedbackRes.status === 'fulfilled' && feedbackRes.value && feedbackRes.value.recent?.length > 0) {
-          hasRealData = true;
-          const val = feedbackRes.value;
-          setFeedbackData({
-            recent: val.recent || [],
-            byType: val.byType || [],
-            byStatus: val.byStatus || [],
-            byDay: val.byDay || { labels: [], data: [] }
-          });
-        } else {
-          setFeedbackData(MOCK_FEEDBACK_DATA);
-        }
-
-        if (reportRes.status === 'fulfilled' && reportRes.value && reportRes.value.total > 0) {
-          hasRealData = true;
-          const val = reportRes.value;
-          setReportData({
-            total: val.total ?? 0,
-            new: val.new ?? 0,
-            byStatus: val.byStatus || { pending: 0, 'in-progress': 0, resolved: 0, rejected: 0 },
-            byType: val.byType || {}
-          });
-        } else {
-          setReportData(MOCK_REPORT_DATA);
-        }
-
-        if (!hasRealData) {
-          setIsOfflinePreview(true);
-        }
-      } catch (error) {
-
-        setStatistics(MOCK_DASHBOARD_STATS);
-        setAnalyticsData(MOCK_ANALYTICS_DATA);
-        setFeedbackData(MOCK_FEEDBACK_DATA);
-        setReportData(MOCK_REPORT_DATA);
-        setIsOfflinePreview(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  const [loading] = useState(false);
+  const isOfflinePreview = false;
 
   // Shared dark theme chart defaults
   const darkChartTheme = {
