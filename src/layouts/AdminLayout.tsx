@@ -5,6 +5,8 @@ import Head from 'next/head';
 import AdminHeader from '@/features/admin/components/Layout/AdminHeader';
 import AdminSidebar from '@/features/admin/components/Layout/AdminSidebar';
 import AdminFooter from '@/features/admin/components/Layout/AdminFooter';
+import AdminLoadingBar from '@/features/admin/components/Loading/AdminLoadingBar';
+import AdminRouteLoader from '@/features/admin/components/Loading/AdminRouteLoader';
 import styles from '@/styles/Admin.module.css';
 import dynamic from 'next/dynamic';
 import { WebSocketProvider } from '@/context/WebSocketContext';
@@ -46,6 +48,9 @@ const AdminLayout = ({ children, skipHeader = false }: { children: React.ReactNo
         <meta name="description" content="Admin dashboard for movie streaming platform" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
+
+      <AdminLoadingBar />
+      <AdminRouteLoader />
 
       <div className={styles.adminContainer}>
         <AdminSidebar />
