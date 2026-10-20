@@ -225,8 +225,6 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
             alt={currentMovie.name}
             className={styles.backdropImage}
             onError={() => {
-              // eslint-disable-next-line no-console
-              console.warn('[BigSlide] backdrop failed → fallback. Was:', backdropSrc, 'slug:', currentMovie.slug);
               setBackdropSrc(FALLBACK_BACKDROP);
             }}
           />
@@ -303,8 +301,6 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
                     className={styles.thumbImg}
                     loading="lazy"
                     onError={(e) => {
-                      // eslint-disable-next-line no-console
-                      console.warn('[BigSlide] thumb failed → fallback. slug:', movie.slug);
                       (e.currentTarget as HTMLImageElement).src = FALLBACK_POSTER;
                     }}
                   />

@@ -96,8 +96,6 @@ const MovieCardHorizontal: React.FC<MovieCardHorizontalProps> = ({
           className={styles.wideBackdropImg}
           loading="lazy"
           onError={() => {
-            // eslint-disable-next-line no-console
-            console.warn('[MovieCardH] image failed → fallback. Was:', imgSrc, 'slug:', movie?.slug);
             setImgSrc('/img/placeholder-backdrop.svg');
           }}
         />

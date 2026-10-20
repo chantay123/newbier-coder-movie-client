@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file authService.ts
  * @description Service xác thực thống nhất cho toàn bộ frontend.
  * Gom login, register, refresh token, logout, profile, watchlist, user stats.
@@ -726,7 +726,15 @@ const authService = {
 
     const data = await response.json();
 
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}') as UserPayload;
+    const currentUser = (() => {
+      try {
+        const fromSS = (typeof window !== 'undefined' && window.sessionStorage)
+          ? window.sessionStorage.getItem('user')
+          : null;
+        if (fromSS) return JSON.parse(fromSS) as UserPayload;
+      } catch { /* ignore */ }
+      return {} as UserPayload;
+    })();
     const updatedUser: UserPayload = {
       ...currentUser,
       fullname: data.user.fullname,
@@ -741,7 +749,10 @@ const authService = {
       dateOfBirth: data.user.date_of_birth
     };
 
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    localStorage.removeItem('user'); // clean up legacy key
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    }
 
     return {
       success: true,
@@ -779,13 +790,24 @@ const authService = {
 
     const data = await response.json();
 
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}') as UserPayload;
+    const currentUser = (() => {
+      try {
+        const fromSS = (typeof window !== 'undefined' && window.sessionStorage)
+          ? window.sessionStorage.getItem('user')
+          : null;
+        if (fromSS) return JSON.parse(fromSS) as UserPayload;
+      } catch { /* ignore */ }
+      return {} as UserPayload;
+    })();
     const updatedUser: UserPayload = {
       ...currentUser,
       avatar: data.avatarUrl || data.user?.avatar
     };
 
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+    localStorage.removeItem('user'); // clean up legacy key
 
     return {
       success: true,
@@ -806,7 +828,10 @@ const authService = {
       throw new Error(data.error || data.message || 'Không thể lấy thông tin người dùng');
     }
 
-    localStorage.setItem('user', JSON.stringify(data.user));
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem('user', JSON.stringify(data.user));
+    }
+    localStorage.removeItem('user'); // clean up legacy key
     return data.user as UserPayload;
   },
 

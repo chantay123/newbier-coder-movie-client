@@ -240,17 +240,9 @@ export async function safeFetchJson<T = unknown>(
     });
     clearTimeout(timeoutId);
 
-    // [DEBUG] Log response status of every fetch
-    // eslint-disable-next-line no-console
-    console.log('[safeFetchJson]', url, '→', response.status);
-
     if (!response.ok) {
       // Controlled diagnostic - log an toàn (endpoint, status, message),
       // TUYỆT ĐỐI không log token/cookie/header Authorization.
-      if (SYSTEM_CONFIG.debugMovies) {
-        // eslint-disable-next-line no-console
-
-      }
       return fallback;
     }
 

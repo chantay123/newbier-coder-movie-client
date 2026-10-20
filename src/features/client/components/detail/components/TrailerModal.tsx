@@ -126,18 +126,6 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
   useEffect(() => {
     if (!SYSTEM_CONFIG.debugMovies) return;
     if (!movie) return;
-    // eslint-disable-next-line no-console
-    console.debug('[TrailerDebug] TrailerModal received movie:', {
-      movieId: (movie as { _id?: string })._id,
-      movieSlug: (movie as { slug?: string }).slug,
-      movieName: (movie as { name?: string }).name,
-      hasTrailerUrl: typeof movie.trailer_url === 'string' && movie.trailer_url.trim() !== '',
-      trailer_url: movie.trailer_url,
-      hasTrailerObject: Boolean(movie.trailer),
-      trailerObject: movie.trailer,
-    });
-    // eslint-disable-next-line no-console
-    console.debug('[TrailerDebug] TrailerModal resolution:', resolution);
   }, [movie, resolution]);
 
   const embedUrl = resolution.embedUrl;

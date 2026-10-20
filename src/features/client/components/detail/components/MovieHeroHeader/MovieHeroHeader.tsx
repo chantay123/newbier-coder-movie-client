@@ -181,8 +181,6 @@ const MovieHeroHeader: React.FC<MovieHeroHeaderProps> = ({
           className={styles.backdropImg}
           onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
-            // eslint-disable-next-line no-console
-            console.warn('[MovieHeroHeader] backdrop failed → fallback. Was:', img.src);
             img.onerror = null;
             img.src = LOCAL_DEFAULT_BACKDROP;
           }}
@@ -218,8 +216,6 @@ const MovieHeroHeader: React.FC<MovieHeroHeaderProps> = ({
                 className={styles.posterImg}
                 onError={(e) => {
                   const img = e.currentTarget as HTMLImageElement;
-                  // eslint-disable-next-line no-console
-                  console.warn('[MovieHeroHeader] poster failed → fallback. Was:', img.src, 'slug:', movie.slug);
                   img.onerror = null;
                   img.src = LOCAL_DEFAULT_POSTER;
                 }}

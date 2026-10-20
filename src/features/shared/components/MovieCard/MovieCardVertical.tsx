@@ -121,8 +121,6 @@ const MovieCardVertical: React.FC<MovieCardVerticalProps> = ({
           className={styles.posterImg}
           loading="lazy"
           onError={() => {
-            // eslint-disable-next-line no-console
-            console.warn('[MovieCard] image failed → fallback. Was:', imgSrc, 'slug:', movie?.slug);
             setImgSrc('/img/placeholder-poster.svg');
           }}
         />

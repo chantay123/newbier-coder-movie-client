@@ -83,12 +83,21 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
 
   const initializeUser = useCallback((): void => {
     if (typeof window !== 'undefined' && !isInitialized) {
-      const userData = localStorage.getItem('user');
+      // ✅ Đọc user từ sessionStorage (fallback localStorage cho remember-me)
+      const remembered = localStorage.getItem('remember_me') === '1';
+      const userData = (() => {
+        if (window.sessionStorage) {
+          const ss = window.sessionStorage.getItem('user');
+          if (ss) return ss;
+        }
+        if (remembered) return localStorage.getItem('user');
+        return null;
+      })();
       if (userData) {
         try {
           setUser(JSON.parse(userData));
         } catch (err) {
-
+          // ignore
         }
       }
       setIsInitialized(true);

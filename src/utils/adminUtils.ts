@@ -23,18 +23,21 @@ const FALLBACK_ADMIN: AdminUser = {
 /** Kiểm tra user có phải admin không */
 export const isAdmin = (): boolean => true;
 
-/** Lấy dữ liệu user hiện tại từ localStorage */
+/** Lấy dữ liệu user hiện tại.
+ *
+ * User info được đọc từ sessionStorage (không phải localStorage).
+ * Admin UI nên dùng `useAuth()` hook thay vì hàm này. */
 export const getCurrentUser = (): AdminUser => {
   try {
     if (typeof window === 'undefined') {
       return FALLBACK_ADMIN;
     }
-
-    const userStr = localStorage.getItem('user');
+    const userStr =
+      (window.sessionStorage && window.sessionStorage.getItem('user')) ||
+      localStorage.getItem('user');
     if (!userStr) {
       return FALLBACK_ADMIN;
     }
-
     return JSON.parse(userStr) as AdminUser;
   } catch {
     return FALLBACK_ADMIN;
