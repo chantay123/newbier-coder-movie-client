@@ -24,8 +24,21 @@ export interface MovieLite {
   backdrop_url?: string;
   vote_average?: number;
   rating?: number;
-  tmdb?: { vote_average?: number };
+  tmdb?: { vote_average?: number; trailer_url?: string; trailer?: { key?: string; site?: string; name?: string; url?: string } };
   episodes?: Array<{ server_data?: Array<{ name?: string }> }>;
+  // Trailer fields — declared here so the trailer utility accepts the same
+  // shape on the homepage, the detail page, and the admin live preview.
+  // Mirrors the MongoDB / TMDB contract documented in `@/utils/trailer`.
+  trailer_url?: string;
+  trailerUrl?: string;
+  video_url?: string;
+  videoUrl?: string;
+  trailerLink?: string;
+  trailer?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  video?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  youtube?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  youtube_trailer?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  movie_trailer?: { key?: string; site?: string; name?: string; url?: string } | string | null;
   [key: string]: unknown;
 }
 

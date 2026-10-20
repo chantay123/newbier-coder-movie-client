@@ -22,6 +22,7 @@ import {
 } from '@/features/home';
 import { TrailerModal } from '@/features/movie-detail';
 import type { TrailerMovie as DetailTrailerMovie } from '@/features/client/components/detail/components/TrailerModal';
+import { hasValidTrailer } from '@/utils/trailer';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import { useAuth } from '@/utils/auth';
 import {
@@ -177,7 +178,16 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
   // OR when the user simply hadn't logged in yet.
   // See bug report: "sao trang home tui van loading".
 
-  const handlePlayTrailer = (movie: DetailTrailerMovie): void => setActiveTrailerMovie(movie);
+  const handlePlayTrailer = (movie: DetailTrailerMovie): void => {
+    // Last-line guard: every rail in this page has already been
+    // filtered through `filterMoviesWithValidTrailer` in
+    // `useHomeData`, but a future card component wired here might
+    // forget to filter its own list. Re-checking here means a
+    // "Trailer chưa được cung cấp" panel can never appear from
+    // this entry point.
+    if (!hasValidTrailer(movie as never)) return;
+    setActiveTrailerMovie(movie);
+  };
   const handleCloseTrailer = (): void => setActiveTrailerMovie(null);
 
   const renderSection = (sectionId: SectionId): ReactNode => {
@@ -281,7 +291,11 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
         )}
       </div>
 
-      <TrailerModal movie={activeTrailerMovie} onClose={handleCloseTrailer} />
+      <TrailerModal
+        key={activeTrailerMovie?._id || activeTrailerMovie?.slug || 'trailer-modal'}
+        movie={activeTrailerMovie}
+        onClose={handleCloseTrailer}
+      />
       <BackToTop />
 
       <style jsx global>{`

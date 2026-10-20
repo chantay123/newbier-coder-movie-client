@@ -31,7 +31,7 @@ const MovieGridSection: React.FC<MovieGridSectionProps> = ({
       <SectionHeader
         title={title}
         badge="MỚI NHẤT"
-        viewAllHref="/danh-sach"
+        viewAllHref="/browse/movies?type=all"
         viewAllText="Xem tất cả"
       />
 

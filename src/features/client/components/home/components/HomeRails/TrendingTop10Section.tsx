@@ -30,7 +30,7 @@ const TrendingTop10Section: React.FC<TrendingTop10SectionProps> = ({
     <MovieSection
       title="Phim Được Xem Nhiều Nhất"
       badge="TOP 10"
-      viewAllHref="/danh-sach/phim-hot"
+      viewAllHref="/rankings"
       layout="rail"
       variant="horizontal"
       showRank={true}

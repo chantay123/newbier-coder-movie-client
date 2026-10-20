@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import radarService from '@/API/services/radarService';
+import { hasValidTrailer } from '@/utils/trailer';
 import styles from './RadarTop10Modal.module.css';
 import type { RadarMovie, DeltaType } from './TrendingRadarSection';
 
@@ -339,7 +340,14 @@ const RadarTop10Modal: React.FC<RadarTop10ModalProps> = ({
                       const m = confirmMovie;
                       setConfirmMovie(null);
                       onClose();
-                      onPlayTrailer(m);
+                      // Re-check trailer validity at the entry
+                      // point so a mis-wired upstream list can
+                      // never open the modal for an unplayable
+                      // movie. The radar service already filters,
+                      // but a future refactor might bypass it.
+                      if (onPlayTrailer && hasValidTrailer(m as never)) {
+                        onPlayTrailer(m);
+                      }
                     }}
                   >
                     Xem Trailer

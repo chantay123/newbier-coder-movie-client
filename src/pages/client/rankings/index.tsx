@@ -9,6 +9,7 @@ import { useRouter } from 'next/router';
 import radarService from '@/API/services/radarService';
 import { TrailerModal } from '@/features/movie-detail';
 import type { TrailerMovie } from '@/features/client/components/detail/components/TrailerModal';
+import { hasValidTrailer } from '@/utils/trailer';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import styles from '@/styles/Rankings.module.css';
 
@@ -204,7 +205,14 @@ export default function RankingsPage() {
                         <button
                           type="button"
                           className={styles.overlayTrailerBtn}
-                          onClick={() => setActiveTrailerMovie(movie)}
+                          onClick={() => {
+                            // Guard: the grid has already been
+                            // filtered by radarService, but re-check
+                            // here so a future wiring change can
+                            // never bypass the filter.
+                            if (!hasValidTrailer(movie as never)) return;
+                            setActiveTrailerMovie(movie as unknown as TrailerMovie);
+                          }}
                         >
                           Trailer
                         </button>
@@ -235,6 +243,7 @@ export default function RankingsPage() {
         </div>
 
         <TrailerModal
+          key={activeTrailerMovie?._id || activeTrailerMovie?.slug || 'trailer-modal'}
           movie={activeTrailerMovie}
           onClose={() => setActiveTrailerMovie(null)}
         />
