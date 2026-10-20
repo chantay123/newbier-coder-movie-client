@@ -480,8 +480,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     setUpcomingLoading(true);
 
     const startTime = Date.now();
-    const MIN_LOADING_TIME = 300;
-    const MAX_TIMEOUT = 5000;
+    const MIN_LOADING_TIME = 150;
+    const MAX_TIMEOUT = 3000;
 
     let timeoutTriggered = false;
     const timeoutTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
@@ -595,7 +595,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     // flips off.
     initialFetchesPendingRef.current = 4;
 
-    // Hard safety net: if the counter is still > 0 after 3s, force
+    // Hard safety net: if the counter is still > 0 after 2s, force
     // `loading=false` anyway. The fetcher's own finally will still
     // run when it eventually resolves — it will just find the
     // counter already at 0 and no-op.
@@ -606,7 +606,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         initialFetchesPendingRef.current = 0;
         setLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
     Promise.allSettled([
       fetchHeroMovies(),

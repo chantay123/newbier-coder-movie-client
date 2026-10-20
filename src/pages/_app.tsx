@@ -13,6 +13,24 @@ import '../styles/feedbackAdmin.css';
 import { SessionProvider } from 'next-auth/react';
 import { AuthProvider, withAccountStatus, withAuth } from '@/utils/auth';
 import { useEffect, useState, useCallback } from 'react';
+
+/** Obfuscation helpers — giấu user info trong DevTools */
+const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
+
+const obfDecode = (encoded: string): string | null => {
+  try {
+    const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    if (decoded.startsWith(OBFUSCATION_KEY) && decoded.endsWith(OBFUSCATION_KEY)) {
+      return decoded.slice(OBFUSCATION_KEY.length, -OBFUSCATION_KEY.length);
+    }
+    JSON.parse(decoded);
+    return decoded;
+  } catch {
+    return null;
+  }
+};
 import { useRouter } from 'next/router';
 import Layout from '@/layouts/ClientLayout';
 import OfflineNotice from '@/features/shared/components/UI/OfflineNotice';
@@ -88,9 +106,18 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
       const userData = (() => {
         if (window.sessionStorage) {
           const ss = window.sessionStorage.getItem('user');
-          if (ss) return ss;
+          if (ss) {
+            const decoded = obfDecode(ss) || ss;
+            if (decoded) return decoded;
+          }
         }
-        if (remembered) return localStorage.getItem('user');
+        if (remembered) {
+          const ls = localStorage.getItem('user');
+          if (ls) {
+            const decoded = obfDecode(ls) || ls;
+            if (decoded) return decoded;
+          }
+        }
         return null;
       })();
       if (userData) {

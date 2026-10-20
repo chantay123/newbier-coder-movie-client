@@ -16,6 +16,35 @@ import { useRouter } from 'next/router';
 import { useSession, signOut, type SessionProviderProps } from 'next-auth/react';
 import authService from '@/API/services/authService';
 
+/** Obfuscation helpers — giấu user info trong DevTools */
+const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
+
+const obfEncode = (plain: string): string => {
+  try {
+    const prefixed = OBFUSCATION_KEY + plain + OBFUSCATION_KEY;
+    return btoa(encodeURIComponent(prefixed).replace(/%([0-9A-F]{2})/g,
+      (_: string, p1: string) => String.fromCharCode(parseInt(p1, 16))));
+  } catch {
+    return plain;
+  }
+};
+
+const obfDecode = (encoded: string): string | null => {
+  try {
+    const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    if (decoded.startsWith(OBFUSCATION_KEY) && decoded.endsWith(OBFUSCATION_KEY)) {
+      return decoded.slice(OBFUSCATION_KEY.length, -OBFUSCATION_KEY.length);
+    }
+    // Legacy plain JSON
+    JSON.parse(decoded);
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
 export interface AuthUser {
   _id?: string;
   fullname?: string;
@@ -114,10 +143,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const remembered = localStorage.getItem('remember_me') === '1';
       const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
       const lsUser = remembered ? localStorage.getItem('user') : null;
-      const storedUser = ssUser || lsUser;
-      if (storedUser) {
+      const rawUser = ssUser || lsUser;
+      if (rawUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          const decoded = obfDecode(rawUser) || rawUser;
+          setUser(JSON.parse(decoded));
         } catch (err) {
           setUser(null);
         }
@@ -152,7 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               backendToken
             };
             // ✅ Lưu user vào sessionStorage (tự xóa khi đóng tab)
-            sessionStorage.setItem('user', JSON.stringify(userWithToken));
+            sessionStorage.setItem('user', obfEncode(JSON.stringify(userWithToken)));
             setUser(userWithToken);
             setLoading(false);
             return;
@@ -175,10 +205,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const storedUser = (() => {
           if (window.sessionStorage) {
             const ssUser = window.sessionStorage.getItem('user');
-            if (ssUser) return ssUser;
+            if (ssUser) {
+              try {
+                const decoded = obfDecode(ssUser) || ssUser;
+                return decoded;
+              } catch { return null; }
+            }
           }
           if (remembered) {
-            return localStorage.getItem('user');
+            const lsUser = localStorage.getItem('user');
+            if (lsUser) {
+              try {
+                const decoded = obfDecode(lsUser) || lsUser;
+                return decoded;
+              } catch { return null; }
+            }
           }
           return null;
         })();
@@ -586,8 +627,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // ✅ Cập nhật sessionStorage thay vì localStorage
       try {
         const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
-        const currentUser = ssUser ? JSON.parse(ssUser) as AuthUser : {};
-        window.sessionStorage.setItem('user', JSON.stringify({ ...currentUser, avatar: avatarUrl }));
+        const currentUser = ssUser ? (() => { try { const d = obfDecode(ssUser); return d ? JSON.parse(d) : {}; } catch { return {}; } })() : {};
+        window.sessionStorage.setItem('user', obfEncode(JSON.stringify({ ...currentUser, avatar: avatarUrl })));
       } catch { /* ignore */ }
       return avatarUrl;
     }

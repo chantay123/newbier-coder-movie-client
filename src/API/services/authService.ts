@@ -6,6 +6,39 @@
 
 import { AUTH_CONFIG } from '@/config/authConfig';
 
+/** Obfuscation key — biến environment để thay đổi khi cần */
+const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
+
+/** Encode một string thành base64 có prefix để dễ nhận diện + xác thực */
+const obfEncode = (plain: string): string => {
+  try {
+    const prefixed = OBFUSCATION_KEY + plain + OBFUSCATION_KEY;
+    // Base64 encode đơn giản
+    return btoa(encodeURIComponent(prefixed).replace(/%([0-9A-F]{2})/g,
+      (_: string, p1: string) => String.fromCharCode(parseInt(p1, 16))));
+  } catch {
+    return plain;
+  }
+};
+
+/** Decode string đã obfuscate */
+const obfDecode = (encoded: string): string | null => {
+  try {
+    const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    // Strip prefix/suffix
+    if (decoded.startsWith(OBFUSCATION_KEY) && decoded.endsWith(OBFUSCATION_KEY)) {
+      return decoded.slice(OBFUSCATION_KEY.length, -OBFUSCATION_KEY.length);
+    }
+    // Legacy plain JSON — vẫn parse được
+    JSON.parse(decoded);
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
 const API_URL = process.env.NEXT_PUBLIC_CORE_API_URL
     || process.env.NEXT_PUBLIC_API_URL
   || 'http://localhost:5000/api';
@@ -333,9 +366,10 @@ const authService = {
         }
         const user = resolveUser(rawAccessToken);
         if (rememberMe) {
-          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+          // ✅ Legacy localStorage key — vẫn obfuscate để che thông tin
+          localStorage.setItem(STORAGE_KEYS.user, obfEncode(JSON.stringify(user)));
         } else if (typeof window !== 'undefined' && window.sessionStorage) {
-          window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, JSON.stringify(user));
+          window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, obfEncode(JSON.stringify(user)));
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('storage'));
@@ -386,9 +420,9 @@ const authService = {
       }
       const user = resolveUser(rawAccessToken);
       if (rememberMe) {
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
+        localStorage.setItem(STORAGE_KEYS.user, obfEncode(JSON.stringify(user)));
       } else if (typeof window !== 'undefined' && window.sessionStorage) {
-        window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, JSON.stringify(user));
+        window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, obfEncode(JSON.stringify(user)));
       }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('storage'));
@@ -665,7 +699,8 @@ const authService = {
           ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
           : null) || localStorage.getItem(STORAGE_KEYS.user);
       if (!userJson) return false;
-      const user = JSON.parse(userJson) as { backendToken?: string };
+      const decoded = obfDecode(userJson) || userJson;
+      const user = JSON.parse(decoded) as { backendToken?: string };
       return !!user?.backendToken;
     } catch {
       return false;
@@ -678,7 +713,9 @@ const authService = {
         (typeof window !== 'undefined' && window.sessionStorage
           ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
           : null) || localStorage.getItem(STORAGE_KEYS.user);
-      return userJson ? (JSON.parse(userJson) as UserPayload) : null;
+      if (!userJson) return null;
+      const decoded = obfDecode(userJson) || userJson;
+      return JSON.parse(decoded) as UserPayload;
     } catch (e) {
 
       return null;
@@ -731,7 +768,10 @@ const authService = {
         const fromSS = (typeof window !== 'undefined' && window.sessionStorage)
           ? window.sessionStorage.getItem('user')
           : null;
-        if (fromSS) return JSON.parse(fromSS) as UserPayload;
+        if (fromSS) {
+          const decoded = obfDecode(fromSS) || fromSS;
+          return JSON.parse(decoded) as UserPayload;
+        }
       } catch { /* ignore */ }
       return {} as UserPayload;
     })();
@@ -751,7 +791,7 @@ const authService = {
 
     localStorage.removeItem('user'); // clean up legacy key
     if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      window.sessionStorage.setItem('user', obfEncode(JSON.stringify(updatedUser)));
     }
 
     return {
@@ -795,7 +835,10 @@ const authService = {
         const fromSS = (typeof window !== 'undefined' && window.sessionStorage)
           ? window.sessionStorage.getItem('user')
           : null;
-        if (fromSS) return JSON.parse(fromSS) as UserPayload;
+        if (fromSS) {
+          const decoded = obfDecode(fromSS) || fromSS;
+          return JSON.parse(decoded) as UserPayload;
+        }
       } catch { /* ignore */ }
       return {} as UserPayload;
     })();
@@ -805,7 +848,7 @@ const authService = {
     };
 
     if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      window.sessionStorage.setItem('user', obfEncode(JSON.stringify(updatedUser)));
     }
     localStorage.removeItem('user'); // clean up legacy key
 
@@ -829,7 +872,7 @@ const authService = {
     }
 
     if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem('user', JSON.stringify(data.user));
+      window.sessionStorage.setItem('user', obfEncode(JSON.stringify(data.user)));
     }
     localStorage.removeItem('user'); // clean up legacy key
     return data.user as UserPayload;

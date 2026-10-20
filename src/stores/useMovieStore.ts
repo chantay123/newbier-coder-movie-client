@@ -12,7 +12,6 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 
 // ============================================================
 // TYPES
@@ -138,7 +137,7 @@ interface MovieStoreActions {
 /** TTL cho movie detail: 5 phút */
 const MOVIE_DETAIL_TTL_MS = 5 * 60 * 1000;
 
-/** TTL cho homepage movies: 2 phút */
+/** TTL cho homepage movies: chỉ dùng trong bộ nhớ, không persist */
 const HOME_MOVIES_TTL_MS = 2 * 60 * 1000;
 
 /** Kiểm tra cache có hết hạn không */
@@ -150,9 +149,13 @@ const isExpired = (timestamp: number, ttlMs: number): boolean => {
 // STORE
 // ============================================================
 
+// Homepage cache KHÔNG persist vì:
+// 1. localStorage read đồng bộ → chặn initial render
+// 2. Homepage data thay đổi thường xuyên → persist không cần thiết
+// 3. User quay lại trang → data vẫn được cache trong component state
+
 export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       // ---- Initial State ----
       movieCache: {},
       relatedCache: {},
@@ -346,29 +349,7 @@ export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
           homeError: {}
         });
       }
-    }),
-    {
-      // ===== PERSIST CONFIG =====
-      name: 'movie-cache', // key trong localStorage
-      storage: createJSONStorage(() => localStorage),
-
-      // Chỉ persist cache data, KHÔNG persist loading/error states
-      // (vì loading/error nên reset khi reload)
-      partialize: (state) => ({
-        movieCache: state.movieCache,
-        relatedCache: state.relatedCache,
-        homeCache: state.homeCache
-      }),
-
-      // Rehydrate xong → xóa cache hết hạn
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Xóa entries đã hết hạn ngay khi hydrate từ localStorage
-          state.clearExpiredCache();
-        }
-      }
-    }
-  )
+    })
 );
 
 export default useMovieStore;

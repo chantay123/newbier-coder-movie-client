@@ -13,9 +13,10 @@
 import movieService from '@/API/services/movieService';
 import { SYSTEM_CONFIG } from './systemConfig';
 
-/** Thời gian chờ mặc định (ms) trước khi reveal batch khi scroll breakpoint */
+/** Thời gian chờ mặc định (ms) trước khi reveal batch khi scroll breakpoint.
+ * Giảm từ 2000ms xuống 1200ms để cải thiện perceived performance. */
 export const BATCH_LOADING_CONFIG = {
-  delayMs: 2000
+  delayMs: 1200
 } as const;
 
 /** Dictionary ngôn ngữ UI. */
@@ -234,7 +235,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     id: 'country',
     minHeight: 320,
     loadAfterScroll: true,
-    delayMs: 2000,
+    delayMs: 1200,
     rails: [
       {
         id: 'korean',
@@ -297,7 +298,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     minHeight: 480,
     limit: 24,
     loadAfterScroll: true,
-    delayMs: 2000,
+    delayMs: 1200,
     load: ((page: number = 1, limit: number = 24) =>
       movieService.getMoviesPage(page, limit)) as SectionOverrides['load']
   } as SectionOverrides),
@@ -328,7 +329,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     minHeight: 320,
     limit: 15,
     loadAfterScroll: true,
-    delayMs: 2000
+    delayMs: 1200
   })
 };
 

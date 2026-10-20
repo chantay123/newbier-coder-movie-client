@@ -74,7 +74,7 @@ export const SYSTEM_CONFIG = {
       original: 'original'
     },
     // Hàm ghép URL ảnh TMDB theo size, có fallback
-    getImageUrl: (path: string | null | undefined, size: string = 'w500', fallback: string = '/img/default-poster.jpg') => {
+    getImageUrl: (path: string | null | undefined, size: string = 'w500', fallback: string = '/placeholder.jpg') => {
       if (!path) return fallback;
       if (path.startsWith('http')) return path;
       const cleanPath = path.startsWith('/') ? path : `/${path}`;
