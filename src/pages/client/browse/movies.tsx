@@ -9,6 +9,7 @@ import { useRouter } from 'next/router';
 import Skeleton from '@/features/shared/components/UI/Skeleton';
 import type { SkeletonProps } from '@/features/shared/components/UI/Skeleton';
 import { FaPlayCircle, FaStar, FaClock, FaChevronDown, FaSync } from 'react-icons/fa';
+import { pickMovieImage } from '@/utils/imageSource';
 import styles from '@/styles/Movies.module.css';
 
 const CATEGORIES = [
@@ -172,11 +173,19 @@ export default function Movies() {
       const result = (await response.json()) as SearchResponse;
 
       if (result?.hits && Array.isArray(result.hits)) {
-        const processed = result.hits.map((m) => ({
-          ...m,
-          thumb_url: m.thumb_url || m.poster_url || '/placeholder.jpg',
-          poster_url: m.poster_url || m.thumb_url || '/placeholder.jpg'
-        }));
+        // The v1 API returns images as camelCase `posterUrl`/`thumbUrl`,
+        // but this page renders `poster_url`/`thumb_url`. Resolve both
+        // casings here — otherwise every card fell back to a placeholder
+        // because `m.poster_url` was `undefined`.
+        const processed = result.hits.map((m) => {
+          const poster = pickMovieImage(m as Record<string, unknown>, 'poster', '');
+          const thumb = pickMovieImage(m as Record<string, unknown>, 'thumb', '');
+          return {
+            ...m,
+            poster_url: poster || thumb || '/img/Phim.png',
+            thumb_url: thumb || poster || '/img/Phim.png'
+          };
+        });
 
         const seenSlugs = new Set<string>();
         const seenIds = new Set<string>();
