@@ -3,9 +3,17 @@
  * @description Centralized data management hook for the Homepage.
  * Tích hợp HOME_SECTIONS để render không nhấp nháy, cập nhật state sạch,
  * fallback bền bỉ.
+ *
+ * 🆕 Tích hợp Zustand (useMovieStore):
+ * - Cache homepage movies theo section ('hero', 'top10', 'bigSlide', 'latest')
+ * - Đọc từ cache trước → chỉ fetch khi cache miss hoặc hết hạn
+ * - Tránh gọi lại API khi user quay lại trang chủ
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+
+// Zustand store cho movie caching
+import { useMovieStore } from '@/stores/useMovieStore';
 import {
   normalizeHeroMovie,
   resolveImageUrl
@@ -110,6 +118,33 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
 
   const posterResolved = resolveFirstUsable(posterCandidates);
   const thumbResolved = resolveFirstUsable(thumbCandidates);
+
+  // CHỈ HIỂN THỊ PHIM CÓ ẢNH THẬT: nếu cả poster lẫn thumb đều rỗng
+  // từ API, trả null để caller filterMovies có thể bỏ qua. Trước đây
+  // code fallback về LOCAL_DEFAULT_POSTER, gây ra "dải xám" (placeholder
+  // SVG) trên trang chủ. Yêu cầu mới: phim không có ảnh → ẩn hoàn toàn.
+  //
+  // Chấp nhận 3 dạng URL có thể hiển thị:
+  //   1. http(s)://…            — URL tuyệt đối từ CDN/backend
+  //   2. data:image/…           — base64 inline
+  //   3. /uploads/…, /img/…     — host-relative (khi `imageOrigin` env
+  //      rỗng, `resolveImageUrl` giữ nguyên relative path). Trường hợp
+  //      này vẫn load được trong trình duyệt nên KHÔNG được coi là
+  //      "không có ảnh" — nếu không, phim sẽ bị ẩn oan khi env thiếu.
+  const hasRealPoster = (v: string): boolean => {
+    if (!v) return false;
+    const s = v.trim();
+    if (/^https?:\/\//i.test(s)) return true;
+    if (/^data:image\//i.test(s)) return true;
+    if (/^\/uploads\//i.test(s) || /^\/img\//i.test(s)) return true;
+    return false;
+  };
+  const posterHasReal = hasRealPoster(posterResolved);
+  const thumbHasReal = hasRealPoster(thumbResolved);
+  if (!posterHasReal && !thumbHasReal) {
+    return null;
+  }
+
   const poster = posterResolved || thumbResolved || LOCAL_DEFAULT_POSTER;
   const thumb = thumbResolved || posterResolved || poster || LOCAL_DEFAULT_POSTER;
   const backdrop = resolveMovieBackdrop(movie as never, index) || LOCAL_DEFAULT_BACKDROP;
@@ -140,10 +175,55 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
   };
 };
 
+/**
+ * Áp dụng `normalizeMovie` cho mảng phim, **đồng thời loại bỏ phim thiếu
+ * poster** (mà `normalizeMovie` giờ trả về `null`). Giữ nguyên thứ tự.
+ *
+ * Dùng ở mọi call-site setTopMovies / setMostViewedMovies / setLatestMovies
+ * / setUpcomingMovies để áp dụng đồng bộ triết lý "không có ảnh thật
+ * thì ẩn phim" mà không phải sửa từng call-site.
+ */
+const normalizeAndCompact = <T>(
+  movies: readonly T[],
+  rankOffset?: (index: number) => number
+): NormalizedMovie[] => {
+  const out: NormalizedMovie[] = [];
+  movies.forEach((m, idx) => {
+    const norm = normalizeMovie(m as unknown as RawMovie, idx);
+    if (!norm) return;
+    out.push(rankOffset ? { ...norm, rank: rankOffset(idx) } : norm);
+  });
+  return out;
+};
+
+/**
+ * Tương tự `normalizeAndCompact` nhưng dùng `normalizeHeroMovie` cho
+ * HeroBanner. Cùng triết lý bỏ phim không có ảnh thật (cả poster và
+ * thumb đều là placeholder local).
+ */
+const compactHeroMovies = (movies: readonly unknown[]): NormalizedMovie[] => {
+  const out: NormalizedMovie[] = [];
+  movies.forEach((m, idx) => {
+    const norm = normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie | null;
+    if (!norm) return;
+    const isLocal = (v: unknown): boolean => typeof v === 'string' && v.startsWith('/img/');
+    if (isLocal(norm.poster_url) && isLocal(norm.thumb_url)) return;
+    out.push(norm);
+  });
+  return out;
+};
+
+
 export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): UseHomeDataReturn => {
   const isSnapshotEnabled = process.env.NEXT_PUBLIC_ENABLE_HOMEPAGE_SNAPSHOT === 'true';
   const effectiveSnapshot: HomeDataSnapshot | null = isSnapshotEnabled ? initialSnapshot : null;
   const snap = effectiveSnapshot as HomeDataSnapshot | null;
+
+  // ---- Zustand cache selectors ----
+  // Dùng selector để tránh re-render toàn component khi cache không liên quan thay đổi
+  const getHomeCache = useMovieStore((s) => s.getCachedHomeMovies);
+  const setHomeCache = useMovieStore((s) => s.setCachedHomeMovies);
+  const setHomeLoading = useMovieStore((s) => s.setLoadingHome);
 
   // Pure real API data states initialized from ISR snapshot when available & enabled.
   // Each initializer runs the trailer-aware filter so the homepage
@@ -152,29 +232,43 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   // by the network fetchers is reused here to keep the rule in one
   // place: a movie without a valid trailer simply must not appear in
   // any rail that exposes a "Xem trailer" button.
+  //
+  // 🆕 Cache-first: kiểm tra Zustand store trước, fallback về snapshot
   const [featuredMovies, setFeaturedMovies] = useState<NormalizedMovie[]>(() => {
+    const cached = getHomeCache('hero');
+    if (cached && cached.length > 0) {
+      return compactHeroMovies(filterMoviesWithValidTrailer(cached));
+    }
     const list = snap && (snap.featuredMovies?.length ?? 0) > 0
       ? (snap.featuredMovies ?? [])
       : [];
     const filtered = filterMoviesWithValidTrailer(list);
-    return filtered.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie);
+    return compactHeroMovies(filtered);
   });
   const [topMovies, setTopMovies] = useState<NormalizedMovie[]>(() => {
+    const cached = getHomeCache('top10');
+    if (cached && cached.length > 0) {
+      return normalizeAndCompact(cached);
+    }
     const list = snap && (snap.topMovies?.length ?? 0) > 0
       ? (snap.topMovies ?? [])
       : [];
     const filtered = filterMoviesWithValidTrailer(list);
-    return filtered.map((m, idx) => normalizeMovie(m, idx) as NormalizedMovie);
+    return normalizeAndCompact(filtered);
   });
   const [mostViewedMovies, setMostViewedMovies] = useState<RankedMovie[]>(() => {
+    const cached = getHomeCache('mostViewed');
+    if (cached && cached.length > 0) {
+      return normalizeAndCompact(cached, (idx) => idx + 1) as unknown as RankedMovie[];
+    }
     const list = snap && (snap.mostViewedMovies?.length ?? 0) > 0
       ? (snap.mostViewedMovies ?? [])
       : [];
     const filtered = filterMoviesWithValidTrailer(list);
-    return filtered.map((m, idx) => ({
-      ...(normalizeMovie(m, idx) as NormalizedMovie),
-      rank: (m.rank as number) || idx + 1
-    }));
+    return normalizeAndCompact(filtered, (idx) => {
+      const r = (list[idx] as { rank?: number } | undefined)?.rank;
+      return (typeof r === 'number' ? r : idx) + 1;
+    }) as unknown as RankedMovie[];
   });
   const [upcomingMovies, setUpcomingMovies] = useState<NormalizedMovie[]>([]);
   const [upcomingLoading, setUpcomingLoading] = useState<boolean>(false);
@@ -187,7 +281,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       ? (snap.latestMovies ?? [])
       : [];
     const filtered = filterMoviesWithValidTrailer(list);
-    return filtered.map((m, idx) => normalizeMovie(m, idx) as NormalizedMovie);
+    return normalizeAndCompact(filtered);
   });
 
   const [loading, setLoading] = useState<boolean>(() => !(snap?.featuredMovies?.length ?? 0));
@@ -224,10 +318,12 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
    */
   const finishInitialFetch = useCallback((): void => {
     initialFetchesPendingRef.current = Math.max(0, initialFetchesPendingRef.current - 1);
+    // eslint-disable-next-line no-console
+    console.log('[HomeData] finishInitialFetch, remaining:', initialFetchesPendingRef.current);
     if (
       isMountedRef.current
       && initialFetchesPendingRef.current === 0
-    ) {
+      ) {
       if (loadingSafetyNetRef.current) {
         clearTimeout(loadingSafetyNetRef.current);
         loadingSafetyNetRef.current = null;
@@ -239,32 +335,51 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   /**
    * Fetches hero spotlight movies via HOME_SECTIONS bundle.
    * Falls back to local mockMovies when the API returns empty (e.g. 401).
+   *
+   * 🆕 Cache: ghi kết quả vào Zustand store sau khi fetch thành công
    */
   const fetchHeroMovies = useCallback(async (): Promise<void> => {
     try {
       const heroSection = HOME_SECTIONS['hero'];
       const movies = heroSection?.load ? await heroSection.load([]) : [];
+      // eslint-disable-next-line no-console
+      console.log('[Hero] API returned', Array.isArray(movies) ? movies.length : 'non-array', 'movies');
       let finalList = movies;
       if (!Array.isArray(movies) || movies.length === 0) {
         // eslint-disable-next-line no-console
-
+        console.warn('[Hero] API empty, falling back to mockMovies (', mockMovies.length, 'items)');
         finalList = mockMovies as unknown as typeof movies;
       }
       if (isMountedRef.current && finalList.length > 0) {
         const filtered = filterMoviesWithValidTrailer(finalList);
-        setFeaturedMovies(filtered.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie));
-      }
-    } catch {
-      if (isMountedRef.current) {
         // eslint-disable-next-line no-console
+        console.log('[Hero] filtered to', filtered.length, 'movies with valid trailer');
 
+        // Theo yêu cầu: chỉ hiển thị phim CÓ trailer. Không fallback về
+        // danh sách không-trailer. Nếu lọc ra 0 phim thì Hero render
+        // null (xử lý ở HeroBanner khi `!activeMovie`). Lấy tối đa 6 phim
+        // đầu tiên pass qua filter để giữ layout carousel gọn gàng.
+        const finalHeroList = filtered.slice(0, 6);
+
+        // Tránh setState khi danh sách rỗng để React không re-render vô ích.
+        if (finalHeroList.length > 0) {
+          setFeaturedMovies(compactHeroMovies(finalHeroList));
+          // 🆕 Ghi cache cho section 'hero'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setHomeCache('hero', finalHeroList as any);
+        }
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[Hero] fetcher threw error:', err);
+      if (isMountedRef.current) {
         const filtered = filterMoviesWithValidTrailer(mockMovies as unknown as RawMovie[]);
-        setFeaturedMovies(filtered.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as NormalizedMovie));
+        setFeaturedMovies(compactHeroMovies(filtered));
       }
     } finally {
       finishInitialFetch();
     }
-  }, [finishInitialFetch]);
+  }, [finishInitialFetch, getHomeCache, setHomeCache]);
 
   /**
    * Fetches Top 10 movies via HOME_SECTIONS bundle.
@@ -274,27 +389,36 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     try {
       const top10Section = HOME_SECTIONS['top10'];
       const movies = top10Section?.load ? await top10Section.load([]) : [];
+      // eslint-disable-next-line no-console
+      console.log('[Top10] API returned', Array.isArray(movies) ? movies.length : 'non-array', 'movies');
       let finalList = movies;
       if (!Array.isArray(movies) || movies.length === 0) {
         // eslint-disable-next-line no-console
-
+        console.warn('[Top10] API empty, falling back to mockMovies');
         finalList = mockMovies as unknown as typeof movies;
       }
       if (isMountedRef.current && finalList.length > 0) {
         const filtered = filterMoviesWithValidTrailer(finalList);
-        const normalized: RankedMovie[] = filtered.slice(0, 10).map((m, idx) => ({
-          ...(normalizeMovie(m as RawMovie, idx) as NormalizedMovie),
+        const compact = normalizeAndCompact(filtered.slice(0, 10));
+        const normalized: RankedMovie[] = compact.map((m, idx) => ({
+          ...m,
           rank: idx + 1
         }));
         setMostViewedMovies(normalized);
+        // 🆕 Ghi cache
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setHomeCache('mostViewed', normalized as any);
+        setTopMovies(compact);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setHomeCache('top10', compact as any);
       }
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[Top10] fetcher threw:', err);
       if (isMountedRef.current) {
-        // eslint-disable-next-line no-console
-
         const filtered = filterMoviesWithValidTrailer(mockMovies as unknown as RawMovie[]);
-        const normalized: RankedMovie[] = filtered.slice(0, 10).map((m, idx) => ({
-          ...(normalizeMovie(m, idx) as NormalizedMovie),
+        const normalized: RankedMovie[] = normalizeAndCompact(filtered.slice(0, 10)).map((m, idx) => ({
+          ...m,
           rank: idx + 1
         }));
         setMostViewedMovies(normalized);
@@ -302,7 +426,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     } finally {
       finishInitialFetch();
     }
-  }, [finishInitialFetch]);
+  }, [finishInitialFetch, setHomeCache]);
 
   /**
    * Fetches the homepage movie list (page=1, limit=20) on first paint
@@ -323,11 +447,15 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         ? await movieService.getHomeMovies()
         : await movieService.getMoviesPage(pageNumber, 24);
 
+      // [DEBUG] log API response size
+      // eslint-disable-next-line no-console
+      console.log('[Latest] page=' + pageNumber, 'API returned', Array.isArray(rawMovies) ? rawMovies.length : 'non-array', 'movies');
+
       // FALLBACK: backend returns empty/401 → use local mock movies.
       // This keeps the homepage visible during backend auth maintenance.
       if ((!Array.isArray(rawMovies) || rawMovies.length === 0) && pageNumber === 1) {
         // eslint-disable-next-line no-console
-
+        console.warn('[Latest] API empty on first page, using mockMovies fallback');
         rawMovies = mockMovies as unknown as RawMovie[];
       }
 
@@ -339,11 +467,16 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         // when clicked or show a "Trailer chưa được cung cấp" panel
         // for a movie the user thought they could watch.
         const filteredRaw = filterMoviesWithValidTrailer(rawMovies);
-        const normalized = filteredRaw.map((m, idx) => normalizeMovie(m as RawMovie, idx) as NormalizedMovie);
+        // normalizeAndCompact đồng thời bỏ phim không có ảnh thật
+        // (poster_url + thumb_url đều rỗng/trả về local placeholder).
+        const normalized = normalizeAndCompact(filteredRaw);
 
         if (pageNumber === 1) {
           setTopMovies(normalized.slice(0, 12));
           setLatestMovies(normalized);
+          // 🆕 Ghi cache cho section 'latest'
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setHomeCache('latest', normalized as any);
         } else {
           setLatestMovies((prev) => [...prev, ...normalized]);
         }
@@ -399,7 +532,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         // Same trailer-aware filter as the other rails. Upcoming
         // movies also expose a "Xem trailer" button on the card.
         const filtered = filterMoviesWithValidTrailer(result.upcomingMovies || []);
-        setUpcomingMovies(filtered.map((m) => normalizeMovie(m) as NormalizedMovie));
+        setUpcomingMovies(normalizeAndCompact(filtered));
       } else if (isMountedRef.current) {
         setUpcomingMovies([]);
       }
@@ -431,10 +564,12 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       const movies = bigSlideSection?.load
         ? ((await bigSlideSection.load([])) as unknown as RawMovie[])
         : undefined;
+      // eslint-disable-next-line no-console
+      console.log('[BigSlide] API returned', Array.isArray(movies) ? movies.length : 'non-array', 'movies');
       let finalList = movies;
       if (!Array.isArray(movies) || movies.length === 0) {
         // eslint-disable-next-line no-console
-
+        console.warn('[BigSlide] API empty, falling back to mockAnimationMovies');
         finalList = mockAnimationMovies as unknown as RawMovie[];
       }
       if (isMountedRef.current && Array.isArray(finalList) && finalList.length > 0) {
@@ -442,18 +577,21 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         // card. Filter to only items with a resolvable trailer.
         const filtered = filterMoviesWithValidTrailer(finalList);
         setAnimeSpotlightMovies(filtered);
+        // 🆕 Ghi cache cho section 'bigSlide'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setHomeCache('bigSlide', filtered as any);
       }
-    } catch {
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[BigSlide] fetcher threw:', err);
       if (isMountedRef.current) {
-        // eslint-disable-next-line no-console
-
         const filtered = filterMoviesWithValidTrailer(mockAnimationMovies as unknown as RawMovie[]);
         setAnimeSpotlightMovies(filtered);
       }
     } finally {
       finishInitialFetch();
     }
-  }, [finishInitialFetch]);
+  }, [finishInitialFetch, setHomeCache]);
 
   // Initial fetch on mount: ONLY triggered if initialSnapshot is not provided or empty.
   // We use a ref-based counter (`initialFetchesPendingRef`) plus a hard
@@ -461,11 +599,27 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   // Skeleton if any individual fetcher hangs. Even if the network
   // never resolves, the safety net forces `loading=false` and the
   // page renders whatever data we already have (mock fallback).
+  //
+  // 🆕 Cache-first: kiểm tra Zustand cache trước.
+  // Nếu tất cả sections đã có cache → skip fetch, loading = false ngay.
   useEffect(() => {
     if (initialSnapshot?.featuredMovies?.length) {
       // eslint-disable-next-line no-console
 
       return;
+    }
+
+    // 🆕 Cache-first: đếm xem có bao nhiêu sections đã có cache
+    const cachedHero = getHomeCache('hero');
+    const cachedTop10 = getHomeCache('top10');
+    const cachedBigSlide = getHomeCache('bigSlide');
+    const cachedLatest = getHomeCache('latest');
+
+    const hasAllCache = cachedHero && cachedTop10 && cachedBigSlide && cachedLatest;
+    if (hasAllCache) {
+      // eslint-disable-next-line no-console
+      console.log('[HomeData] All sections cached → skip initial fetch');
+      return; // loading = false (đã init từ cache ở trên)
     }
     // eslint-disable-next-line no-console
 
@@ -474,6 +628,10 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     // `finishInitialFetch()`. When the counter hits 0, `loading`
     // flips off.
     initialFetchesPendingRef.current = 4;
+
+    // [DEBUG] Log trạng thái bắt đầu fetcher batch
+    // eslint-disable-next-line no-console
+    console.log('[HomeData] Initial fetch started, counter=4');
 
     // Hard safety net: if the counter is still > 0 after 6s, force
     // `loading=false` anyway. The fetcher's own finally will still
@@ -484,7 +642,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       if (!isMountedRef.current) return;
       if (initialFetchesPendingRef.current > 0) {
         // eslint-disable-next-line no-console
-
+        console.warn('[HomeData] Safety net: forcing loading=false after 6s timeout. Pending:', initialFetchesPendingRef.current);
         initialFetchesPendingRef.current = 0;
         setLoading(false);
       }
@@ -497,7 +655,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       fetchLatestMovies(1, false)
     ]).then((results) => {
       // eslint-disable-next-line no-console
-
+      console.log('[HomeData] All initial fetches settled:', results.map(r => r.status));
     });
   }, [initialSnapshot, fetchHeroMovies, fetchTop10Movies, fetchBigSlideMovies, fetchLatestMovies]);
 
@@ -531,7 +689,9 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         // will then expose play buttons for, leading to the
         // "Trailer chưa được cung cấp" panel on movie detail.
         const filteredRaw = filterMoviesWithValidTrailer(rawMovies);
-        const normalized = filteredRaw.map((m, idx) => normalizeMovie(m as RawMovie, idx) as NormalizedMovie);
+        // Bỏ phim không có ảnh thật để không xuất hiện dải xám
+        // placeholder ở trang chủ.
+        const normalized = normalizeAndCompact(filteredRaw);
         setLatestMovies((prev) => [...prev, ...normalized]);
         setPage(nextPage);
       } else if (isMountedRef.current) {

@@ -16,6 +16,10 @@ import {
   FaCog
 } from 'react-icons/fa';
 import { useRouter } from 'next/router';
+
+// Zustand store cho user (cache profile + favorites)
+import { useUserStore } from '@/stores/useUserStore';
+
 // .js deps - cast for strict TS
 import { useAuth as useAuthRaw, isAdminUser } from '@/utils/auth';
 const { useAuth } = { useAuth: useAuthRaw as unknown as () => AuthApi };
@@ -242,6 +246,32 @@ const Navbar: React.FC = () => {
 
   const router = useRouter();
   const { user, logout, isAuthenticated } = useAuth();
+
+  // ---- Zustand: sync user data vào cache khi login/logout ----
+  // Dùng selector để chỉ subscribe `user` và `isAuthenticated`
+  // → Navbar không re-render khi các state khác trong store thay đổi
+  const zustandUser = useUserStore((s) => s.getCachedProfile());
+  const setUserStore = useUserStore((s) => ({
+    setCachedProfile: s.setCachedProfile,
+    setToken: s.setToken,
+    logout: s.logout
+  }));
+
+  // Sync khi user login/logout
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Cache profile vào Zustand store (localStorage persist)
+      setUserStore.setCachedProfile(user as Parameters<typeof setUserStore.setCachedProfile>[0]);
+      // Sync token nếu có
+      const token = typeof window !== 'undefined'
+        ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
+        : null;
+      if (token) setUserStore.setToken(token);
+    } else if (!isAuthenticated) {
+      // Logout → xóa cache
+      setUserStore.logout();
+    }
+  }, [isAuthenticated, user, setUserStore]);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
