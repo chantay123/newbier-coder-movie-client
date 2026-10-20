@@ -154,12 +154,8 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
   // per page load.
   if (SYSTEM_CONFIG.debugMovies && index === 0 && !didLogHomeDiagnostic) {
     didLogHomeDiagnostic = true;
-    // eslint-disable-next-line no-console
-
-    // eslint-disable-next-line no-console
-
-    // eslint-disable-next-line no-console
-
+    // DEBUG: uncomment below lines when you need to diagnose movie data
+    // console.log('[HomeData] First movie raw:', JSON.stringify(movie, null, 2));
   }
 
   const id = (movie._id as string) || (movie.id as string) || `movie-${index}`;
@@ -318,8 +314,6 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
    */
   const finishInitialFetch = useCallback((): void => {
     initialFetchesPendingRef.current = Math.max(0, initialFetchesPendingRef.current - 1);
-    // eslint-disable-next-line no-console
-    console.log('[HomeData] finishInitialFetch, remaining:', initialFetchesPendingRef.current);
     if (
       isMountedRef.current
       && initialFetchesPendingRef.current === 0
@@ -342,18 +336,12 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     try {
       const heroSection = HOME_SECTIONS['hero'];
       const movies = heroSection?.load ? await heroSection.load([]) : [];
-      // eslint-disable-next-line no-console
-      console.log('[Hero] API returned', Array.isArray(movies) ? movies.length : 'non-array', 'movies');
       let finalList = movies;
       if (!Array.isArray(movies) || movies.length === 0) {
-        // eslint-disable-next-line no-console
-        console.warn('[Hero] API empty, falling back to mockMovies (', mockMovies.length, 'items)');
         finalList = mockMovies as unknown as typeof movies;
       }
       if (isMountedRef.current && finalList.length > 0) {
         const filtered = filterMoviesWithValidTrailer(finalList);
-        // eslint-disable-next-line no-console
-        console.log('[Hero] filtered to', filtered.length, 'movies with valid trailer');
 
         // Theo yêu cầu: chỉ hiển thị phim CÓ trailer. Không fallback về
         // danh sách không-trailer. Nếu lọc ra 0 phim thì Hero render
@@ -370,8 +358,6 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         }
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[Hero] fetcher threw error:', err);
       if (isMountedRef.current) {
         const filtered = filterMoviesWithValidTrailer(mockMovies as unknown as RawMovie[]);
         setFeaturedMovies(compactHeroMovies(filtered));
@@ -389,12 +375,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     try {
       const top10Section = HOME_SECTIONS['top10'];
       const movies = top10Section?.load ? await top10Section.load([]) : [];
-      // eslint-disable-next-line no-console
-      console.log('[Top10] API returned', Array.isArray(movies) ? movies.length : 'non-array', 'movies');
       let finalList = movies;
       if (!Array.isArray(movies) || movies.length === 0) {
-        // eslint-disable-next-line no-console
-        console.warn('[Top10] API empty, falling back to mockMovies');
         finalList = mockMovies as unknown as typeof movies;
       }
       if (isMountedRef.current && finalList.length > 0) {
@@ -413,8 +395,6 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         setHomeCache('top10', compact as any);
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[Top10] fetcher threw:', err);
       if (isMountedRef.current) {
         const filtered = filterMoviesWithValidTrailer(mockMovies as unknown as RawMovie[]);
         const normalized: RankedMovie[] = normalizeAndCompact(filtered.slice(0, 10)).map((m, idx) => ({
@@ -447,15 +427,9 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         ? await movieService.getHomeMovies()
         : await movieService.getMoviesPage(pageNumber, 24);
 
-      // [DEBUG] log API response size
-      // eslint-disable-next-line no-console
-      console.log('[Latest] page=' + pageNumber, 'API returned', Array.isArray(rawMovies) ? rawMovies.length : 'non-array', 'movies');
-
       // FALLBACK: backend returns empty/401 → use local mock movies.
       // This keeps the homepage visible during backend auth maintenance.
       if ((!Array.isArray(rawMovies) || rawMovies.length === 0) && pageNumber === 1) {
-        // eslint-disable-next-line no-console
-        console.warn('[Latest] API empty on first page, using mockMovies fallback');
         rawMovies = mockMovies as unknown as RawMovie[];
       }
 
@@ -506,8 +480,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     setUpcomingLoading(true);
 
     const startTime = Date.now();
-    const MIN_LOADING_TIME = 1500;
-    const MAX_TIMEOUT = 8000;
+    const MIN_LOADING_TIME = 300;
+    const MAX_TIMEOUT = 5000;
 
     let timeoutTriggered = false;
     const timeoutTimer: ReturnType<typeof setTimeout> = setTimeout(() => {
@@ -564,12 +538,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       const movies = bigSlideSection?.load
         ? ((await bigSlideSection.load([])) as unknown as RawMovie[])
         : undefined;
-      // eslint-disable-next-line no-console
-      console.log('[BigSlide] API returned', Array.isArray(movies) ? movies.length : 'non-array', 'movies');
       let finalList = movies;
       if (!Array.isArray(movies) || movies.length === 0) {
-        // eslint-disable-next-line no-console
-        console.warn('[BigSlide] API empty, falling back to mockAnimationMovies');
         finalList = mockAnimationMovies as unknown as RawMovie[];
       }
       if (isMountedRef.current && Array.isArray(finalList) && finalList.length > 0) {
@@ -582,8 +552,6 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         setHomeCache('bigSlide', filtered as any);
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('[BigSlide] fetcher threw:', err);
       if (isMountedRef.current) {
         const filtered = filterMoviesWithValidTrailer(mockAnimationMovies as unknown as RawMovie[]);
         setAnimeSpotlightMovies(filtered);
@@ -617,8 +585,6 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
 
     const hasAllCache = cachedHero && cachedTop10 && cachedBigSlide && cachedLatest;
     if (hasAllCache) {
-      // eslint-disable-next-line no-console
-      console.log('[HomeData] All sections cached → skip initial fetch');
       return; // loading = false (đã init từ cache ở trên)
     }
     // eslint-disable-next-line no-console
@@ -629,11 +595,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     // flips off.
     initialFetchesPendingRef.current = 4;
 
-    // [DEBUG] Log trạng thái bắt đầu fetcher batch
-    // eslint-disable-next-line no-console
-    console.log('[HomeData] Initial fetch started, counter=4');
-
-    // Hard safety net: if the counter is still > 0 after 6s, force
+    // Hard safety net: if the counter is still > 0 after 3s, force
     // `loading=false` anyway. The fetcher's own finally will still
     // run when it eventually resolves — it will just find the
     // counter already at 0 and no-op.
@@ -641,22 +603,17 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     loadingSafetyNetRef.current = setTimeout(() => {
       if (!isMountedRef.current) return;
       if (initialFetchesPendingRef.current > 0) {
-        // eslint-disable-next-line no-console
-        console.warn('[HomeData] Safety net: forcing loading=false after 6s timeout. Pending:', initialFetchesPendingRef.current);
         initialFetchesPendingRef.current = 0;
         setLoading(false);
       }
-    }, 6000);
+    }, 3000);
 
     Promise.allSettled([
       fetchHeroMovies(),
       fetchTop10Movies(),
       fetchBigSlideMovies(),
       fetchLatestMovies(1, false)
-    ]).then((results) => {
-      // eslint-disable-next-line no-console
-      console.log('[HomeData] All initial fetches settled:', results.map(r => r.status));
-    });
+    ]);
   }, [initialSnapshot, fetchHeroMovies, fetchTop10Movies, fetchBigSlideMovies, fetchLatestMovies]);
 
   /**

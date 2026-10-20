@@ -381,8 +381,6 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
     // Cast về đúng type của hook (NormalizedMovieDetail)
     const cached = getCachedMovie(slug) as NormalizedMovieDetail | null;
     if (cached) {
-      // eslint-disable-next-line no-console
-      console.log('[MovieDetail] Cache hit for:', slug);
       if (isMountedRef.current) {
         setMovie(cached);
         setLoading(false);
@@ -390,9 +388,6 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
       fetchInFlightSlug.current = null;
       return;
     }
-    // eslint-disable-next-line no-console
-    console.log('[MovieDetail] Cache miss → fetching API:', slug);
-
     // Resolve the auth header via the shared service. This transparently
     // refreshes the token if it is within 60s of expiry. Returns `{}` when
     // no token is present (the request will then 401 from the backend
@@ -506,14 +501,7 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           // normalization so we can confirm the data flow from API →
           // mapper → hook → modal. Gated by NEXT_PUBLIC_DEBUG_MOVIES.
           if (SYSTEM_CONFIG.debugMovies) {
-            // eslint-disable-next-line no-console
-            console.debug('[TrailerDebug] useMovieDetail normalized movie:', {
-              movieId: normalized._id,
-              movieSlug: normalized.slug,
-              movieName: normalized.name,
-              trailer_url: normalized.trailer_url,
-              trailerObject: normalized.trailer
-            });
+            // Debug mode only - remove in production
           }
           setMovie(normalized);
           // 🆕 Ghi vào Zustand cache sau khi fetch thành công
@@ -529,8 +517,6 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
     } catch (err) {
       if (isMountedRef.current) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        // eslint-disable-next-line no-console
-        console.warn('[useMovieDetail] fetch failed:', errorMessage);
         // Network / server error — show retry UI, do NOT fall back to
         // mock data. Mock fallback would hide real bugs and mislead
         // users into thinking they are seeing a real movie.
