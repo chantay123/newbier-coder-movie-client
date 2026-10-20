@@ -8,6 +8,38 @@ import styles from '@/styles/MovieCards.module.css';
  * smooth hover elevation, and responsive meta details.
  */
 
+/**
+ * Defensive: chọn URL poster khả dĩ hiển thị được từ nhiều field mà
+ * backend có thể trả về. Chỉ chấp nhận URL có scheme http(s) hoặc
+ * data:image (base64). Mọi giá trị khác (rỗng, undefined, chuỗi
+ * không có scheme, đường dẫn tương đối thiếu host, ...) đều trả về
+ * placeholder. Đây là defense in depth cuối cùng trước khi <img>
+ * tải, bảo vệ cả các entry-point khác ngoài Country rail.
+ */
+const resolvePosterSrc = (
+  movie: Record<string, unknown> | null | undefined,
+  fallback: string
+): string => {
+  if (!movie || typeof movie !== 'object') return fallback;
+  const candidates = [
+    movie.poster_url,
+    movie.posterUrl,
+    movie.thumb_url,
+    movie.thumbUrl,
+    movie.imagePoster,
+    movie.poster_path,
+    movie.posterPath
+  ];
+  for (const raw of candidates) {
+    if (typeof raw !== 'string') continue;
+    const v = raw.trim();
+    if (!v) continue;
+    if (/^https?:\/\//i.test(v)) return v;
+    if (/^data:image\//i.test(v)) return v;
+  }
+  return fallback;
+};
+
 /** Minimal movie shape (compatible across project) */
 export interface MovieLite {
   _id?: string;
@@ -57,8 +89,8 @@ const MovieCardVertical: React.FC<MovieCardVerticalProps> = ({
   onPlayTrailer,
   className = ''
 }) => {
-  const [imgSrc, setImgSrc] = useState<string>(
-    movie?.poster_url || movie?.thumb_url || '/img/placeholder-poster.svg'
+  const [imgSrc, setImgSrc] = useState<string>(() =>
+    resolvePosterSrc(movie as Record<string, unknown>, '/img/placeholder-poster.svg')
   );
 
   if (!movie) return null;
@@ -88,7 +120,11 @@ const MovieCardVertical: React.FC<MovieCardVerticalProps> = ({
           alt={movie?.name || 'Poster phim'}
           className={styles.posterImg}
           loading="lazy"
-          onError={() => setImgSrc('/img/placeholder-poster.svg')}
+          onError={() => {
+            // eslint-disable-next-line no-console
+            console.warn('[MovieCard] image failed → fallback. Was:', imgSrc, 'slug:', movie?.slug);
+            setImgSrc('/img/placeholder-poster.svg');
+          }}
         />
 
         {/* Top Badges: IMDb rating & resolution */}

@@ -20,6 +20,14 @@ export interface ActiveEpisode {
   name?: string;
   link_m3u8?: string;
   link_embed?: string;
+  /** camelCase variants — the movie-detail API returns the embed URL as
+   * `linkEmbed`/`linkM3u8`. `useMovieDetail.normalizeEpisodes` already
+   * aliases these to snake_case, but the player reads them defensively so
+   * an episode passed in from any other path still plays. */
+  linkM3u8?: string;
+  linkEmbed?: string;
+  /** Some payloads nest the links under a `link` object. */
+  link?: { embed?: string; m3u8?: string } | string;
 }
 
 export interface MoviePlayerSectionProps {
@@ -49,10 +57,24 @@ const MoviePlayerSection: React.FC<MoviePlayerSectionProps> = ({
   const currentEpisodes: WatchEpisode[] = currentServer?.server_data || [];
   const totalEpisodes = currentEpisodes.length;
 
+  // Resolve the episode's stream URL, accepting every shape the API has
+  // used: snake_case (`link_embed`), camelCase (`linkEmbed`), and the
+  // legacy nested `link: { embed }` object.
+  const embedLink: string =
+    activeEpisode?.link_embed ||
+    activeEpisode?.linkEmbed ||
+    (typeof activeEpisode?.link === 'object' ? activeEpisode.link.embed || '' : activeEpisode?.link || '') ||
+    '';
+  const m3u8Link: string =
+    activeEpisode?.link_m3u8 ||
+    activeEpisode?.linkM3u8 ||
+    (typeof activeEpisode?.link === 'object' ? activeEpisode.link.m3u8 || '' : '') ||
+    '';
+
   // Prioritize self-hosted cinema player with pixel-perfect timeline
-  const streamEmbedUrl: string = activeEpisode?.link_m3u8
-    ? `/player.html?url=${encodeURIComponent(activeEpisode.link_m3u8)}&title=${encodeURIComponent(movie?.name || '')}&ep=${encodeURIComponent(activeEpisode?.name || '')}`
-    : (activeEpisode?.link_embed || '');
+  const streamEmbedUrl: string = m3u8Link
+    ? `/player.html?url=${encodeURIComponent(m3u8Link)}&title=${encodeURIComponent(movie?.name || '')}&ep=${encodeURIComponent(activeEpisode?.name || '')}`
+    : embedLink;
 
   const handlePrevEpisode = (): void => {
     if (currentEpisodeIndex > 0 && onSelectEpisode) {

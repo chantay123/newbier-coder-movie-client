@@ -4,11 +4,19 @@
  * Elevated height with minimal filter overlays to highlight vivid anime artwork.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Skeleton from '@/features/shared/components/UI/Skeleton';
 import SectionHeader from '@/features/shared/components/MovieSection/SectionHeader';
 import styles from './BigSlideBanner.module.css';
+import {
+  pickImageSrc,
+  BACKDROP_FIELDS,
+  THUMB_FIELDS,
+  FALLBACK_BACKDROP,
+  FALLBACK_POSTER
+} from '@/utils/imageSource';
+import { hasValidTrailer } from '@/utils/trailer';
 
 /** Movie thô từ API - loose shape */
 export type SpotlightMovie = Record<string, unknown> & {
@@ -93,14 +101,46 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
   viewAllHref = '/genre/hoat-hinh',
   autoPlayInterval = 7000
 }) => {
-  const displayMovies: SpotlightMovie[] = Array.isArray(movies) ? movies : [];
+  const rawMovies: SpotlightMovie[] = Array.isArray(movies) ? movies : [];
+
+  // Defense in depth: chỉ hiển thị phim có trailer hợp lệ. Trước đó
+  // yêu cầu này chỉ filter ở `useHomeData` — nếu caller khác truyền
+  // prop `movies` chưa filter, banner vẫn để lọt phim không trailer,
+  // nút "Trailer" bấm vào mở modal trống.
+  const displayMovies = useMemo(
+    () => rawMovies.filter((m) => hasValidTrailer(m as never)),
+    [rawMovies]
+  );
+
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
+  const [backdropSrc, setBackdropSrc] = useState<string>(FALLBACK_BACKDROP);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const currentMovie: SpotlightMovie | undefined = displayMovies[currentIndex] || displayMovies[0];
+  // Clamp index về khoảng hợp lệ — khi `movies` props thay đổi (filter
+  // loại phim), không để currentIndex trỏ vào phim đã biến mất.
+  const safeIndex = displayMovies.length === 0
+    ? 0
+    : Math.min(currentIndex, displayMovies.length - 1);
+  const currentMovie: SpotlightMovie | undefined = displayMovies[safeIndex] || displayMovies[0];
+
+  // Cập nhật backdropSrc mỗi khi currentMovie đổi. Đặt ở effect thay
+  // vì render để re-mount img (giữ behavior cũ của BigSlideBanner)
+  // và có thể reset về placeholder khi URL rỗng.
+  useEffect(() => {
+    if (!currentMovie) {
+      setBackdropSrc(FALLBACK_BACKDROP);
+      return;
+    }
+    const src = pickImageSrc(
+      currentMovie as Record<string, unknown>,
+      BACKDROP_FIELDS,
+      FALLBACK_BACKDROP
+    );
+    setBackdropSrc(src);
+  }, [currentMovie]);
 
   // Auto-play logic with progress bar
   useEffect(() => {
@@ -134,7 +174,9 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
   }, [currentIndex, isPaused, displayMovies, autoPlayInterval]);
 
   const handleSelectSlide = (index: number): void => {
-    setCurrentIndex(index);
+    if (displayMovies.length === 0) return;
+    const safeClamped = Math.max(0, Math.min(index, displayMovies.length - 1));
+    setCurrentIndex(safeClamped);
     setProgress(0);
   };
 
@@ -167,12 +209,26 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
         onMouseLeave={() => setIsPaused(false)}
       >
         <div className={styles.slideWrapper}>
-          {/* Background Backdrop Image */}
+          {/* Background Backdrop Image.
+           *
+           * Trước đó src lấy trực tiếp từ payload (
+   `currentMovie.backdrop_url || poster_url || thumb_url`) —
+           * nếu tất cả URL đều rỗng, `<img src="">` không trigger onError
+           * → nền đen tuyền (lỗi bạn vừa báo). Nay dùng helper
+           * `pickImageSrc` để:
+           *   1. Tự fallback về FALLBACK_BACKDROP khi không có URL hợp lệ.
+           *   2. Có onError nếu CDN trả 404 hoặc content sai type.
+           */}
           <img
             key={currentMovie._id || currentMovie.slug}
-            src={currentMovie.backdrop_url || currentMovie.poster_url || currentMovie.thumb_url}
+            src={backdropSrc}
             alt={currentMovie.name}
             className={styles.backdropImage}
+            onError={() => {
+              // eslint-disable-next-line no-console
+              console.warn('[BigSlide] backdrop failed → fallback. Was:', backdropSrc, 'slug:', currentMovie.slug);
+              setBackdropSrc(FALLBACK_BACKDROP);
+            }}
           />
 
           {/* Minimalist, Gentle Gradient Overlay */}
@@ -233,15 +289,24 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
               {displayMovies.slice(0, 5).map((movie, idx) => (
                 <div
                   key={movie._id || movie.slug || String(idx)}
-                  className={`${styles.thumbItem} ${idx === currentIndex ? styles.thumbItemActive : ''}`}
+                  className={`${styles.thumbItem} ${idx === safeIndex ? styles.thumbItemActive : ''}`}
                   onClick={() => handleSelectSlide(idx)}
                   title={movie.name}
                 >
                   <img
-                    src={movie.thumb_url || movie.poster_url}
+                    src={pickImageSrc(
+                      movie as Record<string, unknown>,
+                      THUMB_FIELDS,
+                      FALLBACK_POSTER
+                    )}
                     alt={movie.name}
                     className={styles.thumbImg}
                     loading="lazy"
+                    onError={(e) => {
+                      // eslint-disable-next-line no-console
+                      console.warn('[BigSlide] thumb failed → fallback. slug:', movie.slug);
+                      (e.currentTarget as HTMLImageElement).src = FALLBACK_POSTER;
+                    }}
                   />
                 </div>
               ))}

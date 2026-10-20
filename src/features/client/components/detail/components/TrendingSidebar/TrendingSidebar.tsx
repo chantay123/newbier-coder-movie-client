@@ -3,6 +3,7 @@ import Link from 'next/link';
 import movieService from '@/API/services/movieService';
 import { LOCAL_DEFAULT_POSTER } from '@/config/movieFallbackConfig';
 import { WATCH_CONFIG } from '@/config/watchConfig';
+import { pickImageSrc, POSTER_FIELDS } from '@/utils/imageSource';
 import styles from './TrendingSidebar.module.css';
 
 /**
@@ -96,7 +97,11 @@ const TrendingSidebar: React.FC<TrendingSidebarProps> = ({ currentSlug = '' }) =
       ) : displayedMovies.length > 0 ? (
         <div className={styles.movieList}>
           {displayedMovies.map((movie, idx) => {
-            const posterSrc = movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER;
+            const posterSrc = pickImageSrc(
+              movie as unknown as Record<string, unknown>,
+              POSTER_FIELDS,
+              LOCAL_DEFAULT_POSTER
+            );
 
             const hasDistinctOrigin =
               !!(movie.origin_name && movie.name) &&
