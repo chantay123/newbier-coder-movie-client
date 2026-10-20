@@ -30,7 +30,7 @@ const TopRecommendedSection: React.FC<TopRecommendedSectionProps> = ({
     <MovieSection
       title="Phim Đề Xuất"
       badge="HOT"
-      viewAllHref="/danh-sach/phim-de-xuat"
+      viewAllHref="/browse/movies?type=all&sort=highest-rating"
       layout="rail"
       variant="vertical"
       cardSize={cardSize}

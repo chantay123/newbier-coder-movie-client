@@ -25,21 +25,39 @@ export const endpoints = {
     movies: () => `${API_URL}/crawl/movies`,
     moviesAll: () => `${API_URL}/crawl/moviesall`
   },
+  /**
+   * Watch history — path đã verify trực tiếp với backend production
+   * (2026-10-20). Route cũ `/history/*` trả 404 "Route not found".
+   *   GET    /users/me/history        → 401 (list, cần Bearer token)
+   *   POST   /users/me/history        → 400 (add, cần Bearer token + body)
+   *   DELETE /users/me/history/:id    → 401 (xóa 1 item)
+   *   DELETE /users/me/history        → 401 (xóa toàn bộ)
+   * Baseline `/users/me/zzz-nope` → 404 nên 401 ở đây là route thật, không
+   * phải false-positive của `/users/me/:param`.
+   */
   history: {
-    getAll: (limit = 10, page = 1) => buildUrl(`${API_URL}/history`, { limit, page }),
-    add: () => `${API_URL}/history`,
-    addById: (movieId: string) => `${API_URL}/history/${movieId}`,
-    delete: (historyId: string) => `${API_URL}/history/${historyId}`,
-    clear: () => `${API_URL}/history/clear`,
+    getAll: (limit = 10, page = 1) => buildUrl(`${API_URL}/users/me/history`, { limit, page }),
+    add: () => `${API_URL}/users/me/history`,
+    addById: (_movieId: string) => `${API_URL}/users/me/history`,
+    delete: (historyId: string) => `${API_URL}/users/me/history/${historyId}`,
+    clear: () => `${API_URL}/users/me/history`,
     getUserHistory: (userId: string, limit = 10, page = 1) =>
       buildUrl(`${API_URL}/users/${userId}/history`, { limit, page })
   },
+  /**
+   * Favorites — path đã được verify trực tiếp với backend production
+   * (2026-10-20). Route cũ `/favorites` trả 404 "Route not found".
+   *   GET    /users/me/favorites    → 401 (tồn tại, cần Bearer token)
+   *   POST   /movies/:slug/favorite → 401 (tồn tại, cần Bearer token)
+   *   DELETE /movies/:slug/favorite → 401 (tồn tại, cần Bearer token)
+   * Toggle dùng slug (không phải id) — đã đúng ở useMovieDetail.ts.
+   */
   favorites: {
-    getAll: () => `${API_URL}/favorites`,
-    add: () => `${API_URL}/favorites`,
-    remove: (movieId: string) => `${API_URL}/favorites/${movieId}`,
+    getAll: () => `${API_URL}/users/me/favorites`,
+    add: (movieSlug: string) => `${API_URL}/movies/${encodeURIComponent(movieSlug)}/favorite`,
+    remove: (movieSlug: string) => `${API_URL}/movies/${encodeURIComponent(movieSlug)}/favorite`,
     check: (movieSlug: string) =>
-      `${API_URL}/favorites/check?movieSlug=${encodeURIComponent(movieSlug)}`
+      `${API_URL}/users/me/favorites?slug=${encodeURIComponent(movieSlug)}`
   },
   search: {
     find: () => `${API_URL}/search`

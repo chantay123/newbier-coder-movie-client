@@ -12,6 +12,7 @@ import {
   normalizeHeroMovie,
   LOCAL_DEFAULT_BACKDROP
 } from '@/config/movieConfig';
+import { hasValidTrailer } from '@/utils/trailer';
 
 /** Category entry dùng cho pill chips */
 interface CategoryEntry {
@@ -258,39 +259,67 @@ const SpotlightDock: React.FC<SpotlightDockProps> = ({ movies, currentIndex, onS
  * HeroBanner component for displaying featured cinematic movies.
  */
 const HeroBanner: React.FC<HeroBannerProps> = ({ movies = [], loading = false, onPlayTrailer }) => {
-  // Use passed movies normalized defensively
+  // Use passed movies normalized defensively.
   const rawList = movies && Array.isArray(movies) && movies.length > 0 ? movies.slice(0, 5) : [];
   const candidateMovies = rawList.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as HeroMovie);
+
+  // Defense in depth: Hero MỚI chỉ hiển thị phim có trailer hợp lệ.
+  // Trước đó yêu cầu này chỉ áp dụng ở `useHomeData.compactHeroMovies`,
+  // nhưng nếu một caller khác truyền `movies` không qua filter này, Hero
+  // vẫn để lọt phim không trailer → bấm nút "Trailer" mở modal trống.
+  // Lọc bằng cùng helper single-source-of-truth (`hasValidTrailer`) để
+  // hành vi của Hero luôn khớp với các rail khác.
+  const trailerableMovies = candidateMovies.filter((m) => hasValidTrailer(m as never));
+
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
-  const activeMovie = candidateMovies[currentIndex] || candidateMovies[0];
+  // currentIndex có thể đã trỏ vào phim đã bị loại sau khi prop `movies`
+  // thay đổi (ví dụ: lúc đầu có phim A,B,C, sau đó filter chỉ còn A).
+  // Đảm bảo index luôn nằm trong tập hợp còn lại.
+  const safeIndex = trailerableMovies.length === 0
+    ? 0
+    : Math.min(currentIndex, trailerableMovies.length - 1);
+  const activeMovie = trailerableMovies[safeIndex] || trailerableMovies[0];
 
   /**
    * Advances the hero spotlight to the next featured movie.
    */
   const handleNextSpotlight = useCallback((): void => {
-    if (candidateMovies.length <= 1) return;
-    setCurrentIndex((prev) => (prev + 1) % candidateMovies.length);
-  }, [candidateMovies.length]);
+    if (trailerableMovies.length <= 1) return;
+    setCurrentIndex((prev) => (prev + 1) % trailerableMovies.length);
+  }, [trailerableMovies.length]);
 
   /**
    * Sets up auto-cycling of spotlight movies.
    */
   useEffect(() => {
-    if (candidateMovies.length <= 1) return;
+    if (trailerableMovies.length <= 1) return;
     const interval = setInterval(handleNextSpotlight, MOVIE_CONFIG.hero.autoPlayInterval);
     return () => clearInterval(interval);
-  }, [candidateMovies.length, handleNextSpotlight]);
+  }, [trailerableMovies.length, handleNextSpotlight]);
 
   /**
    * Selects a specific featured movie by index.
    */
   const handleSelectSpotlight = (index: number): void => {
-    setCurrentIndex(index);
+    // Clamp index trong khoảng hợp lệ của danh sách hiện tại.
+    if (trailerableMovies.length === 0) return;
+    const safeClamped = Math.max(0, Math.min(index, trailerableMovies.length - 1));
+    setCurrentIndex(safeClamped);
   };
 
-  if (loading || !activeMovie) {
+  // QUAN TRỌNG: chỉ hiển thị skeleton khi ĐANG THỰC SỰ LOAD.
+  // Trước đây điều kiện là `loading || !activeMovie`, khiến Hero rơi vào
+  // skeleton VĨNH VIỄN nếu danh sách rỗng (ví dụ mọi phim trả về đều có
+  // `trailer: null` và bị `filterMoviesWithValidTrailer` loại hết).
+  // Nếu đã load xong mà không có phim nào, render null cho gọn thay vì
+  // để user nhìn một khối skeleton vĩnh viễn.
+  if (loading) {
     return <HeroBannerSkeleton />;
+  }
+
+  if (!activeMovie) {
+    return null;
   }
 
   const seriesStatusText = resolveSeriesStatus(activeMovie);
@@ -422,8 +451,8 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ movies = [], loading = false, o
 
         {/* Right Corner */}
         <SpotlightDock
-          movies={candidateMovies}
-          currentIndex={currentIndex}
+          movies={trailerableMovies}
+          currentIndex={safeIndex}
           onSelect={handleSelectSpotlight}
         />
       </div>

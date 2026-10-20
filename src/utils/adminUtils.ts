@@ -20,22 +20,42 @@ const FALLBACK_ADMIN: AdminUser = {
   role: 'admin'
 };
 
+/** Obfuscation key — phải khớp với authService.ts và auth.tsx */
+const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
+
+const obfDecode = (encoded: string): string | null => {
+  try {
+    const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    if (decoded.startsWith(OBFUSCATION_KEY) && decoded.endsWith(OBFUSCATION_KEY)) {
+      return decoded.slice(OBFUSCATION_KEY.length, -OBFUSCATION_KEY.length);
+    }
+    JSON.parse(decoded);
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
 /** Kiểm tra user có phải admin không */
 export const isAdmin = (): boolean => true;
 
-/** Lấy dữ liệu user hiện tại từ localStorage */
+/** Lấy dữ liệu user hiện tại.
+ *
+ * User info được đọc từ sessionStorage (obfuscated), fallback localStorage (obfuscated).
+ * Admin UI nên dùng `useAuth()` hook thay vì hàm này. */
 export const getCurrentUser = (): AdminUser => {
   try {
     if (typeof window === 'undefined') {
       return FALLBACK_ADMIN;
     }
-
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      return FALLBACK_ADMIN;
-    }
-
-    return JSON.parse(userStr) as AdminUser;
+    const raw =
+      (window.sessionStorage && window.sessionStorage.getItem('user')) ||
+      localStorage.getItem('user');
+    if (!raw) return FALLBACK_ADMIN;
+    const decoded = obfDecode(raw) || raw;
+    return JSON.parse(decoded) as AdminUser;
   } catch {
     return FALLBACK_ADMIN;
   }

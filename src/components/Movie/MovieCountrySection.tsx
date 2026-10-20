@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MovieCarouselSection from './MovieCarouselSection';
 import { MOVIE_CONFIG } from '@/config/movieConfig';
+import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 import type { MovieLite } from '@/features/shared/components/MovieCard/MovieCardVertical';
 
 type CountryMovie = {
@@ -35,10 +36,15 @@ const MovieCountrySection: React.FC<MovieCountrySectionProps> = ({ onPlayTrailer
         const allMovies: CountryMovie[] = data?.data?.movies || data?.movies || [];
 
         if (allMovies.length > 0 && isSubscribed) {
-          const kr = allMovies.filter((m) =>
+          // Same trailer-aware filter used by the homepage rails.
+          // Country sections also render "Xem trailer" buttons, so
+          // a movie without a valid trailer is excluded before the
+          // carousel section ever sees it.
+          const withTrailer = filterMoviesWithValidTrailer(allMovies) as CountryMovie[];
+          const kr = withTrailer.filter((m) =>
             m.country?.some?.((c) => c.slug === 'han-quoc' || (c.name?.toLowerCase().includes('hàn') ?? false))
           );
-          const cn = allMovies.filter((m) =>
+          const cn = withTrailer.filter((m) =>
             m.country?.some?.((c) => c.slug === 'trung-quoc' || (c.name?.toLowerCase().includes('trung') ?? false))
           );
 

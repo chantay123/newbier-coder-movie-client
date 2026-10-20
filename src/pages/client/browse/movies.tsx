@@ -5,9 +5,11 @@
 import React, { useState, useEffect, MouseEvent } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import Skeleton from '@/features/shared/components/UI/Skeleton';
 import type { SkeletonProps } from '@/features/shared/components/UI/Skeleton';
 import { FaPlayCircle, FaStar, FaClock, FaChevronDown, FaSync } from 'react-icons/fa';
+import { pickMovieImage } from '@/utils/imageSource';
 import styles from '@/styles/Movies.module.css';
 
 const CATEGORIES = [
@@ -83,6 +85,7 @@ const sortMovies = (list: MovieItem[], opt: SortOption): MovieItem[] => {
 };
 
 export default function Movies() {
+  const router = useRouter();
   const [movies, setMovies] = useState<MovieItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [page, setPage] = useState<number>(1);
@@ -91,12 +94,38 @@ export default function Movies() {
   const [totalMovies, setTotalMovies] = useState<number>(0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  const [filters, setFilters] = useState({ category: '', country: '', year: '', type: 'single' });
+  // Read initial filters from the URL so each "Xem tất cả" deep-link
+  // opens the right slice. Defaults below preserve the previous
+  // "phim lẻ" view for any direct visitor to /browse/movies without
+  // query params.
+  const [filters, setFilters] = useState<{ category: string; country: string; year: string; type: string }>({ category: '', country: '', year: '', type: 'single' });
   const [showCategoryDropdown, setShowCategoryDropdown] = useState<boolean>(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState<boolean>(false);
   const [showYearDropdown, setShowYearDropdown] = useState<boolean>(false);
   const [sortOption, setSortOption] = useState<SortOption>('newest');
   const [showSortOptions, setShowSortOptions] = useState<boolean>(false);
+
+  // Apply query params exactly once when the router becomes ready.
+  // We use `router.isReady` so SSR + client hydration stay consistent
+  // and `router.query` is populated.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { type, sort, category, country, year } = router.query;
+    setFilters((prev) => ({
+      ...prev,
+      type: typeof type === 'string' && type ? type : prev.type,
+      category: typeof category === 'string' ? category : prev.category,
+      country: typeof country === 'string' ? country : prev.country,
+      year: typeof year === 'string' ? year : prev.year
+    }));
+    if (typeof sort === 'string' && sort) {
+      const allowed: SortOption[] = ['newest','oldest','a-z','z-a','highest-rating','lowest-rating','year-desc','year-asc'];
+      if (allowed.includes(sort as SortOption)) {
+        setSortOption(sort as SortOption);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: currentYear - 2005 }, (_, i) => currentYear - i);
@@ -118,7 +147,7 @@ export default function Movies() {
     return () => document.removeEventListener('mousedown', handleClickOutside as unknown as EventListener);
   }, []);
 
-  useEffect(() => { fetchMovies(1, false); }, []);
+  useEffect(() => { fetchMovies(1, false); }, [filters.type, filters.category, filters.country, filters.year, sortOption]);
 
   const fetchMovies = async (pageNumber: number, isLoadMore = false): Promise<void> => {
     try {
@@ -130,21 +159,33 @@ export default function Movies() {
       params.append('q', '');
       params.append('page', String(pageNumber));
       params.append('size', '24');
-      params.append('type', filters.type);
+      // `type=all` means "no type filter" — the section "Xem tất cả"
+      // links send this to mean "all movies, both single and series".
+      // The backend's /search endpoint treats a missing/empty `type`
+      // as "no type constraint" so we just skip the param.
+      if (filters.type && filters.type !== 'all') params.append('type', filters.type);
       if (filters.category) params.append('category', filters.category);
       if (filters.country) params.append('country', filters.country);
       if (filters.year) params.append('year', filters.year);
       if (sortOption) params.append('sort', sortOption);
 
-      const response = await fetch(`${apiUrl}/search?${params.toString()}`);
+      const response = await fetch(`${apiUrl}/movies/search?${params.toString()}`);
       const result = (await response.json()) as SearchResponse;
 
       if (result?.hits && Array.isArray(result.hits)) {
-        const processed = result.hits.map((m) => ({
-          ...m,
-          thumb_url: m.thumb_url || m.poster_url || '/placeholder.jpg',
-          poster_url: m.poster_url || m.thumb_url || '/placeholder.jpg'
-        }));
+        // The v1 API returns images as camelCase `posterUrl`/`thumbUrl`,
+        // but this page renders `poster_url`/`thumb_url`. Resolve both
+        // casings here — otherwise every card fell back to a placeholder
+        // because `m.poster_url` was `undefined`.
+        const processed = result.hits.map((m) => {
+          const poster = pickMovieImage(m as Record<string, unknown>, 'poster', '');
+          const thumb = pickMovieImage(m as Record<string, unknown>, 'thumb', '');
+          return {
+            ...m,
+            poster_url: poster || thumb || '/img/Phim.png',
+            thumb_url: thumb || poster || '/img/Phim.png'
+          };
+        });
 
         const seenSlugs = new Set<string>();
         const seenIds = new Set<string>();
@@ -243,24 +284,41 @@ export default function Movies() {
   };
 
   const clearAllFilters = (): void => {
-    setFilters({ category: '', country: '', year: '', type: 'single' });
+    // Keep the deep-link `type` so the user stays on the right
+    // section (e.g. "Tất cả phim" or "Phim Lẻ") — only clear
+    // category/country/year.
+    setFilters((prev) => ({ category: '', country: '', year: '', type: prev.type }));
     setTimeout(() => { setLoading(true); fetchMovies(1, false); }, 0);
   };
+
+  // Title shown to the user depends on which deep-link sent them
+  // here. Default ("Phim Lẻ") is preserved for direct visitors to
+  // /browse/movies without query params.
+  const pageTitle = filters.type === 'all'
+    ? 'Tất cả phim'
+    : filters.type === 'series'
+      ? 'Phim Bộ'
+      : 'Phim Lẻ';
+  const pageDescription = filters.type === 'all'
+    ? 'Tổng hợp tất cả phim, cập nhật liên tục'
+    : filters.type === 'series'
+      ? 'Tổng hợp phim bộ hay nhất, cập nhật nhanh nhất'
+      : 'Tổng hợp các bộ phim lẻ, phim chiếu rạp hay nhất, cập nhật nhanh nhất';
 
   return (
     <>
       <Head>
-        <title>Phim Lẻ | Movie Streaming</title>
-        <meta name="description" content="Xem phim lẻ hay nhất và mới nhất trên Movie Streaming" />
+        <title>{pageTitle} | Movie Streaming</title>
+        <meta name="description" content={`Xem ${pageDescription.toLowerCase()} trên Movie Streaming`} />
       </Head>
 
       <div className={styles.container}>
         <div className="container py-5 mt-5">
           <div className="row mb-4">
             <div className="col-12">
-              <h1 className="text-white">Phim Lẻ</h1>
+              <h1 className="text-white">{pageTitle}</h1>
               <p className="text-secondary">
-                Tổng hợp các bộ phim lẻ, phim chiếu rạp hay nhất, cập nhật nhanh nhất
+                {pageDescription}
                 {totalMovies > 0 && ` (${totalMovies} phim)`}
               </p>
             </div>

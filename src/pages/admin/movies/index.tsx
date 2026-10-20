@@ -814,10 +814,10 @@ const MoviesAdmin = () => {
                       <div className={cinemaTable.posterCell} onClick={() => setDetailModal({ isOpen: true, movie })} style={{ cursor: 'pointer' }}>
                         <div className={cinemaTable.posterThumb}>
                           <img
-                            src={movie.thumb_url || movie.poster_url || '/img/default-poster.jpg'}
+                            src={movie.thumb_url || movie.poster_url || '/placeholder.jpg'}
                             alt={movie.name}
                             className={cinemaTable.posterImg}
-                            onError={(e) => { (e.target as HTMLImageElement).src = '/img/default-poster.jpg'; }}
+                            onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
                           />
                         </div>
                         <div className={cinemaTable.titleBlock}>

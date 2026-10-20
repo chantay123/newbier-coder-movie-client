@@ -207,7 +207,7 @@ export default function MovieDetailModal({
               <div className={styles.posterCol}>
                 <div className={styles.posterBox}>
                   <img
-                    src={displayMovie.thumb_url || displayMovie.poster_url || '/img/default-poster.jpg'}
+                    src={displayMovie.thumb_url || displayMovie.poster_url || '/placeholder.jpg'}
                     alt={displayMovie.name}
                     className={styles.posterImg}
                     onError={(e) => {

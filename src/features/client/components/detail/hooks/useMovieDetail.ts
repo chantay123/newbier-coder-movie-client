@@ -3,10 +3,21 @@
  * @description Centralized data management hook for the Movie Detail Page (/movie/[slug]).
  * Fetches real movie metadata, episode server streams, related recommendations,
  * and user interactions (favorites, ratings, comments) with robust defensive fallbacks.
+ *
+ * 🆕 Tích hợp Zustand (useMovieStore + useCommentStore):
+ * - Cache movie detail theo slug → không gọi lại khi quay lại trang
+ * - Cache related movies → không gọi lại khi quay lại
+ * - Cache comments → dùng chung với homepage
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+
+// Zustand stores cho caching
+import { useMovieStore } from '@/stores/useMovieStore';
+import { useCommentStore } from '@/stores/useCommentStore';
 import { MOVIE_CONFIG } from '@/config/movieConfig';
+import { SYSTEM_CONFIG } from '@/config/systemConfig';
+import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 import {
   resolveMovieBackdrop,
   resolveMovieSubTitle,
@@ -19,8 +30,8 @@ import {
   LOCAL_DEFAULT_POSTER,
   MOVIE_FALLBACK_DEFAULTS
 } from '@/config/movieFallbackConfig';
-import { getClientSnapshot } from '@/utils/dashboardSnapshot';
-import { mockMovies } from '@/mock/mockMovies';
+import { pickImageSrc, POSTER_FIELDS, THUMB_FIELDS } from '@/utils/imageSource';
+import { resolveImageUrl } from '@/utils/movieNormalizer';
 
 const API_BASE = MOVIE_CONFIG.apiBaseUrl;
 
@@ -35,6 +46,17 @@ interface CountryEntity {
 
 /** Episode server data entry */
 export interface EpisodeServerData {
+  id?: string;
+  name?: string;
+  slug?: string;
+  filename?: string;
+  /** Embed URL (iframe). Normalized from the backend's camelCase `linkEmbed`. */
+  link_embed?: string;
+  /** HLS playlist URL. Normalized from the backend's camelCase `linkM3u8`. */
+  link_m3u8?: string;
+  /** Original camelCase keys are preserved for any caller still using them. */
+  linkEmbed?: string;
+  linkM3u8?: string;
   [key: string]: unknown;
 }
 
@@ -42,8 +64,74 @@ export interface EpisodeServerData {
 export interface EpisodeServer {
   server_name?: string;
   server_data?: EpisodeServerData[];
+  /** Original camelCase keys are preserved for any caller still using them. */
+  serverName?: string;
+  serverData?: EpisodeServerData[];
   [key: string]: unknown;
 }
+
+/**
+ * Normalizes the `episodes` array from the backend into snake_case.
+ *
+ * ## Why this exists
+ * The movie-detail API returns episode servers in **camelCase**:
+ * ```json
+ * [{ "serverName": "Vietsub #1", "serverData": [
+ *     { "id": "...", "name": "1", "slug": "tap-1",
+ *       "linkEmbed": "https://embed13.streamc.xyz/embed.php?hash=...",
+ *       "linkM3u8": "" }] }]
+ * ```
+ * but every consumer in the app (`EpisodeDirectory`, `MovieHeroHeader`,
+ * `WatchSidebarPlaylist`, `MoviePlayerSection`, `watch.tsx`) reads the
+ * **snake_case** contract — `server_name` / `server_data` / `link_embed` /
+ * `link_m3u8`.
+ *
+ * Because those interfaces all carry `[key: string]: unknown`, TypeScript
+ * could not catch the mismatch, so at runtime `server.server_data` was
+ * `undefined`. Symptoms: the episode directory rendered nothing, the server
+ * tab showed a fallback name, and the player showed "Tập phim đang được cập
+ * nhật luồng phát" despite the movie having 12 playable episodes.
+ *
+ * ## Why we add aliases instead of renaming
+ * The camelCase keys are kept alongside the snake_case ones so that admin
+ * screens (which save `server_name`/`server_data`) and any legacy caller
+ * reading the raw payload keep working. Only additive changes are made.
+ */
+export const normalizeEpisodes = (raw: unknown): EpisodeServer[] => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((srv): srv is Record<string, unknown> => !!srv && typeof srv === 'object')
+    .map((srv) => {
+      // The episode list lives under `serverData` (camelCase) or
+      // `server_data` (snake_case) depending on payload vintage.
+      const rawList = (srv.serverData ?? srv.server_data) as unknown;
+      const serverData: EpisodeServerData[] = Array.isArray(rawList)
+        ? rawList
+            .filter((ep): ep is Record<string, unknown> => !!ep && typeof ep === 'object')
+            .map((ep) => ({
+              // Spread first so the backend's own fields (including `id`,
+              // which the admin edit form keys on) are preserved as-is.
+              ...ep,
+              name: (ep.name as string) ?? '',
+              slug: (ep.slug as string) ?? '',
+              link_embed: (ep.link_embed as string) || (ep.linkEmbed as string) || '',
+              link_m3u8: (ep.link_m3u8 as string) || (ep.linkM3u8 as string) || ''
+            }))
+        : [];
+
+      const serverName = (srv.server_name as string) || (srv.serverName as string) || '';
+
+      return {
+        ...srv,
+        server_name: serverName,
+        server_data: serverData,
+        // Canonical camelCase keys, in case the backend used snake_case.
+        serverName: serverName,
+        serverData: serverData
+      } as EpisodeServer;
+    });
+};
 
 /** Episode trailer object (cho TrailerModal) */
 export interface TrailerObject {
@@ -93,11 +181,24 @@ export interface Comment {
   [key: string]: unknown;
 }
 
+export type MovieDetailError =
+  /** Backend returned 404 — the movie truly does not exist. */
+  | 'not-found'
+  /** Backend returned 401/403 and we could not recover via refresh
+   * (either no token at all, or the refresh token is also rejected).
+   * The UI should surface a "please log in" affordance, NOT a generic
+   * "try again" button, because retrying without a token will always
+   * produce the same 401. */
+  | 'auth-required'
+  /** Anything else (5xx, network, malformed response). The UI can offer
+   * a "Thử lại" button. */
+  | 'request-error';
+
 /** Hook return type */
 export interface UseMovieDetailReturn {
   movie: NormalizedMovieDetail | null;
   loading: boolean;
-  error: string | null;
+  error: MovieDetailError | null;
   currentServerIndex: number;
   currentEpisodeIndex: number;
   activeServer: EpisodeServer | null;
@@ -127,8 +228,12 @@ export const normalizeMovieDetail = (raw: RawMovie | null | undefined, slug = ''
     || (raw.data as RawMovie | undefined)
     || raw;
 
-  // Normalize episodes structure
-  const episodes: EpisodeServer[] = Array.isArray(m.episodes) ? (m.episodes as EpisodeServer[]) : [];
+  // Normalize episodes structure. `normalizeEpisodes` maps the backend's
+  // camelCase `serverName`/`serverData`/`linkEmbed`/`linkM3u8` to the
+  // snake_case contract every component in the app reads. Without this,
+  // `server_data` was undefined at runtime and the episode list + player
+  // stayed empty even though the API returned 12 episodes.
+  const episodes: EpisodeServer[] = normalizeEpisodes(m.episodes);
 
   // Resolve actors & directors defensively
   const actorsList = (resolveMovieActors(m as never) as unknown[]) || [];
@@ -149,8 +254,14 @@ export const normalizeMovieDetail = (raw: RawMovie | null | undefined, slug = ''
     name: (m.name as string) || 'Chi Tiết Phim',
     origin_name: resolveMovieSubTitle(m as never) as string,
     backdrop_url: (resolveMovieBackdrop(m as never) as string) || LOCAL_DEFAULT_BACKDROP,
-    poster_url: (m.poster_url as string) || (m.thumb_url as string) || LOCAL_DEFAULT_POSTER,
-    thumb_url: (m.thumb_url as string) || (m.poster_url as string) || LOCAL_DEFAULT_POSTER,
+    // Đọc poster/thumb qua helper chung thay vì chỉ 1-2 field cứng.
+    // Backend có thể đặt ảnh ở `image`, `imagePoster`, `poster_path`...
+    // Trước đây chỉ đọc `poster_url`/`thumb_url` nên phim có ảnh ở field
+    // khác rơi về LOCAL_DEFAULT_POSTER → hiển thị dải xám placeholder.
+    // `resolveImageUrl` bọc ngoài để relative path (`/uploads/x.jpg`)
+    // từ backend được gắn `imageOrigin` thay vì trỏ về host hiện tại.
+    poster_url: resolveImageUrl(pickImageSrc(m, POSTER_FIELDS, LOCAL_DEFAULT_POSTER)),
+    thumb_url: resolveImageUrl(pickImageSrc(m, THUMB_FIELDS, LOCAL_DEFAULT_POSTER)),
     year: resolveMovieYear(m as never) as number | string,
     quality: resolveMovieQuality(m as never) as string,
     category: (resolveMovieCategories(m as never) as unknown[]) || [],
@@ -167,10 +278,22 @@ export const normalizeMovieDetail = (raw: RawMovie | null | undefined, slug = ''
     lang: (m.lang as string) || 'Vietsub + Thuyết minh',
     type: (m.type as string) || 'single',
     status: (m.status as string) || 'completed',
-    trailer_url: (m.trailer_url as string) || (tmdb?.trailer_url as string) || '',
-    // Preserve the full trailer object so TrailerModal.resolveTrailer can use
-    // it for nhánh 2/3 (trailer.url, trailer.key, trailer.site).
-    // The normalized trailer_url above handles nhánh 1 (legacy flat field).
+    // Backend movie-detail DTO uses the camelCase `trailerUrl`; some
+    // legacy payloads still ship the snake_case `trailer_url`. Read
+    // both so we never silently drop a valid trailer field just
+    // because of casing. `trailer_url` is preserved here purely for
+    // the legacy branch of `resolveMovieTrailer`; the canonical
+    // YouTube data now lives in the `trailer` object below.
+    trailer_url: (m.trailerUrl as string)
+      || (m.trailer_url as string)
+      || (tmdb?.trailer_url as string)
+      || '',
+    // Preserve the full trailer object so TrailerModal.resolveTrailer
+    // can use the `trailer.url` field directly. The resolver prefers
+    // `trailer.url` (the field our backend crawler populates) and only
+    // falls back to `trailer.key` when no `url` is present. Both
+    // shapes are preserved here untouched so we never have to
+    // duplicate the watch?v= → /embed/ conversion logic in callers.
     trailer: (m.trailer as TrailerObject | undefined) || null,
     episodes,
     actors: actorsList,
@@ -186,7 +309,7 @@ export const normalizeMovieDetail = (raw: RawMovie | null | undefined, slug = ''
 export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailReturn => {
   const [movie, setMovie] = useState<NormalizedMovieDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MovieDetailError | null>(null);
 
   // Player state
   const [currentServerIndex, setCurrentServerIndex] = useState<number>(0);
@@ -199,7 +322,21 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
   const [commentsLoading, setCommentsLoading] = useState<boolean>(false);
   const [relatedMovies, setRelatedMovies] = useState<NormalizedMovieDetail[]>([]);
 
+  // ---- Zustand cache selectors ----
+  // Dùng selector để tránh re-render khi cache không liên quan thay đổi
+  const getCachedMovie = useMovieStore((s) => s.getCachedMovie);
+  const setCachedMovie = useMovieStore((s) => s.setCachedMovie);
+  const getCachedRelated = useMovieStore((s) => s.getCachedRelated);
+  const setCachedRelated = useMovieStore((s) => s.setCachedRelated);
+  const getCachedComments = useCommentStore((s) => s.getCachedMovieComments);
+  const setCachedComments = useCommentStore((s) => s.setCachedMovieComments);
+
   const isMountedRef = useRef<boolean>(true);
+  // Module-level "request in flight" guard. Prevents the React
+  // StrictMode double-mount from issuing two parallel `fetchMovie`
+  // calls for the same slug (which would log the same 401 twice and
+  // race the setMovie / setError state updates).
+  const fetchInFlightSlug = useRef<string | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -210,149 +347,227 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
 
   /**
    * Fetches full movie details by slug.
+   *
    * Strategy:
-   *   1. Try the public API first (no auth header) so we respect the
-   *      backend's actual auth posture.
-   *   2. If 401/403, retry once with the auth token from localStorage.
-   *   3. If still failing, fall back to dashboard snapshot cache.
-   *   4. If nothing works, fall back to local mockMovies (last resort).
-   *   Mock data is ONLY used as a true last-resort, not for auth failures
-   *   when the user is logged in.
+   *   1. Resolve the auth header via `authService.getAuthHeader()`,
+   *      which transparently refreshes the access token when it is
+   *      about to expire. This avoids the "401 because the JWT
+   *      expired 30 seconds ago" failure mode.
+   *   2. If we still get 401, classify the error as `auth-required`
+   *      and do NOT retry — retrying without a valid token always
+   *      returns the same 401, and an automatic retry loop would
+   *      just spam the console.
+   *   3. 404 → `not-found`. 5xx / network → `request-error`.
+   *
+   * Mock data is NEVER substituted for a real backend response —
+   * that would mislead the user into thinking they are seeing a
+   * real movie.
+   *
+   * Re-entrancy: a module-level `fetchInFlightSlug` ref prevents
+   * multiple concurrent `fetchMovie` calls for the same slug from
+   * running at the same time. Without this guard, React StrictMode
+   * double-mount in development can issue two parallel requests and
+   * spam the console with two identical 401 logs.
    */
   const fetchMovie = useCallback(async (): Promise<void> => {
     if (!slug) return;
+    // Re-entrancy guard: bail if the same slug is already in flight.
+    if (fetchInFlightSlug.current === slug) return;
+    fetchInFlightSlug.current = slug;
     setLoading(true);
     setError(null);
 
-    const tryFetch = async (withAuth: boolean): Promise<Response> => {
-      const headers: Record<string, string> = { Accept: 'application/json' };
-      if (withAuth && typeof window !== 'undefined') {
-        const token = localStorage.getItem('auth_token')
-          || localStorage.getItem('token')
-          || localStorage.getItem('authToken');
-        if (token) headers.Authorization = `Bearer ${token}`;
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    // Cast về đúng type của hook (NormalizedMovieDetail)
+    const cached = getCachedMovie(slug) as NormalizedMovieDetail | null;
+    if (cached) {
+      if (isMountedRef.current) {
+        setMovie(cached);
+        setLoading(false);
       }
-      return fetch(`${API_BASE}/movies/${slug}`, { headers });
+      fetchInFlightSlug.current = null;
+      return;
+    }
+    // Resolve the auth header via the shared service. This transparently
+    // refreshes the token if it is within 60s of expiry. Returns `{}` when
+    // no token is present (the request will then 401 from the backend
+    // and we will surface `auth-required`).
+    const tryFetch = async (): Promise<Response> => {
+      let authHeaders: Record<string, string> = { Accept: 'application/json' };
+      try {
+        // Dynamic import so we don't pull authService into the hook's
+        // initial render path (avoids circular-dep surprises).
+        const { default: authService } = await import('@/API/services/authService');
+        authHeaders = { ...authHeaders, ...(await authService.getAuthHeader()) };
+      } catch {
+        // No auth header is fine — backend will 401 and we'll classify.
+      }
+      return fetch(`${API_BASE}/movies/${slug}`, { headers: authHeaders });
     };
 
     try {
-      // Attempt 1: public (no auth) — most public endpoints work this way
-      let res = await tryFetch(false);
+      const res = await tryFetch();
+
+      if (res.status === 404) {
+        // Backend explicitly says the movie does not exist.
+        if (isMountedRef.current) {
+          setMovie(null);
+          setError('not-found');
+        }
+        return;
+      }
+
+      // 401 / 403 → auth problem. The shared axios layer would have
+      // already attempted a single silent refresh, so reaching here
+      // with 401 means refresh also failed (or no token at all).
       if (res.status === 401 || res.status === 403) {
-        // Attempt 2: with auth token (in case the user is logged in
-        // and the endpoint is private)
-        res = await tryFetch(true);
+        if (isMountedRef.current) {
+          setMovie(null);
+          setError('auth-required');
+        }
+        return;
       }
 
       if (!res.ok) {
-        throw new Error(`Movie not found (${res.status})`);
+        // 5xx or any other non-2xx — surface as a transient error so
+        // the UI can offer a retry.
+        throw new Error(`Request failed (${res.status})`);
       }
 
-      const json = await res.json();
+      // Parse the body. We always read `responseStatus` first because
+      // the backend v1 contract returns a 200 HTTP status with a
+      // non-success `responseStatus.responseCode` for many failure
+      // modes (notably auth failures wrapped in a 200 envelope on
+      // some endpoints). We must NOT treat such a 200 as a real movie
+      // payload.
+      let json: Record<string, unknown> = {};
+      try {
+        json = await res.json();
+      } catch {
+        // Non-JSON body — treat as not-found.
+        if (isMountedRef.current) {
+          setMovie(null);
+          setError('not-found');
+        }
+        return;
+      }
+
+      // Inspect the v1 envelope's responseCode so a 200-wrapped auth
+      // failure still surfaces as `auth-required` rather than
+      // "Movie not found". Codes 00000204 (Missing Bearer token) and
+      // 00000403 (Forbidden) are the documented auth-error codes.
+      const responseStatus = json.responseStatus as
+        | { responseCode?: string; responseMessage?: string }
+        | undefined;
+      const responseCode = responseStatus?.responseCode;
+      if (responseCode) {
+        if (responseCode === '00000204' || responseCode === '00000403') {
+          if (isMountedRef.current) {
+            setMovie(null);
+            setError('auth-required');
+          }
+          return;
+        }
+        // Any other non-success responseCode (e.g. 00000500 server
+        // error, 00000404) means the request didn't actually yield a
+        // movie. Treat generic errors as transient and unknown-id as
+        // not-found.
+        if (!responseCode.startsWith('00000')) {
+          if (isMountedRef.current) {
+            setMovie(null);
+            setError(responseCode === '00000404' ? 'not-found' : 'request-error');
+          }
+          return;
+        }
+      }
+
       const raw = (json.responseData as RawMovie | undefined)
         || (json.data as RawMovie | undefined)
         || json;
 
       if (!raw || typeof raw !== 'object') {
-        throw new Error('Empty response from server');
+        // 200 but empty body — treat as not-found per API contract.
+        if (isMountedRef.current) {
+          setMovie(null);
+          setError('not-found');
+        }
+        return;
       }
 
       if (isMountedRef.current) {
         const normalized = normalizeMovieDetail(raw, slug);
         if (normalized) {
+          // Temporary diagnostic: log the trailer fields that survived
+          // normalization so we can confirm the data flow from API →
+          // mapper → hook → modal. Gated by NEXT_PUBLIC_DEBUG_MOVIES.
+          if (SYSTEM_CONFIG.debugMovies) {
+            // Debug mode only - remove in production
+          }
           setMovie(normalized);
+          // 🆕 Ghi vào Zustand cache sau khi fetch thành công
+          setCachedMovie(slug, normalized);
           setError(null);
           return;
         }
-        throw new Error('Unable to normalize movie data');
+        // Could not normalize the payload — treat as not-found rather
+        // than masking it with a fake movie.
+        setMovie(null);
+        setError('not-found');
       }
     } catch (err) {
       if (isMountedRef.current) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        // eslint-disable-next-line no-console
-
-
-        // Try dashboard snapshot cache (from ISR)
-        try {
-          const snapshot = await getClientSnapshot() as { moviesDetail?: Record<string, RawMovie> } | null;
-          const cachedMovie = snapshot?.moviesDetail?.[slug];
-          if (cachedMovie) {
-            // eslint-disable-next-line no-console
-
-            const normalized = normalizeMovieDetail(cachedMovie, slug);
-            if (normalized) {
-              setMovie(normalized);
-              setError(null);
-              return;
-            }
-          }
-        } catch {
-          // ignore
-        }
-
-        // Last-resort fallback: only when this is NOT an auth error
-        // AND we have nothing else. Mock data is never preferred over
-        // a real backend response.
-        const isAuthError = /401|403|Authentication/i.test(errorMessage);
-        if (!isAuthError) {
-          const mock = mockMovies.find((m) => m.slug === slug) || mockMovies[0];
-          if (mock) {
-            // eslint-disable-next-line no-console
-
-            const normalized = normalizeMovieDetail(mock as unknown as RawMovie, slug);
-            if (normalized) {
-              setMovie(normalized);
-              setError(null);
-              return;
-            }
-          }
-        }
-        setError(isAuthError
-          ? 'Vui lòng đăng nhập để xem chi tiết phim.'
-          : 'Không tìm thấy thông tin phim hoặc phim đã bị xóa.');
+        // Network / server error — show retry UI, do NOT fall back to
+        // mock data. Mock fallback would hide real bugs and mislead
+        // users into thinking they are seeing a real movie.
         setMovie(null);
+        setError('request-error');
       }
     } finally {
+      fetchInFlightSlug.current = null;
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  }, [slug]);
+  }, [slug, getCachedMovie, setCachedMovie]);
 
   /**
    * Fetches related movie recommendations.
-   * Same auth strategy as fetchMovie: try public first, then with auth,
-   * then fall back to mockMovies (slice) only on real failure.
+   *
+   * Same auth header strategy as `fetchMovie` — resolves via
+   * `authService.getAuthHeader()` so the token is auto-refreshed.
+   * On any failure (network, 4xx, 5xx, auth) we render an empty
+   * list instead of substituting mock data so the user is never
+   * misled into thinking the suggestions are real.
    */
   const fetchRelated = useCallback(async (): Promise<void> => {
     if (!slug) return;
-    const tryFetch = async (withAuth: boolean): Promise<Response> => {
-      const headers: Record<string, string> = { Accept: 'application/json' };
-      if (withAuth && typeof window !== 'undefined') {
-        const token = localStorage.getItem('auth_token')
-          || localStorage.getItem('token')
-          || localStorage.getItem('authToken');
-        if (token) headers.Authorization = `Bearer ${token}`;
-      }
-      return fetch(`${API_BASE}/movies/related/${slug}`, { headers });
-    };
 
-    const applyMockFallback = (): void => {
-      if (!isMountedRef.current) return;
-      setRelatedMovies(
-        mockMovies
-          .slice(0, 6)
-          .map((m, idx) => normalizeMovieDetail(m as unknown as RawMovie, m.slug || `rel-${idx}`))
-          .filter((m): m is NormalizedMovieDetail => m !== null)
-      );
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    const cached = getCachedRelated(slug);
+    if (cached && cached.length > 0) {
+      const normalized = cached
+        .map((m, idx) => normalizeMovieDetail(m as unknown as RawMovie, m.slug || `rel-${idx}`))
+        .filter((m): m is NormalizedMovieDetail => m !== null);
+      if (isMountedRef.current) setRelatedMovies(normalized);
+      return;
+    }
+
+    const tryFetch = async (): Promise<Response> => {
+      let authHeaders: Record<string, string> = { Accept: 'application/json' };
+      try {
+        const { default: authService } = await import('@/API/services/authService');
+        authHeaders = { ...authHeaders, ...(await authService.getAuthHeader()) };
+      } catch {
+        // No auth header is fine — backend will 401 and we'll silently
+        // leave the related list empty (no point showing a banner for a
+        // non-essential rail).
+      }
+      return fetch(`${API_BASE}/movies/related/${slug}`, { headers: authHeaders });
     };
 
     try {
-      // Try public first, then with auth
-      let res = await tryFetch(false);
-      if (res.status === 401 || res.status === 403) {
-        res = await tryFetch(true);
-      }
+      const res = await tryFetch();
       if (res.ok) {
         const json = await res.json();
         const list = (json.responseData as unknown[])
@@ -360,30 +575,57 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           || (json.movies as unknown[])
           || [];
         if (Array.isArray(list) && list.length > 0 && isMountedRef.current) {
-          setRelatedMovies(
-            list
-              .map((m, idx) => normalizeMovieDetail(m as RawMovie, ((m as RawMovie).slug as string) || `rel-${idx}`))
-              .filter((m): m is NormalizedMovieDetail => m !== null)
-          );
+          // The related rail on the detail page exposes a
+          // "Xem trailer" button per item. Filter out anything
+          // that does not actually have a trailer so the user
+          // is never sent to a modal that immediately shows
+          // "Trailer chưa được cung cấp".
+          const filtered = filterMoviesWithValidTrailer(list);
+          const normalized = filtered
+            .map((m, idx) => normalizeMovieDetail(m as RawMovie, ((m as RawMovie).slug as string) || `rel-${idx}`))
+            .filter((m): m is NormalizedMovieDetail => m !== null);
+          setRelatedMovies(normalized);
+          // 🆕 Ghi vào Zustand cache
+          setCachedRelated(slug, filtered as unknown as import('@/stores/useMovieStore').CachedMovieItem[]);
           return;
         }
       }
-      // Real API returned empty/error -> mock fallback
-      applyMockFallback();
+      // Real API returned empty or non-2xx (including 401) — leave
+      // the list empty. Do NOT inject mock data on a real failure.
+      if (isMountedRef.current) setRelatedMovies([]);
     } catch {
-      // Network error -> mock fallback
-      applyMockFallback();
+      // Network error — leave the list empty, do NOT inject mock data.
+      if (isMountedRef.current) setRelatedMovies([]);
     }
-  }, [slug]);
+  }, [slug, getCachedRelated, setCachedRelated]);
 
   /**
-   * Fetches comments for this specific movie.
+   * Fetches comments for this specific movie. Uses the shared
+   * auth-header resolver so an expired token is refreshed before
+   * the request goes out. On any failure (including 401) we
+   * silently leave the comments list empty — comments are not
+   * critical content, so we don't surface a banner for them.
    */
   const fetchComments = useCallback(async (): Promise<void> => {
     if (!slug) return;
+
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    const cached = getCachedComments(slug);
+    if (cached && cached.length > 0) {
+      if (isMountedRef.current) setComments(cached as Comment[]);
+      return;
+    }
+
     setCommentsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/movies/${slug}/comments?page=1&limit=20`);
+      let authHeaders: Record<string, string> = { Accept: 'application/json' };
+      try {
+        const { default: authService } = await import('@/API/services/authService');
+        authHeaders = { ...authHeaders, ...(await authService.getAuthHeader()) };
+      } catch {
+        // No token — request will 401, list stays empty (silent).
+      }
+      const res = await fetch(`${API_BASE}/movies/${slug}/comments?page=1&limit=20`, { headers: authHeaders });
       if (res.ok) {
         const json = await res.json();
         const rd = json.responseData as { data?: unknown[] } | unknown[] | undefined;
@@ -391,7 +633,10 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           || (json.data as { comments?: unknown[] })?.comments
           || [];
         if (Array.isArray(list) && isMountedRef.current) {
-          setComments(list as Comment[]);
+          const typed = list as Comment[];
+          setComments(typed);
+          // 🆕 Ghi vào Zustand cache
+          setCachedComments(slug, typed);
           return;
         }
       }
@@ -402,7 +647,7 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         setCommentsLoading(false);
       }
     }
-  }, [slug]);
+  }, [slug, getCachedComments, setCachedComments]);
 
   /**
    * Toggles movie favorite status.
@@ -459,15 +704,23 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         likes: 0
       };
 
-      setComments((prev) => [newCommentObj, ...prev]);
+      setComments((prev) => {
+        const updated = [newCommentObj, ...prev];
+        // 🆕 Cập nhật cache comments
+        setCachedComments(slug, updated);
+        return updated;
+      });
       return true;
     } catch {
       return false;
     }
   }, [slug]);
 
-  // Initial load on slug change
+  // Initial load on slug change. Reset the in-flight guard here so a
+  // previous failed fetch for a different slug doesn't suppress the
+  // fetch for the new slug.
   useEffect(() => {
+    fetchInFlightSlug.current = null;
     if (slug) {
       fetchMovie();
       fetchRelated();

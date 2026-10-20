@@ -19,6 +19,7 @@ import {
 import type { HeroHeaderMovie } from '@/features/client/components/detail/components/MovieHeroHeader/MovieHeroHeader';
 import type { CastCrewPerson } from '@/features/client/components/detail/components/CastCrewSection/CastCrewSection';
 import type { TrailerMovie } from '@/features/client/components/detail/components/TrailerModal';
+import { hasValidTrailer } from '@/utils/trailer';
 import { MovieSection } from '@/features/shared/components/MovieSection';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import styles from '@/styles/MovieDetailPage.module.css';
@@ -42,7 +43,8 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
     comments,
     commentsLoading,
     addComment,
-    relatedMovies
+    relatedMovies,
+    refetchMovie
   } = useMovieDetail(isPreview ? null : slug);
 
   // Live draft state when viewed from Admin Live Demo
@@ -73,7 +75,17 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
   }, [router, slug]);
 
   const handleOpenTrailer = useCallback((targetMovie?: unknown) => {
-    setActiveTrailerMovie(targetMovie || movie);
+    // Final guard before opening the modal. List-level filtering
+    // elsewhere in the app should already have removed movies
+    // without a trailer, but this is the single entry point that
+    // can directly open the modal — keep the check here so we
+    // never end up showing the "Trailer chưa được cung cấp"
+    // panel as a result of a developer wiring a new "Xem trailer"
+    // button without going through the filter helper.
+    const candidate = (targetMovie as TrailerMovie | null) || (movie as TrailerMovie | null);
+    if (!candidate) return;
+    if (!hasValidTrailer(candidate as never)) return;
+    setActiveTrailerMovie(candidate);
   }, [movie]);
 
   if (loading && !movie) {
@@ -84,7 +96,87 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
     );
   }
 
-  if (!loading && (!movie || error)) {
+  // Distinguish three terminal states once loading is finished:
+  //   1. request-error -> backend is unreachable / 4xx / 5xx
+  //      -> show a retry button (transient issue, user can recover)
+  //   2. not-found     -> backend says the movie truly does not exist
+  //      -> show the "Movie not found" card with Back to Home
+  //   3. anything else (no movie, no error) -> treat as not-found
+  //      to keep the previous behaviour for edge cases.
+  if (!loading && error) {
+    if (error === 'auth-required') {
+      // 401 from the backend: either the user is not logged in or
+      // their refresh token was rejected. A "Thử lại" button is
+      // useless here because the next attempt will 401 too — guide
+      // the user to the login page instead, preserving the
+      // `?redirect=` param so they land back on the same movie
+      // after authenticating.
+      const handleLogin = (): void => {
+        const currentPath = `/movie/${slug || ''}`;
+        const redirectParam = encodeURIComponent(currentPath);
+        router.push(`/auth/login?redirect=${redirectParam}`);
+      };
+      return (
+        <div className={styles.errorContainer}>
+          <div className={styles.errorCard}>
+            <i className="fas fa-lock text-warning mb-3" style={{ fontSize: '3rem' }} />
+            <h2 className={styles.errorTitle}>Cần đăng nhập để xem phim</h2>
+            <p className={styles.errorDescription}>
+              Bạn cần đăng nhập để xem thông tin chi tiết và xem phim này.
+              Sau khi đăng nhập, bạn sẽ được quay lại trang này.
+            </p>
+            <div className="d-flex gap-2 mt-2 flex-wrap">
+              <button
+                type="button"
+                className="btn btn-danger px-4 py-2"
+                onClick={handleLogin}
+              >
+                <i className="fas fa-sign-in-alt me-2" /> Đăng nhập
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-light px-4 py-2"
+                onClick={() => router.push('/')}
+              >
+                <i className="fas fa-home me-2" /> Về trang chủ
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (error === 'request-error') {
+      return (
+        <div className={styles.errorContainer}>
+          <div className={styles.errorCard}>
+            <i className="fas fa-exclamation-triangle text-warning mb-3" style={{ fontSize: '3rem' }} />
+            <h2 className={styles.errorTitle}>Không thể tải thông tin phim</h2>
+            <p className={styles.errorDescription}>
+              Đã xảy ra lỗi khi kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau ít phút.
+            </p>
+            <div className="d-flex gap-2 mt-2">
+              <button
+                type="button"
+                className="btn btn-danger px-4 py-2"
+                onClick={() => { void refetchMovie(); }}
+              >
+                <i className="fas fa-redo me-2" /> Thử lại
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline-light px-4 py-2"
+                onClick={() => router.push('/')}
+              >
+                <i className="fas fa-home me-2" /> Về trang chủ
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // error === 'not-found' (or any other non-request error)
     return (
       <div className={styles.errorContainer}>
         <div className={styles.errorCard}>
@@ -204,6 +296,9 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
       </div>
 
       <TrailerModal
+        key={(activeTrailerMovie as { _id?: string; slug?: string } | null)?._id
+          || (activeTrailerMovie as { slug?: string } | null)?.slug
+          || 'trailer-modal'}
         movie={activeTrailerMovie as TrailerMovie | null}
         onClose={() => setActiveTrailerMovie(null)}
       />

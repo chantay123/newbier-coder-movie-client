@@ -8,6 +8,36 @@ import type { MovieLite } from './MovieCardVertical';
  * @description Avant-garde 16:9 Cinema Wide Panorama Card with giant typographic outline rank.
  */
 
+/**
+ * Defensive: chọn URL backdrop khả dĩ từ nhiều field. Chỉ chấp nhận
+ * http(s) hoặc data:image. Mọi giá trị khác trả về placeholder.
+ */
+const resolveBackdropSrc = (
+  movie: Record<string, unknown> | null | undefined,
+  fallback: string
+): string => {
+  if (!movie || typeof movie !== 'object') return fallback;
+  const candidates = [
+    movie.backdrop_url,
+    movie.backdropUrl,
+    movie.poster_url,
+    movie.posterUrl,
+    movie.thumb_url,
+    movie.thumbUrl,
+    movie.imagePoster,
+    movie.poster_path,
+    movie.posterPath
+  ];
+  for (const raw of candidates) {
+    if (typeof raw !== 'string') continue;
+    const v = raw.trim();
+    if (!v) continue;
+    if (/^https?:\/\//i.test(v)) return v;
+    if (/^data:image\//i.test(v)) return v;
+  }
+  return fallback;
+};
+
 export interface MovieCardHorizontalProps {
   movie?: MovieLite | null;
   rank?: number;
@@ -27,8 +57,8 @@ const MovieCardHorizontal: React.FC<MovieCardHorizontalProps> = ({
   onPlayTrailer,
   className = ''
 }) => {
-  const [imgSrc, setImgSrc] = useState<string>(
-    movie?.backdrop_url || movie?.poster_url || movie?.thumb_url || '/img/placeholder-backdrop.svg'
+  const [imgSrc, setImgSrc] = useState<string>(() =>
+    resolveBackdropSrc(movie as Record<string, unknown>, '/img/placeholder-backdrop.svg')
   );
 
   if (!movie) return null;
@@ -65,7 +95,9 @@ const MovieCardHorizontal: React.FC<MovieCardHorizontalProps> = ({
           alt={movie?.name || 'Banner phim'}
           className={styles.wideBackdropImg}
           loading="lazy"
-          onError={() => setImgSrc('/img/placeholder-backdrop.svg')}
+          onError={() => {
+            setImgSrc('/img/placeholder-backdrop.svg');
+          }}
         />
 
         {/* Bottom Ambient Vignette Gradient */}

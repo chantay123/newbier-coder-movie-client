@@ -22,6 +22,7 @@ import {
 } from '@/features/home';
 import { TrailerModal } from '@/features/movie-detail';
 import type { TrailerMovie as DetailTrailerMovie } from '@/features/client/components/detail/components/TrailerModal';
+import { hasValidTrailer } from '@/utils/trailer';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import { useAuth } from '@/utils/auth';
 import {
@@ -39,7 +40,7 @@ interface BatchScrollSentinelProps {
   delayMs?: number;
 }
 
-function BatchScrollSentinel({ onTrigger, delayMs = 800 }: BatchScrollSentinelProps): ReactElement {
+function BatchScrollSentinel({ onTrigger, delayMs = 600 }: BatchScrollSentinelProps): ReactElement {
   const ref = useRef<HTMLDivElement>(null);
   const isTriggeredRef = useRef<boolean>(false);
 
@@ -120,6 +121,25 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
     if (isUpcomingUnlocked && !upcomingLoaded && !upcomingLoading) loadUpcoming();
   }, [isUpcomingUnlocked, upcomingLoaded, upcomingLoading, loadUpcoming]);
 
+  // 🆕 Preload: khi batch 1 unlock, bắt đầu fetch batch 2 data trước khi user scroll tới
+  useEffect(() => {
+    if (!unlockedBatches.has(1) && unlockedBatches.has(0)) {
+      // Batch 1 vừa unlock — dispatch data fetch sớm
+      const batch1Sections = sectionBatches[1] || [];
+      batch1Sections.forEach((sectionId) => {
+        const config = HOME_SECTIONS[sectionId];
+        if (config?.rails) {
+          // Country sections có nhiều rails con
+          config.rails.forEach((rail) => {
+            if (rail.load) rail.load([]).catch(() => {/* silent */});
+          });
+        } else if (config?.load) {
+          config.load([]).catch(() => {/* silent */});
+        }
+      });
+    }
+  }, [unlockedBatches, sectionBatches]);
+
   const isAllBatchesUnlocked = unlockedBatches.has(sectionBatches.length - 1);
   useEffect(() => {
     if (typeof window === 'undefined' || !isAllBatchesUnlocked) return;
@@ -130,11 +150,11 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
           if (isBusyRef.current || !hasMore || loadingMore) return;
           isBusyRef.current = true;
           loadMore().finally(() => {
-            setTimeout(() => { isBusyRef.current = false; }, 1200);
+            setTimeout(() => { isBusyRef.current = false; }, 600);
           });
         }
       },
-      { rootMargin: '100px 0px', threshold: 0.1 }
+      { rootMargin: '50px 0px', threshold: 0.05 }
     );
     const sentinel = bottomSentinelRef.current;
     if (sentinel && hasMore) observer.observe(sentinel);
@@ -177,7 +197,16 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
   // OR when the user simply hadn't logged in yet.
   // See bug report: "sao trang home tui van loading".
 
-  const handlePlayTrailer = (movie: DetailTrailerMovie): void => setActiveTrailerMovie(movie);
+  const handlePlayTrailer = (movie: DetailTrailerMovie): void => {
+    // Last-line guard: every rail in this page has already been
+    // filtered through `filterMoviesWithValidTrailer` in
+    // `useHomeData`, but a future card component wired here might
+    // forget to filter its own list. Re-checking here means a
+    // "Trailer chưa được cung cấp" panel can never appear from
+    // this entry point.
+    if (!hasValidTrailer(movie as never)) return;
+    setActiveTrailerMovie(movie);
+  };
   const handleCloseTrailer = (): void => setActiveTrailerMovie(null);
 
   const renderSection = (sectionId: SectionId): ReactNode => {
@@ -281,7 +310,11 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
         )}
       </div>
 
-      <TrailerModal movie={activeTrailerMovie} onClose={handleCloseTrailer} />
+      <TrailerModal
+        key={activeTrailerMovie?._id || activeTrailerMovie?.slug || 'trailer-modal'}
+        movie={activeTrailerMovie}
+        onClose={handleCloseTrailer}
+      />
       <BackToTop />
 
       <style jsx global>{`

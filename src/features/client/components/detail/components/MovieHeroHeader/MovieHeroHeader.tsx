@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { LOCAL_DEFAULT_BACKDROP, LOCAL_DEFAULT_POSTER } from '@/config/movieConfig';
 import { getWatchProgress } from '@/utils/watchProgress';
+import { pickImageSrc, BACKDROP_FIELDS, POSTER_FIELDS } from '@/utils/imageSource';
 import type { WatchEpisode, WatchServer } from '@/features/client/components/detail/components/WatchSidebarPlaylist/WatchSidebarPlaylist';
 import styles from './MovieHeroHeader.module.css';
 
@@ -171,7 +172,11 @@ const MovieHeroHeader: React.FC<MovieHeroHeaderProps> = ({
       {/* Subtle Atmospheric Backdrop Banner */}
       <div className={styles.backdropLayer}>
         <img
-          src={movie.backdrop_url || movie.thumb_url || movie.poster_url || LOCAL_DEFAULT_BACKDROP}
+          src={pickImageSrc(
+            movie as unknown as Record<string, unknown>,
+            BACKDROP_FIELDS,
+            LOCAL_DEFAULT_BACKDROP
+          )}
           alt=""
           className={styles.backdropImg}
           onError={(e) => {
@@ -202,7 +207,11 @@ const MovieHeroHeader: React.FC<MovieHeroHeaderProps> = ({
           <div className={styles.leftCol}>
             <div className={styles.posterWrapper}>
               <img
-                src={movie.poster_url || movie.thumb_url || LOCAL_DEFAULT_POSTER}
+                src={pickImageSrc(
+                  movie as unknown as Record<string, unknown>,
+                  POSTER_FIELDS,
+                  LOCAL_DEFAULT_POSTER
+                )}
                 alt={movie.name}
                 className={styles.posterImg}
                 onError={(e) => {

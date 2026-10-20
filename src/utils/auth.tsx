@@ -16,6 +16,35 @@ import { useRouter } from 'next/router';
 import { useSession, signOut, type SessionProviderProps } from 'next-auth/react';
 import authService from '@/API/services/authService';
 
+/** Obfuscation helpers — giấu user info trong DevTools */
+const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
+
+const obfEncode = (plain: string): string => {
+  try {
+    const prefixed = OBFUSCATION_KEY + plain + OBFUSCATION_KEY;
+    return btoa(encodeURIComponent(prefixed).replace(/%([0-9A-F]{2})/g,
+      (_: string, p1: string) => String.fromCharCode(parseInt(p1, 16))));
+  } catch {
+    return plain;
+  }
+};
+
+const obfDecode = (encoded: string): string | null => {
+  try {
+    const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+    if (decoded.startsWith(OBFUSCATION_KEY) && decoded.endsWith(OBFUSCATION_KEY)) {
+      return decoded.slice(OBFUSCATION_KEY.length, -OBFUSCATION_KEY.length);
+    }
+    // Legacy plain JSON
+    JSON.parse(decoded);
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
 export interface AuthUser {
   _id?: string;
   fullname?: string;
@@ -106,16 +135,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // Listen to localStorage changes (cross-tab login/logout)
+  // Listen to sessionStorage changes (cross-tab login/logout).
+  // User info giờ nằm trong sessionStorage, không phải localStorage.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleStorageChange = () => {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
+      const remembered = localStorage.getItem('remember_me') === '1';
+      const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
+      const lsUser = remembered ? localStorage.getItem('user') : null;
+      const rawUser = ssUser || lsUser;
+      if (rawUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          const decoded = obfDecode(rawUser) || rawUser;
+          setUser(JSON.parse(decoded));
         } catch (err) {
-
+          setUser(null);
         }
       } else {
         setUser(null);
@@ -125,9 +159,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Resolve initial user from session, localStorage, or authService
+  // Resolve initial user từ session hoặc sessionStorage (không dùng localStorage cho user info).
+  // Chạy 1 lần duy nhất khi provider mount.
   useEffect(() => {
-    const checkLoggedIn = async () => {
+    let cancelled = false;
+
+    const checkLoggedIn = () => {
       if (typeof window === 'undefined') {
         setLoading(false);
         return;
@@ -144,19 +181,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               ...(session.user as AuthUser),
               backendToken
             };
-            localStorage.setItem('user', JSON.stringify(userWithToken));
+            // ✅ Lưu user vào sessionStorage (tự xóa khi đóng tab)
+            sessionStorage.setItem('user', obfEncode(JSON.stringify(userWithToken)));
             setUser(userWithToken);
             setLoading(false);
             return;
           }
         }
 
-        // Read remember-me flag once so we know where to look for tokens.
+        // Đọc token
         const remembered = localStorage.getItem('remember_me') === '1';
-
-        // Access token: remember-me → localStorage, otherwise sessionStorage
-        // (still fall back to localStorage so tab reload keeps user logged in
-        //  within the same session).
         const accessToken = (() => {
           if (remembered) {
             return localStorage.getItem('token') || localStorage.getItem('auth_token');
@@ -167,34 +201,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return fromSession || localStorage.getItem('token') || localStorage.getItem('auth_token');
         })();
 
-        // User payload: remember-me → localStorage, otherwise sessionStorage
-        // (with localStorage fallback for tab reload).
+        // ✅ User payload: đọc từ sessionStorage trước, fallback localStorage (remember-me)
         const storedUser = (() => {
-          if (remembered) return localStorage.getItem('user');
-          const fromSession = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
-          return fromSession || localStorage.getItem('user');
+          if (window.sessionStorage) {
+            const ssUser = window.sessionStorage.getItem('user');
+            if (ssUser) {
+              try {
+                const decoded = obfDecode(ssUser) || ssUser;
+                return decoded;
+              } catch { return null; }
+            }
+          }
+          if (remembered) {
+            const lsUser = localStorage.getItem('user');
+            if (lsUser) {
+              try {
+                const decoded = obfDecode(lsUser) || lsUser;
+                return decoded;
+              } catch { return null; }
+            }
+          }
+          return null;
         })();
 
         if (accessToken && storedUser) {
           try {
-            setUser(JSON.parse(storedUser));
+            if (!cancelled) setUser(JSON.parse(storedUser));
           } catch (err) {
-
+            if (!cancelled) setUser(null);
           }
         } else {
           const currentUser = authService.getCurrentUser() as AuthUser | null;
-          if (currentUser) setUser(currentUser);
+          if (currentUser && !cancelled) setUser(currentUser);
         }
       } catch (err) {
-
-        setError('Could not check authentication status');
+        if (!cancelled) setError('Could not check authentication status');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     checkLoggedIn();
-  }, [session, sessionStatus, router.pathname]);
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Polls backend to confirm the user account is still active.
@@ -571,8 +624,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatarUrl = `${baseUrl}${avatarUrl}`;
       }
       avatarUrl = `${avatarUrl}?t=${new Date().getTime()}`;
-      const currentUser: AuthUser = JSON.parse(localStorage.getItem('user') || '{}');
-      localStorage.setItem('user', JSON.stringify({ ...currentUser, avatar: avatarUrl }));
+      // ✅ Cập nhật sessionStorage thay vì localStorage
+      try {
+        const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
+        const currentUser = ssUser ? (() => { try { const d = obfDecode(ssUser); return d ? JSON.parse(d) : {}; } catch { return {}; } })() : {};
+        window.sessionStorage.setItem('user', obfEncode(JSON.stringify({ ...currentUser, avatar: avatarUrl })));
+      } catch { /* ignore */ }
       return avatarUrl;
     }
     return null;

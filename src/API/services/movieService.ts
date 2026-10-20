@@ -10,6 +10,7 @@ import {
   resolveCountryTaxonomy,
   resolveCategoryTaxonomy
 } from '@/config/taxonomyConfig';
+import { pickMovieImage } from '@/utils/imageSource';
 
 // Lazy import authService để tránh circular dependency giữa auth và movie.
 const getAuthService = async (): Promise<{
@@ -120,6 +121,28 @@ export interface FetchOptions {
 const getBaseUrl = (): string => MOVIE_CONFIG.apiBaseUrl;
 
 /**
+ * Adds snake_case image aliases to a raw movie object.
+ *
+ * The v1 backend returns images in camelCase (`posterUrl`/`thumbUrl`),
+ * but the browse pages render `poster_url`/`thumb_url`. Aliasing here —
+ * in the single choke point every list endpoint funnels through — means
+ * `/browse/schedule`, the category/country rails, and the home rails all
+ * get real posters instead of silently falling back to a placeholder.
+ *
+ * Original keys are preserved, so any caller reading camelCase still works.
+ */
+const withImageAliases = (m: RawMovie): RawMovie => {
+  const poster = pickMovieImage(m, 'poster', '');
+  const thumb = pickMovieImage(m, 'thumb', '');
+  if (!poster && !thumb) return m;
+  return {
+    ...m,
+    poster_url: poster || thumb,
+    thumb_url: thumb || poster
+  };
+};
+
+/**
  * Chuẩn hoá movie list từ nhiều envelope backend khác nhau về một Array sạch.
  * Hỗ trợ: Fastify Enterprise ({ responseData: [...] } hoặc { responseData: { data: [...] } }),
  * legacy ({ data: { movies: [...] } }), và raw array.
@@ -129,12 +152,12 @@ const getBaseUrl = (): string => MOVIE_CONFIG.apiBaseUrl;
  */
 export const extractMovieList = (json: unknown): RawMovie[] => {
   if (!json) return [];
-  if (Array.isArray(json)) return json as RawMovie[];
+  if (Array.isArray(json)) return (json as RawMovie[]).map(withImageAliases);
 
   const env = json as Record<string, unknown>;
 
   const tryArray = (v: unknown): RawMovie[] | null =>
-    Array.isArray(v) ? (v as RawMovie[]) : null;
+    Array.isArray(v) ? (v as RawMovie[]).map(withImageAliases) : null;
 
   // 1. Direct envelope arrays
   let found = tryArray(env.responseData)
@@ -220,10 +243,6 @@ export async function safeFetchJson<T = unknown>(
     if (!response.ok) {
       // Controlled diagnostic - log an toàn (endpoint, status, message),
       // TUYỆT ĐỐI không log token/cookie/header Authorization.
-      if (SYSTEM_CONFIG.debugMovies) {
-        // eslint-disable-next-line no-console
-
-      }
       return fallback;
     }
 
@@ -264,9 +283,17 @@ export async function safeFetchMovieList(
 
 /** Service object chính cho movie API */
 const movieService = {
-  /** Lấy phim mới nhất cho Hero spotlight */
+  /**
+   * Lấy phim mới nhất cho Hero spotlight. Over-fetch (gấp 4 lần hoặc
+   * tối thiểu 24 phim) để sau khi filter trailer vẫn còn đủ phim hiển thị.
+   *
+   * CHỈ HIỂN THỊ PHIM CÓ TRAILER: đa số phim mới nhất trả về từ
+   * `/movies/latest` đều có `trailer: null` (xem payload thật: 6 phim
+   * đầu đều null, phim thứ 7-8 mới có trailer). Nếu lấy đúng `limit=6`
+   * rồi filter sẽ ra 0 phim, khiến HeroBannerSkeleton kẹt vĩnh viễn.
+   */
   getHeroMovies: (limit = 6, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList('/movies/latest', limit, { signal }),
+    safeFetchMovieList('/movies/latest', Math.max(limit * 4, 24), { signal }),
 
   /** Lấy phim thịnh hành */
   getTrendingMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
@@ -303,11 +330,16 @@ const movieService = {
     const meta = resolveCountryTaxonomy(countrySlug);
     const variants: string[] = meta?.backendSlugs || [countrySlug];
 
+    // Over-fetch: chỉ một phần nhỏ phim có `trailer`, và caller (Country
+    // rail) thường lọc trailer sau đó. Lấy gấp 4 lần để đảm bảo vẫn
+    // còn đủ dữ liệu sau filter, tránh rail rỗng.
+    const fetchLimit = Math.max(limit * 4, 40);
+
     // Tier 1: Query backend /countries/{slug}/movies
     for (const v of variants) {
       const list = await safeFetchMovieList(
         `/countries/${encodeURIComponent(v)}/movies`,
-        limit,
+        fetchLimit,
         { signal }
       );
       if (Array.isArray(list) && list.length > 0) return list;
@@ -318,27 +350,43 @@ const movieService = {
     if (keyword) {
       const searchList = await safeFetchMovieList(
         `/movies/search?q=${encodeURIComponent(keyword)}`,
-        limit,
+        fetchLimit,
         { signal }
       );
       if (Array.isArray(searchList) && searchList.length > 0) return searchList;
     }
 
-    // Tier 3: Fetch general movies and filter client-side
-    const all = await safeFetchMovieList('/movies?page=1&limit=50', undefined, { signal });
+    // Tier 3: Fetch general movies and filter client-side.
+    //
+    // LỖI CŨ: dùng `countrySlug.split('-')[0]` = "han" / "trung" làm
+    // keyword match — quá ngắn, trùng với nhiều chuỗi không liên quan
+    // (ví dụ "trung" match cả "trung-thu-2024", "han" match cả "hanh"),
+    // dẫn tới danh sách gồm phim các nước khác, một số không có
+    // poster hợp lệ → hiển thị ảnh lỗi.
+    //
+    // SỬA: match cả `slug` đầy đủ VÀ `name` đầy đủ của country object
+    // (case-insensitive), đồng thời kiểm tra cả slug cuối cùng phân
+    // tách bằng dấu "-". Ví dụ "han-quoc" sẽ match `country.slug ===
+    // "han-quoc"` hay `country.name` chứa "hàn" / "han quoc".
+    const all = await safeFetchMovieList('/movies?page=1&limit=100', undefined, { signal });
     if (Array.isArray(all) && all.length > 0) {
-      const firstSlugToken = countrySlug.split('-')[0] || '';
+      const slugTokens = countrySlug.split('-').filter(Boolean);
       const filtered = all.filter((m) => {
         const countryList = (m.country as unknown[] | undefined) || (m.countries as unknown[] | undefined) || [];
         return countryList.some?.((c) => {
           const country = c as { slug?: string; name?: string };
           const s = (country.slug || '').toLowerCase();
           const n = (country.name || '').toLowerCase();
-          return s.includes(countrySlug) || n.includes(firstSlugToken);
+          // Ưu tiên match exact slug trước, rồi đến mọi token trong slug
+          // xuất hiện trong country.slug, cuối cùng mới tới country.name.
+          if (s === countrySlug) return true;
+          if (slugTokens.every((tok) => s.includes(tok))) return true;
+          if (n.includes(countrySlug)) return true;
+          return false;
         });
       });
       if (filtered.length > 0) {
-        return typeof limit === 'number' ? filtered.slice(0, limit) : filtered;
+        return typeof limit === 'number' ? filtered.slice(0, fetchLimit) : filtered;
       }
     }
 
@@ -359,11 +407,15 @@ const movieService = {
     const meta = resolveCategoryTaxonomy(categorySlug);
     const variants: string[] = meta?.backendSlugs || [categorySlug];
 
+    // Over-fetch: chỉ một phần nhỏ phim có `trailer`, và caller thường lọc
+    // trailer sau đó. Lấy gấp 3x để đảm bảo vẫn còn đủ dữ liệu sau filter.
+    const fetchLimit = Math.max(limit * 3, 24);
+
     // Tier 1: Query backend /categories/{slug}/movies
     for (const v of variants) {
       const list = await safeFetchMovieList(
         `/categories/${encodeURIComponent(v)}/movies`,
-        limit,
+        fetchLimit,
         { signal }
       );
       if (Array.isArray(list) && list.length > 0) return list;
@@ -374,7 +426,7 @@ const movieService = {
     if (keyword) {
       const searchList = await safeFetchMovieList(
         `/movies/search?q=${encodeURIComponent(keyword)}`,
-        limit,
+        fetchLimit,
         { signal }
       );
       if (Array.isArray(searchList) && searchList.length > 0) return searchList;

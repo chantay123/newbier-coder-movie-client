@@ -30,7 +30,7 @@ const UpcomingMoviesSection: React.FC<UpcomingMoviesSectionProps> = ({
     <MovieSection
       title="Phim Sắp Ra Mắt"
       badge="SẮP CHIẾU"
-      viewAllHref="/danh-sach/phim-sap-chieu"
+      viewAllHref="/browse/schedule"
       layout="rail"
       variant="vertical"
       cardSize={cardSize}

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Skeleton from '@/features/shared/components/UI/Skeleton';
 import type { SkeletonProps } from '@/features/shared/components/UI/Skeleton';
 import { FaPlayCircle, FaStar, FaFilm, FaChevronDown, FaSync } from 'react-icons/fa';
+import { pickMovieImage, normalizeImageUrl } from '@/utils/imageSource';
 import styles from '@/styles/Movies.module.css';
 
 const CATEGORIES = [
@@ -140,11 +141,22 @@ export default function Series() {
 
       if (result.data?.movies) {
         const { movies: newSeries, pagination } = result.data;
-        const processed = newSeries.map((s) => ({
-          ...s,
-          thumb_url: s.thumb_url?.startsWith('http') ? s.thumb_url : `${s.thumb_url}`,
-          poster_url: s.poster_url?.startsWith('http') ? s.poster_url : `${s.poster_url}`
-        }));
+        // The old code here was
+        //   thumb_url: s.thumb_url?.startsWith('http') ? s.thumb_url : `${s.thumb_url}`
+        // which turned a missing field into the literal string "undefined"
+        // and shipped it straight into `<img src>`. Resolve both the
+        // snake_case and camelCase image fields first, and only fall back
+        // when neither exists.
+        const processed = newSeries.map((s) => {
+          const raw = s as Record<string, unknown>;
+          const poster = normalizeImageUrl(pickMovieImage(raw, 'poster', ''));
+          const thumb = normalizeImageUrl(pickMovieImage(raw, 'thumb', ''));
+          return {
+            ...s,
+            poster_url: poster || thumb || '/img/Phim.png',
+            thumb_url: thumb || poster || '/img/Phim.png'
+          };
+        });
 
         const seenSlugs = new Set<string>();
         const seenIds = new Set<string>();

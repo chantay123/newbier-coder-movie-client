@@ -4,6 +4,7 @@
  * clean empty structures when the backend is unreachable.
  */
 import { safeFetchJson } from '@/API/services/movieService';
+import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 
 export type RadarPeriod = 'week' | 'month';
 export type RadarCategory = 'discussed' | 'favorite' | 'views';
@@ -16,6 +17,21 @@ export interface RadarItem {
   poster_url?: string;
   rating?: number;
   views?: number;
+  // Optional trailer fields. The radar endpoint may or may not
+  // include them depending on the backend payload — keep them
+  // optional and structurally aligned with `@/utils/trailer` so the
+  // homepage and rankings pages share the same `hasValidTrailer`
+  // helper for filtering.
+  trailer_url?: string;
+  trailerUrl?: string;
+  video_url?: string;
+  videoUrl?: string;
+  trailerLink?: string;
+  trailer?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  video?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  youtube?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  youtube_trailer?: { key?: string; site?: string; name?: string; url?: string } | string | null;
+  movie_trailer?: { key?: string; site?: string; name?: string; url?: string } | string | null;
   [key: string]: unknown;
 }
 
@@ -35,11 +51,14 @@ export const radarService = {
       const data = result?.data || (result as unknown as RadarPayload | null) || null;
       if (data && data.discussed && data.genres) {
         const breakthrough = data.views || data.breakthrough || [];
+        // Drop movies without a valid trailer from the bento chart
+        // and the runner-up rows so we never expose a "Xem trailer"
+        // button that opens an unplayable modal.
         return {
-          discussed: data.discussed,
-          favorite: data.favorite || [],
-          views: breakthrough,
-          breakthrough,
+          discussed: filterMoviesWithValidTrailer(data.discussed),
+          favorite: filterMoviesWithValidTrailer(data.favorite || []),
+          views: filterMoviesWithValidTrailer(breakthrough),
+          breakthrough: filterMoviesWithValidTrailer(breakthrough),
           genres: data.genres,
           period
         };
@@ -68,7 +87,11 @@ export const radarService = {
         || (result && typeof result === 'object' && 'movies' in result ? result.movies : null)
         || (Array.isArray(result) ? result : null);
       if (Array.isArray(items) && items.length > 0) {
-        return items.slice(0, limit);
+        // The rankings grid also has a per-card "Trailer" button.
+        // Filter so the user is never shown a card that opens a
+        // modal with no playable trailer.
+        const filtered = filterMoviesWithValidTrailer(items);
+        return filtered.slice(0, limit);
       }
     } catch {
       // Handled silently

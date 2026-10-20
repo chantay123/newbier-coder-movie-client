@@ -89,7 +89,7 @@ const PerformerDetail: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<FilterValue>('all');
 
   const imageBaseUrl = `${TMDB_CONFIG.imageBaseUrl}/w500`;
-  const placeholderImage = '/img/default-poster.jpg';
+  const placeholderImage = '/placeholder.jpg';
   const profilePlaceholder = '/img/user-avatar.png';
 
   useEffect(() => {

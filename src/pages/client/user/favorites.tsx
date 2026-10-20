@@ -16,9 +16,9 @@ type FilterTab = 'all' | 'movie' | 'series';
 
 interface FavoriteMovie {
   id: string;
+  slug: string; // required for the toggle endpoint (DELETE /movies/:slug/favorite)
   title: string;
   original_title?: string;
-  slug: string;
   thumbnail?: string;
   year: number;
   quality: string;
@@ -107,9 +107,9 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
             };
             return {
               id: pick<string>('id', '_id', ''),
+              slug: pick<string>('slug', 'slug', ''), // backend DELETE endpoint keys off slug
               title: pick<string>('name', 'title', 'Không có tiêu đề'),
               original_title: pick<string>('origin_name', 'original_title', ''),
-              slug: pick<string>('slug', 'slug', ''),
               thumbnail: pick<string>('thumb_url', 'thumbnail', ''),
               year: pick<number>('year', 'year', new Date().getFullYear()),
               quality: pick<string>('quality', 'quality', 'HD'),
@@ -155,9 +155,10 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
   const handleRemoveFavorite = async (movie: FavoriteMovie): Promise<void> => {
     try {
       setIsDeleting(true);
-      const movieId: string = movie.id;
-      setFavorites((prev) => prev.filter((m) => m.id !== movieId));
-      const result = (await favoritesService.removeFromFavorites(movieId)) as FavoritesServiceResult;
+      const movieSlug: string = movie.slug;
+      setFavorites((prev) => prev.filter((m) => m.id !== movie.id));
+      // Pass slug (preferred) and id as fallback — removeFromFavorites accepts both
+      const result = (await favoritesService.removeFromFavorites(movie.id, movieSlug)) as FavoritesServiceResult;
 
       if (result.success) {
         toast.success('Đã xóa phim khỏi danh sách yêu thích!', {
@@ -248,8 +249,10 @@ export default function FavoritesPage({ inProfilePage = false }: { inProfilePage
         let successCount = 0;
         let errorCount = 0;
         for (const movieId of selectedItems) {
+          const movie = favorites.find((m) => m.id === movieId);
+          const slug = movie?.slug;
           try {
-            const result = (await favoritesService.removeFromFavorites(movieId)) as FavoritesServiceResult;
+            const result = (await favoritesService.removeFromFavorites(movieId, slug)) as FavoritesServiceResult;
             if (result.success) successCount++;
             else {
               errorCount++;

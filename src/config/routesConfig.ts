@@ -10,6 +10,7 @@ export const ROUTES = {
   HOME: '/',
   MOVIES: '/browse/movies',
   SERIES: '/browse/series',
+  SCHEDULE: '/browse/schedule',
   SEARCH: '/search',
   PREMIUM: '/user/premium',
   PROFILE: '/profile',

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Skeleton from '@/features/shared/components/UI/Skeleton';
 import SectionHeader from '@/features/shared/components/MovieSection/SectionHeader';
+import { hasValidTrailer } from '@/utils/trailer';
 import radarService from '@/API/services/radarService';
 import RadarTop10Modal from './RadarTop10Modal';
 import styles from './TrendingRadarSection.module.css';
@@ -25,7 +26,15 @@ export interface RadarMovie {
   metric_label?: string;
   delta_type?: DeltaType;
   delta_val?: number | string;
+  // Legacy flat trailer URL field (some backends send this directly).
   trailer_url?: string;
+  // TMDB-style trailer object (the same shape TrailerModal accepts).
+  // Optional; the service may or may not include it depending on what
+  // the radar endpoint returns. Kept structurally identical to the
+  // `TrailerObject` type in `src/utils/trailer.ts` so the radar movie
+  // can be passed directly to TrailerModal without casting.
+  trailer?: import('@/utils/trailer').TrailerObject | string;
+  [key: string]: unknown;
 }
 
 /** Trending genre entry */
@@ -317,13 +326,14 @@ const TrendingRadarSection: React.FC<TrendingRadarSectionProps> = ({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          onPlayTrailer({
-                            ...championMovie,
-                            name: championMovie.title,
-                            // Only pass trailer_url if the movie actually has one.
-                            // Never hardcode a fake trailer — let TrailerModal show "no trailer" state.
-                            ...(championMovie.trailer_url ? { trailer_url: championMovie.trailer_url } : {})
-                          });
+                          // Same entry-point guard as the modal
+                          // page: re-check the trailer is valid
+                          // before forwarding to the parent. The
+                          // radar service already filters, so this
+                          // is a belt-and-braces safety net.
+                          const candidate = { ...championMovie, name: championMovie.title };
+                          if (!hasValidTrailer(candidate as never)) return;
+                          if (onPlayTrailer) onPlayTrailer(candidate);
                         }}
                         title={`Xem trailer ${championMovie.title}`}
                         aria-label={`Xem trailer ${championMovie.title}`}

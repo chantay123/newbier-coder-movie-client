@@ -28,7 +28,7 @@ const LatestMoviesGridSection: React.FC<LatestMoviesGridSectionProps> = ({
     <MovieSection
       title="Phim Mới Cập Nhật"
       badge="MỚI NHẤT"
-      viewAllHref="/danh-sach/phim-moi"
+      viewAllHref="/browse/movies?type=all&sort=newest"
       viewAllText="Xem tất cả"
       layout="rail"
       variant="vertical"

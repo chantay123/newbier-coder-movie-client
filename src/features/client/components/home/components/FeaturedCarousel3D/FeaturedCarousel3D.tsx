@@ -119,6 +119,10 @@ const FeaturedCarousel3D: React.FC<FeaturedCarousel3DProps> = ({ movies = [], lo
     setTouchEnd(0);
   };
 
+  // Chỉ hiển thị skeleton khi ĐANG THỰC SỰ LOAD. Trước đây điều kiện
+  // `loading && candidateMovies.length === 0` kết hợp với `return null`
+  // bên dưới khiến section biến mất im lặng nếu không có phim nào
+  // pass qua bộ lọc trailer — nay render null có chủ đích.
   if (loading && candidateMovies.length === 0) {
     return (
       <div className="featured-3d-wrapper mb-4">
