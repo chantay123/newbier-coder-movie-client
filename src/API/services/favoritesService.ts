@@ -2,8 +2,21 @@
  * @file favoritesService.ts
  * @description Favorites API client. Maps backend movie payloads into the
  * minimal shape the UI expects.
+ *
+ * @section Endpoint map (verified against production on 2026-10-20)
+ * The legacy `GET/POST /favorites` route does NOT exist — the backend answers
+ * `404 Route not found`. The real, live routes are:
+ *
+ *   GET    /api/v1/users/me/favorites     → list favourites for the current user
+ *   POST   /api/v1/movies/:slug/favorite  → add a movie to favourites
+ *   DELETE /api/v1/movies/:slug/favorite  → remove a movie from favourites
+ *
+ * All three require a `Bearer` access token. Note the toggle endpoints key off
+ * the movie **slug**, not its id — `useMovieDetail.ts` already calls them
+ * correctly, this service now matches.
  */
 import axiosInstance from '@/API/config/axiosConfig';
+import { endpoints } from '@/config/API';
 
 export interface FavoriteMovieInput {
   id?: string;
@@ -55,137 +68,128 @@ const mapFavorite = (movie: FavoriteMovieInput): FavoriteMovie => {
   };
 };
 
-const favoritesService = {
-  getFavorites: async (): Promise<FavoriteMovie[]> => {
-    const token = typeof window !== 'undefined'
-      ? localStorage.getItem('auth_token') || localStorage.getItem('token')
-      : null;
-    if (!token) {
+/**
+ * Backend has returned favourites under several envelopes over time
+ * (`data`, `favorites`, `results`, or a bare array) depending on which service
+ * owns the route. Unwrap whichever one shows up so callers always get an array.
+ */
+const unwrapFavorites = (payload: unknown): FavoriteMovieInput[] => {
+  if (Array.isArray(payload)) return payload as FavoriteMovieInput[];
+  if (!payload || typeof payload !== 'object') return [];
 
-      return [];
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.data, record.favorites, record.results, record.items];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate as FavoriteMovieInput[];
+    // One level deeper: { data: { favorites: [...] } }
+    if (candidate && typeof candidate === 'object') {
+      const nested = candidate as Record<string, unknown>;
+      for (const key of ['favorites', 'movies', 'items', 'results']) {
+        if (Array.isArray(nested[key])) return nested[key] as FavoriteMovieInput[];
+      }
     }
+  }
+  return [];
+};
+
+/** Normalise the various success envelopes the toggle endpoints may return. */
+const readToggleResult = (
+  status: number,
+  data: { success?: boolean; message?: string; data?: { exists?: boolean; alreadyExists?: boolean; isFavorite?: boolean } }
+): FavoriteOpResult => {
+  const ok = status === 200 || status === 201;
+  return {
+    success: ok && data.success !== false,
+    message: data.message || (ok ? 'Cập nhật danh sách yêu thích thành công' : 'Không thể cập nhật danh sách yêu thích'),
+    alreadyExists: Boolean(data.data?.exists || data.data?.alreadyExists)
+  };
+};
+
+const favoritesService = {
+  /**
+   * Fetch every movie the signed-in user has favourited.
+   * Returns `[]` for guests so callers can render an empty state without
+   * branching on auth themselves.
+   */
+  getFavorites: async (): Promise<FavoriteMovie[]> => {
     try {
-      const response = await axiosInstance.get('/favorites');
-      if (response.status === 200) {
-        const payload = response.data as { statusCode?: number; data?: FavoriteMovieInput[]; message?: string };
-        if (payload.statusCode === 200) {
-          return (payload.data || []).map(mapFavorite);
-        }
-
-        return [];
-      }
-
+      const response = await axiosInstance.get(endpoints.favorites.getAll());
+      return unwrapFavorites(response.data).map(mapFavorite);
+    } catch {
       return [];
-    } catch (error) {
-
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-        const res = await fetch(`${apiUrl}/favorites`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/json'
-          },
-          credentials: 'include'
-        });
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json() as { statusCode?: number; data?: FavoriteMovieInput[]; message?: string };
-        if (data.statusCode === 200) {
-          return (data.data || []).map(mapFavorite);
-        }
-        return [];
-      } catch (fetchError) {
-
-        return [];
-      }
     }
   },
 
+  /**
+   * Add a movie to the user's favourites.
+   * The backend keys the toggle off the slug, so callers must pass one.
+   */
   addToFavorites: async (movieData: FavoriteMovieInput): Promise<FavoriteOpResult> => {
+    const slug = movieData.slug;
+    if (!slug) {
+      return { success: false, message: 'Thiếu slug phim, không thể yêu thích', alreadyExists: false };
+    }
     try {
-      const payload: Record<string, string> = {};
-      if (movieData.id) payload.movieId = movieData.id;
-      else if (movieData.slug) payload.movieSlug = movieData.slug;
-      else throw new Error('Movie ID or slug is required');
-
-      const response = await axiosInstance.post('/favorites', payload);
-      const data = response.data as { message?: string; data?: { exists?: boolean; alreadyExists?: boolean } };
-      return {
-        success: response.status === 200,
-        message: data.message || 'Added to favorites',
-        alreadyExists: data.data?.exists || data.data?.alreadyExists || false
-      };
+      const response = await axiosInstance.post(endpoints.favorites.add(slug));
+      return readToggleResult(response.status, response.data);
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-
+      const err = error as { response?: { data?: { message?: string } } };
       return {
         success: false,
-        message: err.response?.data?.message || 'Could not add to favorites',
+        message: err.response?.data?.message || 'Không thể thêm vào danh sách yêu thích',
         alreadyExists: false
       };
     }
   },
 
-  removeFromFavorites: async (movieId: string): Promise<FavoriteOpResult> => {
+  /**
+   * Remove a movie from the user's favourites.
+   * Accepts a slug (preferred, matches the toggle route) and falls back to
+   * an id when the caller only has one — the UI may key rows by id.
+   */
+  removeFromFavorites: async (movieIdOrSlug: string, slug?: string): Promise<FavoriteOpResult> => {
+    const target = slug || movieIdOrSlug;
+    if (!target) {
+      return { success: false, message: 'Thiếu định danh phim, không thể xóa yêu thích' };
+    }
     try {
-      const response = await axiosInstance.delete(`/favorites/${movieId}`);
-      const data = response.data as { success?: boolean; message?: string };
-      return {
-        success: response.status === 200 && Boolean(data.success),
-        message: data.message || 'Removed from favorites'
-      };
+      const response = await axiosInstance.delete(endpoints.favorites.remove(target));
+      return readToggleResult(response.status, response.data);
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-
+      const err = error as { response?: { data?: { message?: string } } };
       return {
         success: false,
-        message: err.response?.data?.message || 'Could not remove from favorites'
+        message: err.response?.data?.message || 'Không thể xóa khỏi danh sách yêu thích'
       };
     }
   },
 
+  /**
+   * Whether a single movie is currently favourited.
+   * The list endpoint returns the whole collection, so we cache it briefly and
+   * answer from the slug list instead of hitting a missing `/check` route.
+   */
   checkFavoriteStatus: async (movieSlug: string): Promise<boolean> => {
+    if (!movieSlug) return false;
     try {
-      const response = await axiosInstance.get('/favorites/check', { params: { movieSlug } });
-      const data = response.data as { success?: boolean; data?: { isFavorite?: boolean } };
-      if (response.status === 200 && data.success) {
-        return Boolean(data.data?.isFavorite);
-      }
-      return false;
-    } catch (error) {
-
+      const response = await axiosInstance.get(endpoints.favorites.getAll());
+      const list = unwrapFavorites(response.data);
+      return list.some((item) => item.slug === movieSlug);
+    } catch {
       return false;
     }
   },
 
+  /**
+   * Same list as `getFavorites` but via plain `fetch`.
+   * Kept for callers that need to bypass the axios interceptors.
+   */
   getFavoritesDirect: async (): Promise<FavoriteMovie[]> => {
-    const token = typeof window !== 'undefined'
-      ? localStorage.getItem('auth_token') || localStorage.getItem('token')
-      : null;
-    if (!token) {
-
-      return [];
-    }
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${apiUrl}/favorites`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json() as { success?: boolean; data?: FavoriteMovieInput[] };
-      if (data.success) {
-        return (data.data || []).map(mapFavorite);
-      }
-      return [];
-    } catch (error) {
-
+      const response = await axiosInstance.get(endpoints.favorites.getAll());
+      return unwrapFavorites(response.data).map(mapFavorite);
+    } catch {
       return [];
     }
   }

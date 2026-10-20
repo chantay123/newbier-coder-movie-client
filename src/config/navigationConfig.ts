@@ -74,7 +74,7 @@ export const COUNTRY_NAV_ITEMS: TaxonomyNavItem[] = Object.values(TAXONOMY_COUNT
  * Các mục điều hướng chính của Navbar, đúng theo spec sản phẩm:
  * 1. Chủ Đề (Dropdown)  2. Duyệt tìm (/search)
  * 3. Phim Lẻ (/movies)  4. Phim Bộ (/series)
- * 5. Quốc gia (Dropdown)  6. Diễn Viên (/performer)  7. Lịch Chiếu (/schedule)
+ * 5. Quốc gia (Dropdown)  6. Diễn Viên (/performer)  7. Lịch Chiếu (/browse/schedule)
  */
 export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
   {
@@ -125,8 +125,11 @@ export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
     id: 'lich-chieu',
     label: 'Lịch Chiếu',
     type: 'link',
-    href: '/schedule',
-    matchExact: true
+    // `/schedule` 404 vì file thật nằm ở src/pages/client/browse/schedule.tsx.
+    // next.config.ts rewrite `/browse/:path*` → `/client/browse/:path*`, nên
+    // phải dùng `/browse/schedule` để khớp với ROUTES.MOVIES/SERIES.
+    href: ROUTES.SCHEDULE,
+    matchPrefix: '/browse/schedule'
   }
 ];
 
