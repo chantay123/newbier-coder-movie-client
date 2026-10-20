@@ -5,6 +5,9 @@ import commentService from '@/API/services/commentService';
 import { LOCAL_DEFAULT_BACKDROP } from '@/config/movieConfig';
 import styles from './CommunityCommentSection.module.css';
 
+// Zustand store cho comment caching (dùng chung với movie detail page)
+import { useCommentStore } from '@/stores/useCommentStore';
+
 /**
  * @file CommunityCommentSection.tsx
  * @description Unified, space-efficient community discussion section.
@@ -85,14 +88,32 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
 
   const feedRef = useRef<HTMLDivElement | null>(null);
 
+  // ---- Zustand cache selectors ----
+  // Dùng selector để tránh re-render khi cache không liên quan thay đổi
+  const getCachedTopComments = useCommentStore((s) => s.getCachedTopComments);
+  const setCachedTopComments = useCommentStore((s) => s.setCachedTopComments);
+  const getCachedLiveBuzz = useCommentStore((s) => s.getCachedLiveBuzz);
+  const setCachedLiveBuzz = useCommentStore((s) => s.setCachedLiveBuzz);
+
   // Fetch Top Weekly Comments (Rail 1)
   useEffect(() => {
     let isSubscribed = true;
+
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    const cached = getCachedTopComments('week');
+    if (cached && cached.comments && cached.comments.length > 0) {
+      if (isSubscribed) setWeekComments(cached.comments as unknown as Comment[]);
+      return;
+    }
+
     const fetchWeek = async (): Promise<void> => {
       try {
         const data = (await commentService.getTopComments({ period: 'week', limit })) as unknown as { comments?: Comment[] };
         if (isSubscribed && data?.comments) {
           setWeekComments(data.comments);
+          // 🆕 Ghi cache (cast về CommentItem[])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setCachedTopComments('week', { comments: data.comments as any, total: data.comments.length, period: 'week' });
         }
       } catch {
         // Fallback handled silently
@@ -102,16 +123,27 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
     return () => {
       isSubscribed = false;
     };
-  }, [limit]);
+  }, [limit, getCachedTopComments, setCachedTopComments]);
 
   // Fetch Top Monthly or All-time Comments (Rail 2)
   useEffect(() => {
     let isSubscribed = true;
+
+    // 🆕 Cache-first
+    const cached = getCachedTopComments(monthPeriod);
+    if (cached && cached.comments && cached.comments.length > 0) {
+      if (isSubscribed) setMonthComments(cached.comments as unknown as Comment[]);
+      return;
+    }
+
     const fetchMonth = async (): Promise<void> => {
       try {
         const data = (await commentService.getTopComments({ period: monthPeriod, limit: 10 })) as unknown as { comments?: Comment[] };
         if (isSubscribed && data?.comments) {
           setMonthComments(data.comments);
+          // 🆕 Ghi cache
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setCachedTopComments(monthPeriod, { comments: data.comments as any, total: data.comments.length, period: monthPeriod });
         }
       } catch {
         // Fallback handled silently
@@ -121,16 +153,27 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
     return () => {
       isSubscribed = false;
     };
-  }, [monthPeriod]);
+  }, [monthPeriod, getCachedTopComments, setCachedTopComments]);
 
   // Fetch Live Buzz Comments
   useEffect(() => {
     let isSubscribed = true;
+
+    // 🆕 Cache-first
+    const cached = getCachedLiveBuzz();
+    if (cached && cached.comments && cached.comments.length > 0) {
+      if (isSubscribed) setLiveMessages(cached.comments as unknown as LiveBuzzMessage[]);
+      return;
+    }
+
     const fetchLive = async (): Promise<void> => {
       try {
         const data = (await commentService.getLiveBuzzComments({ limit: 12 })) as unknown as { comments?: LiveBuzzMessage[] };
         if (isSubscribed && data?.comments) {
           setLiveMessages(data.comments);
+          // 🆕 Ghi cache
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setCachedLiveBuzz({ comments: data.comments as any });
         }
       } catch {
         // Handled silently
@@ -140,7 +183,7 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
     return () => {
       isSubscribed = false;
     };
-  }, []);
+  }, [getCachedLiveBuzz, setCachedLiveBuzz]);
 
   // Handle Scroll in Live Chat: show return-to-latest button when scrolled down
   const handleLiveScroll = (e: React.UIEvent<HTMLDivElement>): void => {

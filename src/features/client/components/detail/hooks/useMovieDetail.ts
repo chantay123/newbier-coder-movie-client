@@ -3,9 +3,18 @@
  * @description Centralized data management hook for the Movie Detail Page (/movie/[slug]).
  * Fetches real movie metadata, episode server streams, related recommendations,
  * and user interactions (favorites, ratings, comments) with robust defensive fallbacks.
+ *
+ * 🆕 Tích hợp Zustand (useMovieStore + useCommentStore):
+ * - Cache movie detail theo slug → không gọi lại khi quay lại trang
+ * - Cache related movies → không gọi lại khi quay lại
+ * - Cache comments → dùng chung với homepage
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+
+// Zustand stores cho caching
+import { useMovieStore } from '@/stores/useMovieStore';
+import { useCommentStore } from '@/stores/useCommentStore';
 import { MOVIE_CONFIG } from '@/config/movieConfig';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
 import { filterMoviesWithValidTrailer } from '@/utils/trailer';
@@ -21,6 +30,8 @@ import {
   LOCAL_DEFAULT_POSTER,
   MOVIE_FALLBACK_DEFAULTS
 } from '@/config/movieFallbackConfig';
+import { pickImageSrc, POSTER_FIELDS, THUMB_FIELDS } from '@/utils/imageSource';
+import { resolveImageUrl } from '@/utils/movieNormalizer';
 
 const API_BASE = MOVIE_CONFIG.apiBaseUrl;
 
@@ -35,6 +46,17 @@ interface CountryEntity {
 
 /** Episode server data entry */
 export interface EpisodeServerData {
+  id?: string;
+  name?: string;
+  slug?: string;
+  filename?: string;
+  /** Embed URL (iframe). Normalized from the backend's camelCase `linkEmbed`. */
+  link_embed?: string;
+  /** HLS playlist URL. Normalized from the backend's camelCase `linkM3u8`. */
+  link_m3u8?: string;
+  /** Original camelCase keys are preserved for any caller still using them. */
+  linkEmbed?: string;
+  linkM3u8?: string;
   [key: string]: unknown;
 }
 
@@ -42,8 +64,74 @@ export interface EpisodeServerData {
 export interface EpisodeServer {
   server_name?: string;
   server_data?: EpisodeServerData[];
+  /** Original camelCase keys are preserved for any caller still using them. */
+  serverName?: string;
+  serverData?: EpisodeServerData[];
   [key: string]: unknown;
 }
+
+/**
+ * Normalizes the `episodes` array from the backend into snake_case.
+ *
+ * ## Why this exists
+ * The movie-detail API returns episode servers in **camelCase**:
+ * ```json
+ * [{ "serverName": "Vietsub #1", "serverData": [
+ *     { "id": "...", "name": "1", "slug": "tap-1",
+ *       "linkEmbed": "https://embed13.streamc.xyz/embed.php?hash=...",
+ *       "linkM3u8": "" }] }]
+ * ```
+ * but every consumer in the app (`EpisodeDirectory`, `MovieHeroHeader`,
+ * `WatchSidebarPlaylist`, `MoviePlayerSection`, `watch.tsx`) reads the
+ * **snake_case** contract — `server_name` / `server_data` / `link_embed` /
+ * `link_m3u8`.
+ *
+ * Because those interfaces all carry `[key: string]: unknown`, TypeScript
+ * could not catch the mismatch, so at runtime `server.server_data` was
+ * `undefined`. Symptoms: the episode directory rendered nothing, the server
+ * tab showed a fallback name, and the player showed "Tập phim đang được cập
+ * nhật luồng phát" despite the movie having 12 playable episodes.
+ *
+ * ## Why we add aliases instead of renaming
+ * The camelCase keys are kept alongside the snake_case ones so that admin
+ * screens (which save `server_name`/`server_data`) and any legacy caller
+ * reading the raw payload keep working. Only additive changes are made.
+ */
+export const normalizeEpisodes = (raw: unknown): EpisodeServer[] => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((srv): srv is Record<string, unknown> => !!srv && typeof srv === 'object')
+    .map((srv) => {
+      // The episode list lives under `serverData` (camelCase) or
+      // `server_data` (snake_case) depending on payload vintage.
+      const rawList = (srv.serverData ?? srv.server_data) as unknown;
+      const serverData: EpisodeServerData[] = Array.isArray(rawList)
+        ? rawList
+            .filter((ep): ep is Record<string, unknown> => !!ep && typeof ep === 'object')
+            .map((ep) => ({
+              // Spread first so the backend's own fields (including `id`,
+              // which the admin edit form keys on) are preserved as-is.
+              ...ep,
+              name: (ep.name as string) ?? '',
+              slug: (ep.slug as string) ?? '',
+              link_embed: (ep.link_embed as string) || (ep.linkEmbed as string) || '',
+              link_m3u8: (ep.link_m3u8 as string) || (ep.linkM3u8 as string) || ''
+            }))
+        : [];
+
+      const serverName = (srv.server_name as string) || (srv.serverName as string) || '';
+
+      return {
+        ...srv,
+        server_name: serverName,
+        server_data: serverData,
+        // Canonical camelCase keys, in case the backend used snake_case.
+        serverName: serverName,
+        serverData: serverData
+      } as EpisodeServer;
+    });
+};
 
 /** Episode trailer object (cho TrailerModal) */
 export interface TrailerObject {
@@ -140,8 +228,12 @@ export const normalizeMovieDetail = (raw: RawMovie | null | undefined, slug = ''
     || (raw.data as RawMovie | undefined)
     || raw;
 
-  // Normalize episodes structure
-  const episodes: EpisodeServer[] = Array.isArray(m.episodes) ? (m.episodes as EpisodeServer[]) : [];
+  // Normalize episodes structure. `normalizeEpisodes` maps the backend's
+  // camelCase `serverName`/`serverData`/`linkEmbed`/`linkM3u8` to the
+  // snake_case contract every component in the app reads. Without this,
+  // `server_data` was undefined at runtime and the episode list + player
+  // stayed empty even though the API returned 12 episodes.
+  const episodes: EpisodeServer[] = normalizeEpisodes(m.episodes);
 
   // Resolve actors & directors defensively
   const actorsList = (resolveMovieActors(m as never) as unknown[]) || [];
@@ -162,8 +254,14 @@ export const normalizeMovieDetail = (raw: RawMovie | null | undefined, slug = ''
     name: (m.name as string) || 'Chi Tiết Phim',
     origin_name: resolveMovieSubTitle(m as never) as string,
     backdrop_url: (resolveMovieBackdrop(m as never) as string) || LOCAL_DEFAULT_BACKDROP,
-    poster_url: (m.poster_url as string) || (m.thumb_url as string) || LOCAL_DEFAULT_POSTER,
-    thumb_url: (m.thumb_url as string) || (m.poster_url as string) || LOCAL_DEFAULT_POSTER,
+    // Đọc poster/thumb qua helper chung thay vì chỉ 1-2 field cứng.
+    // Backend có thể đặt ảnh ở `image`, `imagePoster`, `poster_path`...
+    // Trước đây chỉ đọc `poster_url`/`thumb_url` nên phim có ảnh ở field
+    // khác rơi về LOCAL_DEFAULT_POSTER → hiển thị dải xám placeholder.
+    // `resolveImageUrl` bọc ngoài để relative path (`/uploads/x.jpg`)
+    // từ backend được gắn `imageOrigin` thay vì trỏ về host hiện tại.
+    poster_url: resolveImageUrl(pickImageSrc(m, POSTER_FIELDS, LOCAL_DEFAULT_POSTER)),
+    thumb_url: resolveImageUrl(pickImageSrc(m, THUMB_FIELDS, LOCAL_DEFAULT_POSTER)),
     year: resolveMovieYear(m as never) as number | string,
     quality: resolveMovieQuality(m as never) as string,
     category: (resolveMovieCategories(m as never) as unknown[]) || [],
@@ -224,6 +322,15 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
   const [commentsLoading, setCommentsLoading] = useState<boolean>(false);
   const [relatedMovies, setRelatedMovies] = useState<NormalizedMovieDetail[]>([]);
 
+  // ---- Zustand cache selectors ----
+  // Dùng selector để tránh re-render khi cache không liên quan thay đổi
+  const getCachedMovie = useMovieStore((s) => s.getCachedMovie);
+  const setCachedMovie = useMovieStore((s) => s.setCachedMovie);
+  const getCachedRelated = useMovieStore((s) => s.getCachedRelated);
+  const setCachedRelated = useMovieStore((s) => s.setCachedRelated);
+  const getCachedComments = useCommentStore((s) => s.getCachedMovieComments);
+  const setCachedComments = useCommentStore((s) => s.setCachedMovieComments);
+
   const isMountedRef = useRef<boolean>(true);
   // Module-level "request in flight" guard. Prevents the React
   // StrictMode double-mount from issuing two parallel `fetchMovie`
@@ -269,6 +376,22 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
     fetchInFlightSlug.current = slug;
     setLoading(true);
     setError(null);
+
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    // Cast về đúng type của hook (NormalizedMovieDetail)
+    const cached = getCachedMovie(slug) as NormalizedMovieDetail | null;
+    if (cached) {
+      // eslint-disable-next-line no-console
+      console.log('[MovieDetail] Cache hit for:', slug);
+      if (isMountedRef.current) {
+        setMovie(cached);
+        setLoading(false);
+      }
+      fetchInFlightSlug.current = null;
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.log('[MovieDetail] Cache miss → fetching API:', slug);
 
     // Resolve the auth header via the shared service. This transparently
     // refreshes the token if it is within 60s of expiry. Returns `{}` when
@@ -393,6 +516,8 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
             });
           }
           setMovie(normalized);
+          // 🆕 Ghi vào Zustand cache sau khi fetch thành công
+          setCachedMovie(slug, normalized);
           setError(null);
           return;
         }
@@ -418,7 +543,7 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         setLoading(false);
       }
     }
-  }, [slug]);
+  }, [slug, getCachedMovie, setCachedMovie]);
 
   /**
    * Fetches related movie recommendations.
@@ -431,6 +556,17 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
    */
   const fetchRelated = useCallback(async (): Promise<void> => {
     if (!slug) return;
+
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    const cached = getCachedRelated(slug);
+    if (cached && cached.length > 0) {
+      const normalized = cached
+        .map((m, idx) => normalizeMovieDetail(m as unknown as RawMovie, m.slug || `rel-${idx}`))
+        .filter((m): m is NormalizedMovieDetail => m !== null);
+      if (isMountedRef.current) setRelatedMovies(normalized);
+      return;
+    }
+
     const tryFetch = async (): Promise<Response> => {
       let authHeaders: Record<string, string> = { Accept: 'application/json' };
       try {
@@ -459,11 +595,12 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           // is never sent to a modal that immediately shows
           // "Trailer chưa được cung cấp".
           const filtered = filterMoviesWithValidTrailer(list);
-          setRelatedMovies(
-            filtered
-              .map((m, idx) => normalizeMovieDetail(m as RawMovie, ((m as RawMovie).slug as string) || `rel-${idx}`))
-              .filter((m): m is NormalizedMovieDetail => m !== null)
-          );
+          const normalized = filtered
+            .map((m, idx) => normalizeMovieDetail(m as RawMovie, ((m as RawMovie).slug as string) || `rel-${idx}`))
+            .filter((m): m is NormalizedMovieDetail => m !== null);
+          setRelatedMovies(normalized);
+          // 🆕 Ghi vào Zustand cache
+          setCachedRelated(slug, filtered as unknown as import('@/stores/useMovieStore').CachedMovieItem[]);
           return;
         }
       }
@@ -474,7 +611,7 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
       // Network error — leave the list empty, do NOT inject mock data.
       if (isMountedRef.current) setRelatedMovies([]);
     }
-  }, [slug]);
+  }, [slug, getCachedRelated, setCachedRelated]);
 
   /**
    * Fetches comments for this specific movie. Uses the shared
@@ -485,6 +622,14 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
    */
   const fetchComments = useCallback(async (): Promise<void> => {
     if (!slug) return;
+
+    // 🆕 Cache-first: đọc từ Zustand store trước
+    const cached = getCachedComments(slug);
+    if (cached && cached.length > 0) {
+      if (isMountedRef.current) setComments(cached as Comment[]);
+      return;
+    }
+
     setCommentsLoading(true);
     try {
       let authHeaders: Record<string, string> = { Accept: 'application/json' };
@@ -502,7 +647,10 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           || (json.data as { comments?: unknown[] })?.comments
           || [];
         if (Array.isArray(list) && isMountedRef.current) {
-          setComments(list as Comment[]);
+          const typed = list as Comment[];
+          setComments(typed);
+          // 🆕 Ghi vào Zustand cache
+          setCachedComments(slug, typed);
           return;
         }
       }
@@ -513,7 +661,7 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         setCommentsLoading(false);
       }
     }
-  }, [slug]);
+  }, [slug, getCachedComments, setCachedComments]);
 
   /**
    * Toggles movie favorite status.
@@ -570,7 +718,12 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
         likes: 0
       };
 
-      setComments((prev) => [newCommentObj, ...prev]);
+      setComments((prev) => {
+        const updated = [newCommentObj, ...prev];
+        // 🆕 Cập nhật cache comments
+        setCachedComments(slug, updated);
+        return updated;
+      });
       return true;
     } catch {
       return false;
