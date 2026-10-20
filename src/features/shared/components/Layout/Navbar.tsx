@@ -248,30 +248,32 @@ const Navbar: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
 
   // ---- Zustand: sync user data vào cache khi login/logout ----
-  // Dùng selector để chỉ subscribe `user` và `isAuthenticated`
-  // → Navbar không re-render khi các state khác trong store thay đổi
-  const zustandUser = useUserStore((s) => s.getCachedProfile());
-  const setUserStore = useUserStore((s) => ({
-    setCachedProfile: s.setCachedProfile,
-    setToken: s.setToken,
-    logout: s.logout
-  }));
+  // ⚠️ Lưu ý: Mỗi selector phải trả về giá trị nguyên thủy (primitive)
+  // hoặc reference ổn định (function). KHÔNG trả về object `{...}` mới
+  // vì Zustand sẽ thấy reference khác → re-render vô tận → infinite loop.
+  //
+  // → Navbar chỉ re-render khi `isAuthenticated` đổi true/false.
+  const zustandIsAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const setCachedProfile = useUserStore((s) => s.setCachedProfile);
+  const setToken = useUserStore((s) => s.setToken);
+  const zustandLogout = useUserStore((s) => s.logout);
 
   // Sync khi user login/logout
   useEffect(() => {
     if (isAuthenticated && user) {
       // Cache profile vào Zustand store (localStorage persist)
-      setUserStore.setCachedProfile(user as Parameters<typeof setUserStore.setCachedProfile>[0]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setCachedProfile(user as any);
       // Sync token nếu có
       const token = typeof window !== 'undefined'
         ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
         : null;
-      if (token) setUserStore.setToken(token);
+      if (token) setToken(token);
     } else if (!isAuthenticated) {
       // Logout → xóa cache
-      setUserStore.logout();
+      zustandLogout();
     }
-  }, [isAuthenticated, user, setUserStore]);
+  }, [isAuthenticated, user, setCachedProfile, setToken, zustandLogout]);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
