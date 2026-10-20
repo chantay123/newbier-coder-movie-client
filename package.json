@@ -48,7 +48,8 @@
     "react-toastify": "^11.1.0",
     "slick-carousel": "^2.0.0",
     "socket.io": "^4.8.3",
-    "sweetalert2": "^11.26.25"
+    "sweetalert2": "^11.26.25",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
