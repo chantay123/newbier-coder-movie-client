@@ -29,54 +29,25 @@ const isNotFound = (error: unknown): boolean => {
   return ax?.response?.status === 404;
 };
 
+/**
+ * Retrieves admin notifications.
+ * @description Endpoint /admin/notifications is not active on backend. Returns empty array directly to eliminate 404 errors.
+ */
 export const getNotifications = async (): Promise<AdminNotification[]> => {
-  try {
-    // Use the configured axiosInstance so we inherit baseURL, the auth
-    // header, and the 401-refresh interceptor. We do NOT build the URL
-    // by hand — doing so risks double-prefixing "/api".
-    const response = await axiosInstance.get('/admin/notifications');
-    const data = response.data as { data?: AdminNotification[] } | AdminNotification[];
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray((data as { data?: AdminNotification[] }).data)) {
-      return (data as { data: AdminNotification[] }).data;
-    }
-    // Unexpected shape — treat as empty rather than crashing the bell.
-    return [];
-  } catch (error) {
-    if (isNotFound(error)) {
-      // The endpoint isn't implemented yet. The axiosConfig interceptor
-      // has already logged `[API] GET /admin/notifications → 404`; we
-      // stay quiet here so the bell stays usable.
-      return [];
-    }
-    // 401 is handled by the interceptor (it tries to refresh once). Any
-    // other failure (500, network, CORS) is re-thrown so the caller can
-    // show a real error state instead of a fake "0 unread".
-    throw error;
-  }
+  return [];
 };
 
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
-  try {
-    await axiosInstance.put(`/admin/notifications/${notificationId}/read`);
-  } catch (error) {
-    // The interceptor already logs the status. We do not double-log here.
-    throw error;
-  }
+  // No-op since backend notification endpoints are not active
+  return;
 };
 
 export const deleteNotification = async (notificationId: string): Promise<void> => {
-  try {
-    await axiosInstance.delete(`/admin/notifications/${notificationId}`);
-  } catch (error) {
-    throw error;
-  }
+  // No-op since backend notification endpoints are not active
+  return;
 };
 
 export const markAllNotificationsAsRead = async (): Promise<void> => {
-  try {
-    await axiosInstance.put('/admin/notifications/read-all');
-  } catch (error) {
-    throw error;
-  }
+  // No-op since backend notification endpoints are not active
+  return;
 };

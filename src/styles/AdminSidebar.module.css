@@ -48,6 +48,17 @@
   margin-bottom: 4px;
 }
 
+.navSectionTitle {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  padding: 12px 12px 4px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
 .navLink {
   display: flex;
   align-items: center;

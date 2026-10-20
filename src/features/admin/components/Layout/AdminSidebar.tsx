@@ -15,9 +15,13 @@ import { useRouter } from 'next/router';  import {
   FaBell,
   FaTags,
   FaUserTie,
-  FaGlobeAmericas
+  FaGlobeAmericas,
+  FaLayerGroup,
+  FaCalendarAlt,
+  FaSpinner
 } from 'react-icons/fa';
 import styles from '@/styles/AdminSidebar.module.css';
+import loadingStyles from '@/styles/AdminLoading.module.css';
 import axios from 'axios';
 
 interface MenuItem {
@@ -25,12 +29,33 @@ interface MenuItem {
   icon: React.ElementType;
   label: string;
   badge?: number;
+  section?: string;
 }
 
 const AdminSidebar = () => {
   const router = useRouter();
   const [unreadFeedbackCount, setUnreadFeedbackCount] = useState(0);
   const [pendingPremiumCount, setPendingPremiumCount] = useState(0);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleStart = (url: string) => {
+      setPendingPath(url);
+    };
+    const handleStop = () => {
+      setPendingPath(null);
+    };
+
+    router.events.on('routeChangeStart', handleStart);
+    router.events.on('routeChangeComplete', handleStop);
+    router.events.on('routeChangeError', handleStop);
+
+    return () => {
+      router.events.off('routeChangeStart', handleStart);
+      router.events.off('routeChangeComplete', handleStop);
+      router.events.off('routeChangeError', handleStop);
+    };
+  }, [router]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -111,19 +136,23 @@ const AdminSidebar = () => {
   const closeSidebar = () => {
     document.body.classList.remove('sidebar-open');
   };  const menuItems: MenuItem[] = [
-    { path: '/admin', icon: FaHome, label: 'Dashboard' },
-    { path: '/admin/movies', icon: FaFilm, label: 'Movies' },
-    { path: '/admin/taxonomies', icon: FaTags, label: 'Phân loại & Thuộc tính' },
+    { path: '/admin', icon: FaHome, label: 'Dashboard', section: 'Tổng quan' },
+    { path: '/admin/movies', icon: FaFilm, label: 'Quản Lý Phim', section: 'Nội dung & Phân loại' },
+    { path: '/admin/genres', icon: FaTags, label: 'Thể Loại' },
     { path: '/admin/countries', icon: FaGlobeAmericas, label: 'Quốc Gia' },
+    { path: '/admin/formats', icon: FaLayerGroup, label: 'Định Dạng Phim' },
+    { path: '/admin/years', icon: FaCalendarAlt, label: 'Năm Phát Hành' },
     { path: '/admin/people', icon: FaUserTie, label: 'Diễn viên & Đạo diễn' },
     // { path: '/admin/upcoming-movies', icon: FaPlayCircle, label: 'Phim sắp ra mắt' },
-    { path: '/admin/users', icon: FaUsers, label: 'Users' },
+    { path: '/admin/users', icon: FaUsers, label: 'Users', section: 'Hệ thống' },
     // { path: '/admin/premium', icon: FaCrown, label: 'Premium', badge: pendingPremiumCount },
     // { path: '/admin/feedback', icon: FaEnvelope, label: 'Góp ý người dùng', badge: unreadFeedbackCount },
     // { path: '/admin/reports', icon: FaExclamationTriangle, label: 'Báo cáo lỗi' },
     // { path: '/admin/advertisement', icon: FaAd, label: 'Quảng cáo' },
     // { path: '/admin/notifications/email', icon: FaBell, label: 'Gửi thông báo' },
   ];
+
+  let currentSection = '';
 
   return (
     <>
@@ -155,21 +184,45 @@ const AdminSidebar = () => {
               ? router.pathname === '/admin'
               : router.pathname.startsWith(item.path);
 
+            const isPending = Boolean(
+              pendingPath &&
+              (pendingPath === item.path || (item.path !== '/admin' && pendingPath.startsWith(item.path)))
+            );
+
+            const showSection = Boolean(item.section && item.section !== currentSection);
+            if (item.section) {
+              currentSection = item.section;
+            }
+
             return (
-              <div className={styles.navItem} key={item.path}>
-                <Link
-                  href={item.path}
-                  className={`${styles.navLink} ${isActive ? styles.active : ''}`}
-                  onClick={closeSidebar}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon className={styles.navIcon} aria-hidden="true" />
-                  <span className={styles.navText}>{item.label}</span>
-                  {typeof item.badge === 'number' && item.badge > 0 && (
-                    <span className={styles.navBadge}>{item.badge}</span>
-                  )}
-                </Link>
-              </div>
+              <React.Fragment key={item.path}>
+                {showSection && (
+                  <div className={styles.navSectionTitle} aria-hidden="true">
+                    {item.section}
+                  </div>
+                )}
+                <div className={styles.navItem}>
+                  <Link
+                    href={item.path}
+                    className={`${styles.navLink} ${isActive ? styles.active : ''} ${
+                      isPending ? loadingStyles.sidebarItemPending : ''
+                    }`}
+                    onClick={() => {
+                      if (!isActive) setPendingPath(item.path);
+                      closeSidebar();
+                    }}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon className={styles.navIcon} aria-hidden="true" />
+                    <span className={styles.navText}>{item.label}</span>
+                    {isPending ? (
+                      <FaSpinner className={loadingStyles.sidebarSpinner} aria-label="Đang nạp trang..." />
+                    ) : typeof item.badge === 'number' && item.badge > 0 ? (
+                      <span className={styles.navBadge}>{item.badge}</span>
+                    ) : null}
+                  </Link>
+                </div>
+              </React.Fragment>
             );
           })}
         </nav>

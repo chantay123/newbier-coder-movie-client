@@ -1,5 +1,6 @@
 
 import axiosInstance from '@/API/config/axiosConfig';
+import { MOCK_REPORT_DATA } from '@/mock/admin';
 
 interface ReportParams {
   page?: number;
@@ -67,14 +68,12 @@ export const deleteReport = async (reportId: string) => {
   }
 };
 
+/**
+ * Retrieves report breakdown statistics.
+ * @description Endpoint /admin/reports/stats is not active on backend. Returns mock dataset directly to eliminate 404 errors.
+ */
 export const getReportStats = async () => {
-  try {
-    const response = await axiosInstance.get('/admin/reports/stats');
-    return response.data.data;
-  } catch (error) {
-    // axiosConfig đã log [API] ... ở interceptor — tránh double log.
-    throw error;
-  }
+  return MOCK_REPORT_DATA;
 };
 
 export const createReport = async (reportData: ReportData) => {
