@@ -10,6 +10,7 @@ import type { ComponentType, ReactNode } from 'react';
 import '../styles/animation.css';
 import '../styles/subscription-details.css';
 import '../styles/feedbackAdmin.css';
+import 'react-toastify/dist/ReactToastify.css';
 import { SessionProvider } from 'next-auth/react';
 import { AuthProvider, withAccountStatus, withAuth } from '@/utils/auth';
 import { useEffect, useState, useCallback } from 'react';
@@ -39,6 +40,49 @@ import CinemaAlert from '@/features/shared/components/UI/CinemaAlert';
 import AdContextProvider from '@/context/AdContext';
 import { registerServiceWorker } from '@/utils/serviceWorker';
 import { ROUTES } from '@/config/routesConfig';
+
+// Bỏ qua các lỗi unhandledRejection / runtime từ browser extensions (ví dụ: Urban VPN, adblock, v.v.)
+// tránh làm ô nhiễm Next.js terminal logs và dev overlay.
+if (typeof window !== 'undefined') {
+  const isExtensionError = (message?: string, stack?: string, source?: string): boolean => {
+    const combined = `${message || ''} ${stack || ''} ${source || ''}`;
+    return (
+      combined.includes('chrome-extension://') ||
+      combined.includes('moz-extension://') ||
+      combined.includes('safari-extension://') ||
+      combined.includes('M_ID')
+    );
+  };
+
+  window.addEventListener(
+    'unhandledrejection',
+    (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const stack = typeof reason === 'object' && reason !== null ? (reason as { stack?: string }).stack : '';
+      const message =
+        typeof reason === 'object' && reason !== null
+          ? (reason as { message?: string }).message
+          : String(reason || '');
+
+      if (isExtensionError(message, stack)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
+
+  window.addEventListener(
+    'error',
+    (event: ErrorEvent) => {
+      if (isExtensionError(event.message, event.error?.stack, event.filename)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    },
+    true
+  );
+}
 
 type AppPageProps = AppProps & { session?: unknown };
 

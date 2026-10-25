@@ -1,24 +1,18 @@
 /**
  * @file years/index.tsx
  * @description Standalone Admin page for managing Movie Release Years (Năm Phát Hành).
+ * Integrates dedicated Zustand admin state, Zod validation, and react-toastify notifications.
  */
 'use client';
 
 import React from 'react';
-import { FaCalendarAlt } from 'react-icons/fa';
-import TaxonomyTableView from '@/features/admin/components/Taxonomies/TaxonomyTableView';
+import YearManagementView from '@/features/admin/years/components/YearManagementView';
 
 export default function AdminYearsPage() {
   return (
-    <TaxonomyTableView
-      type="years"
-      title="Quản Lý Năm Phát Hành"
-      subtitle="Quản lý danh mục niên giám và năm phát hành của kho phim trên toàn hệ thống"
-      typeNameVi="Năm Phát Hành"
-      icon={FaCalendarAlt}
+    <YearManagementView
       metaTitle="Quản Lý Năm Phát Hành - Movie Admin Studio"
-      metaDescription="Quản lý danh sách các năm phát hành phim, theo dõi số lượng phim theo từng năm"
-      showRecalculate={true}
+      metaDescription="Quản lý danh sách các năm phát hành phim, thêm năm mới và phân loại kho phim hệ thống."
     />
   );
 }
