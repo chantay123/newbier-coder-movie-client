@@ -72,6 +72,16 @@ export const endpoints = {
       uploadThumbnail: (id: string) => `${API_URL}/admin/movies/${id}/thumbnail`,
       toggleVisibility: (id: string) => `${API_URL}/admin/movies/${id}/visibility`
     },
+    years: {
+      getAll: (page = 1, limit = 10, search?: string) =>
+        buildUrl(`${API_URL}/admin/years`, { page, limit, ...(search ? { search } : {}) }),
+      getPublicAll: () => `${API_URL}/years`,
+      getById: (id: string) => `${API_URL}/admin/years/${id}`,
+      create: () => `${API_URL}/admin/years`,
+      update: (id: string) => `${API_URL}/admin/years/${id}`,
+      delete: (id: string) => `${API_URL}/admin/years/${id}`,
+      toggleStatus: (id: string) => `${API_URL}/admin/years/${id}/status`
+    },
     users: {
       getAll: (page = 1, limit = 10) => buildUrl(`${API_URL}/admin/users`, { page, limit }),
       getById: (id: string) => `${API_URL}/admin/users/${id}`,
