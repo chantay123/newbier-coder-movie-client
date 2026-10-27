@@ -33,6 +33,13 @@ export const ADMIN_YEAR_CONSTANTS = Object.freeze({
     VALIDATION_SLUG_INVALID: 'Slug chỉ được chứa chữ thường không dấu, số và dấu gạch ngang (-).',
     VALIDATION_DESC_MAX: 'Mô tả không được vượt quá 500 ký tự.',
     DUPLICATE_YEAR_ERROR: 'Năm phát hành này đã tồn tại trong hệ thống.',
+    NOT_FOUND_ERROR: 'Bản ghi năm phát hành không tồn tại hoặc đã bị xóa trên máy chủ.',
+    FORBIDDEN_ERROR: 'Quyền hạn đã thay đổi hoặc bạn không có quyền cập nhật bản ghi này.',
+    UNAUTHORIZED_ERROR: 'Phiên làm việc đã hết hạn hoặc token đã bị thu hồi. Vui lòng đăng nhập lại.',
+    NETWORK_TIMEOUT_ERROR: 'Không thể kết nối đến máy chủ hoặc phản hồi bị quá thời gian (timeout). Vui lòng thử lại hoặc kiểm tra lại trạng thái.',
+    DIRTY_CONFIRM_TITLE: 'Cảnh báo: Dữ liệu chưa được lưu',
+    DIRTY_CONFIRM_MESSAGE: 'Bạn đang có các thay đổi chưa được lưu. Bạn có chắc chắn muốn đóng và khôi phục về dữ liệu ban đầu?',
+    RESET_SUCCESS: 'Đã khôi phục về dữ liệu ban đầu.',
   },
   STORAGE_KEYS: {
     ADMIN_TOKEN: 'auth_token',
