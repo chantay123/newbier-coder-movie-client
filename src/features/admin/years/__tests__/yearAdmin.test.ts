@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 /**
  * @file yearAdmin.test.ts
  * @description Enterprise unit tests for Year Validation Schema, YearAdminService, and Zustand Admin Store.
@@ -168,6 +169,74 @@ describe('Admin Year Feature Unit Tests', () => {
       expect(state.years[0].isActive).toBe(false);
       expect(state.activeCount).toBe(0);
       expect(state.inactiveCount).toBe(1);
+    });
+
+    it('should update a year in store and recalculate active counts', async () => {
+      useAdminYearStore.setState({
+        years: [
+          { id: 'yr-1', name: '2021', slug: '2021', description: 'Old', isActive: true, movieCount: 5 },
+          { id: 'yr-2', name: '2022', slug: '2022', description: 'Normal', isActive: false, movieCount: 0 },
+        ],
+        activeCount: 1,
+        inactiveCount: 1,
+      });
+
+      const mockService = {
+        update: jest.fn().mockResolvedValue({
+          id: 'yr-1',
+          name: '2021',
+          slug: '2021-updated',
+          description: 'Updated Description',
+          isActive: false,
+          movieCount: 5,
+        }),
+      } as any;
+
+      const result = await useAdminYearStore.getState().updateYear(
+        'yr-1',
+        {
+          name: '2021',
+          slug: '2021-updated',
+          description: 'Updated Description',
+          isActive: false,
+        },
+        mockService
+      );
+
+      expect(result.slug).toBe('2021-updated');
+      const state = useAdminYearStore.getState();
+      expect(state.years.find((y) => y.id === 'yr-1')?.description).toBe('Updated Description');
+      expect(state.activeCount).toBe(0);
+      expect(state.inactiveCount).toBe(2);
+    });
+
+    it('should remove ghost item from store if server responds with 404', async () => {
+      useAdminYearStore.setState({
+        years: [{ id: 'yr-ghost', name: '1999', slug: '1999', description: '', isActive: true, movieCount: 0 }],
+        total: 1,
+      });
+
+      const mockService = {
+        update: jest.fn().mockRejectedValue({
+          isAxiosError: true,
+          response: {
+            status: 404,
+            data: { message: 'Entity not found' },
+          },
+        }),
+      } as any;
+
+      await expect(
+        useAdminYearStore.getState().updateYear(
+          'yr-ghost',
+          { name: '1999', slug: '1999', description: '', isActive: true },
+          mockService
+        )
+      ).rejects.toThrow();
+
+      const state = useAdminYearStore.getState();
+      expect(state.years.find((y) => y.id === 'yr-ghost')).toBeUndefined();
+      expect(state.total).toBe(0);
     });
   });
 });

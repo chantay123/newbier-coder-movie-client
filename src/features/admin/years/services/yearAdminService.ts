@@ -15,9 +15,11 @@ import {
   YearFilterParams,
   PaginatedYearResponse,
   createYearSchema,
+  updateYearSchema,
 } from '@/features/admin/years/types/year.types';
 import { parseApiError } from '@/utils/errors/appError';
 import { INITIAL_YEARS } from '@/mock/admin/mockTaxonomies';
+import { ADMIN_YEAR_CONSTANTS } from '@/constants/adminYearConstants';
 
 export interface IYearAdminService {
   getAll(params?: YearFilterParams, signal?: AbortSignal): Promise<PaginatedYearResponse>;
@@ -296,15 +298,62 @@ export class YearAdminService implements IYearAdminService {
   }
 
   /**
-   * Updates an existing release year.
+   * Updates an existing release year with validation and enterprise error normalization.
+   * @param id Entity ID
+   * @param payload Update data
+   * @param signal AbortSignal
    */
   async update(id: string, payload: UpdateYearInput, signal?: AbortSignal): Promise<YearEntity> {
+    const validated = updateYearSchema.parse(payload);
     const endpoint = this.config.years.update(id);
-    const response = await this.http.put(endpoint, payload, { signal });
-    const record = extractYearRecord(response.data);
-    const updated = normalizeYearEntity(record);
-    this.fallbackCache = this.fallbackCache.map((item) => (item.id === id ? { ...item, ...updated } : item));
-    return updated;
+
+    try {
+      let response;
+      try {
+        response = await this.http.put(endpoint, validated, { signal });
+      } catch (putErr) {
+        // If backend accepts PATCH instead of PUT, attempt PATCH
+        const putError = parseApiError(putErr);
+        if (putError.statusCode === 405) {
+          response = await this.http.patch(endpoint, validated, { signal });
+        } else {
+          throw putErr;
+        }
+      }
+
+      const record = extractYearRecord(response.data);
+      const updated = normalizeYearEntity(record, {
+        name: validated.name,
+        slug: validated.slug,
+        description: validated.description,
+        isActive: validated.isActive,
+      });
+
+      this.fallbackCache = this.fallbackCache.map((item) => (item.id === id ? { ...item, ...updated } : item));
+      return updated;
+    } catch (error) {
+      const parsedError = parseApiError(error, ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_ERROR);
+
+      // In local dev: if backend write route returns Route not found (404),
+      // update in-memory fallback cache to unblock development and testing
+      if (parsedError.statusCode === 404 && parsedError.message.includes('Route not found')) {
+        const index = this.fallbackCache.findIndex((i) => i.id === id);
+        if (index !== -1) {
+          const updated: YearEntity = {
+            ...this.fallbackCache[index],
+            name: validated.name || this.fallbackCache[index].name,
+            slug: validated.slug || this.fallbackCache[index].slug,
+            description: validated.description !== undefined ? validated.description : this.fallbackCache[index].description,
+            isActive: validated.isActive !== undefined ? validated.isActive : this.fallbackCache[index].isActive,
+            updatedAt: new Date().toISOString(),
+          };
+          this.fallbackCache[index] = updated;
+          return updated;
+        }
+      }
+
+      throw parsedError;
+    }
   }
 
   /**

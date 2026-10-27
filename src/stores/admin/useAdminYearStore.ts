@@ -200,19 +200,46 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
     try {
       const updated = await service.update(id, payload, signal);
 
-      set((state) => ({
-        years: state.years.map((y) => (y.id === id ? updated : y)),
-        isSubmitting: false,
-        isEditModalOpen: false,
-        selectedYear: null,
-      }));
+      set((state) => {
+        const nextYears = state.years.map((y) => (y.id === id ? updated : y));
+        const activeCount = nextYears.filter((y) => y.isActive).length;
+        const inactiveCount = nextYears.length - activeCount;
+
+        return {
+          years: nextYears,
+          activeCount,
+          inactiveCount,
+          isSubmitting: false,
+          isEditModalOpen: false,
+          selectedYear: null,
+          error: null,
+        };
+      });
 
       toastNotification.success(ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_SUCCESS(updated.name));
       return updated;
     } catch (err) {
       const parsed = parseApiError(err, ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_ERROR);
-      set({ isSubmitting: false, error: parsed.message });
-      toastNotification.error(parsed.message);
+
+      // Handle specific HTTP status codes
+      let userFriendlyMsg = parsed.message;
+      if (parsed.statusCode === 404) {
+        userFriendlyMsg = ADMIN_YEAR_CONSTANTS.MESSAGES.NOT_FOUND_ERROR;
+        // If 404, remove ghost item from local store
+        set((state) => ({
+          years: state.years.filter((y) => y.id !== id),
+          total: Math.max(0, state.total - 1),
+        }));
+      } else if (parsed.statusCode === 401) {
+        userFriendlyMsg = ADMIN_YEAR_CONSTANTS.MESSAGES.UNAUTHORIZED_ERROR;
+      } else if (parsed.statusCode === 403) {
+        userFriendlyMsg = ADMIN_YEAR_CONSTANTS.MESSAGES.FORBIDDEN_ERROR;
+      } else if (parsed.code === 'ECONNABORTED' || parsed.statusCode === 504 || parsed.message.includes('timeout')) {
+        userFriendlyMsg = ADMIN_YEAR_CONSTANTS.MESSAGES.NETWORK_TIMEOUT_ERROR;
+      }
+
+      set({ isSubmitting: false, error: userFriendlyMsg });
+      toastNotification.error(userFriendlyMsg);
       throw parsed;
     }
   },

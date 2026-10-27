@@ -51,10 +51,16 @@ export const createYearSchema = z.object({
 export type CreateYearInput = z.infer<typeof createYearSchema>;
 
 /**
- * Schema for updating an existing release year
+ * Schema for updating an existing release year in edit form
  */
-export const updateYearSchema = createYearSchema.partial();
+export const updateYearSchema = createYearSchema;
 export type UpdateYearInput = z.infer<typeof updateYearSchema>;
+
+/**
+ * Schema for partial updates (e.g. quick status toggle)
+ */
+export const partialYearUpdateSchema = createYearSchema.partial();
+export type PartialYearUpdateInput = z.infer<typeof partialYearUpdateSchema>;
 
 /**
  * Domain entity representing a release year in the database.

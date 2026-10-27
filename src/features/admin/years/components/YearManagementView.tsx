@@ -15,6 +15,7 @@ import {
   FaFilm,
   FaTrash,
   FaSyncAlt,
+  FaPen,
 } from 'react-icons/fa';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -27,6 +28,7 @@ import AdminPagination from '@/features/admin/components/Common/AdminPagination'
 import CinemaDropdown from '@/features/admin/components/Common/CinemaDropdown';
 import TaxonomyTableSkeleton from '@/features/admin/components/Loading/TaxonomyTableSkeleton';
 import CreateYearModal from '@/features/admin/years/components/CreateYearModal';
+import EditYearModal from '@/features/admin/years/components/EditYearModal';
 import { useAdminYears } from '@/features/admin/years/hooks/useAdminYears';
 import { YearEntity } from '@/features/admin/years/types/year.types';
 
@@ -51,12 +53,16 @@ export default function YearManagementView({
     totalPages,
     isLoading,
     isCreateModalOpen,
+    isEditModalOpen,
+    selectedYear,
     setSearchTerm,
     setStatusFilter,
     setCurrentPage,
     setPageSize,
     openCreateModal,
     closeCreateModal,
+    openEditModal,
+    closeEditModal,
     deleteYear,
     toggleStatus,
     refresh,
@@ -306,6 +312,15 @@ export default function YearManagementView({
                           <div className={styles.rowActions} style={{ justifyContent: 'flex-end' }}>
                             <button
                               type="button"
+                              className={styles.editBtn}
+                              title={`Chỉnh sửa năm ${item.name}`}
+                              onClick={() => openEditModal(item)}
+                              aria-label={`Chỉnh sửa năm ${item.name}`}
+                            >
+                              <FaPen aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
                               className={styles.deleteBtn}
                               title={`Xóa năm ${item.name}`}
                               onClick={() => handleDeleteClick(item)}
@@ -344,6 +359,16 @@ export default function YearManagementView({
         <CreateYearModal
           isOpen={isCreateModalOpen}
           onClose={closeCreateModal}
+          onSuccess={() => {
+            refresh();
+          }}
+        />
+
+        {/* Edit Year Modal */}
+        <EditYearModal
+          isOpen={isEditModalOpen}
+          year={selectedYear}
+          onClose={closeEditModal}
           onSuccess={() => {
             refresh();
           }}
