@@ -370,7 +370,11 @@ export default function YearManagementView({
           year={selectedYear}
           onClose={closeEditModal}
           onSuccess={() => {
-            refresh();
+            // Zustand store updates state immediately with 0 delay.
+            // Synchronize with server replica in background without flickering or overwriting.
+            setTimeout(() => {
+              refresh();
+            }, 400);
           }}
         />
 
