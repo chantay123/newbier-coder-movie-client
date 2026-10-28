@@ -129,15 +129,42 @@ export function extractYearList(responseData: unknown): YearEntity[] {
 
   const obj = responseData as Record<string, unknown>;
 
-  // Check direct candidates: responseData, data, items, years, results
-  const candidateKeys = ['responseData', 'data', 'items', 'years', 'results', 'list'];
+  // Backend envelope candidate: { responseData: { data: [ ... ] } }
+  if (obj.responseData && typeof obj.responseData === 'object') {
+    const resData = obj.responseData as Record<string, unknown>;
+    if (Array.isArray(resData.data)) {
+      return resData.data.map((item) => normalizeYearEntity(item as Record<string, unknown>));
+    }
+    if (Array.isArray(resData.items)) {
+      return resData.items.map((item) => normalizeYearEntity(item as Record<string, unknown>));
+    }
+    if (Array.isArray(resData.years)) {
+      return resData.years.map((item) => normalizeYearEntity(item as Record<string, unknown>));
+    }
+  }
 
+  // Direct candidate: { data: [ ... ] }
+  if (Array.isArray(obj.data)) {
+    return obj.data.map((item) => normalizeYearEntity(item as Record<string, unknown>));
+  }
+
+  // Direct candidate: { responseData: [ ... ] }
+  if (Array.isArray(obj.responseData)) {
+    return obj.responseData.map((item) => normalizeYearEntity(item as Record<string, unknown>));
+  }
+
+  // Direct candidate: { items: [ ... ] }
+  if (Array.isArray(obj.items)) {
+    return obj.items.map((item) => normalizeYearEntity(item as Record<string, unknown>));
+  }
+
+  // Deep candidate: search candidate keys
+  const candidateKeys = ['responseData', 'data', 'items', 'years', 'results', 'list'];
   for (const key of candidateKeys) {
     const val = obj[key];
     if (Array.isArray(val)) {
       return val.map((item) => normalizeYearEntity(item as Record<string, unknown>));
     }
-    // Deep candidate: { responseData: { items: [...] } } or { data: { items: [...] } }
     if (val && typeof val === 'object') {
       const nested = val as Record<string, unknown>;
       for (const nestedKey of candidateKeys) {
@@ -149,6 +176,13 @@ export function extractYearList(responseData: unknown): YearEntity[] {
   }
 
   return [];
+}
+
+export function generateTraceId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 /**
@@ -173,69 +207,72 @@ export class YearAdminService implements IYearAdminService {
 
   /**
    * Retrieves all release years with optional filtering and pagination.
-   * Tries primary endpoint (/years), then alternates (/movies/years, /admin/years), then fallback cache.
+   * Primary endpoint is GET /api/v1/years?page=1&limit=20
    */
   async getAll(params: YearFilterParams = {}, signal?: AbortSignal): Promise<PaginatedYearResponse> {
-    const { search = '', status = 'all', page = 1, limit = 10 } = params;
+    const { search = '', status = 'all', page = 1, limit = 20 } = params;
     let list: YearEntity[] = [];
+    let serverTotal: number | undefined;
+    let serverTotalPages: number | undefined;
 
-    // Strategy 1: Primary list endpoint (/years)
+    const requestHeaders = {
+      'Accept': 'application/json',
+      'x-request-trace': generateTraceId(),
+    };
+
+    // Primary endpoint: GET /api/v1/years?page=1&limit=20
     try {
-      const primaryUrl = this.config.years.list();
-      const response = await this.http.get(primaryUrl, { signal });
+      const primaryUrl = this.config.years.list({
+        page,
+        limit,
+        ...(search ? { search } : {}),
+      });
+      const response = await this.http.get(primaryUrl, { signal, headers: requestHeaders });
       list = extractYearList(response.data);
+
+      const respData = response.data?.responseData;
+      if (respData && typeof respData === 'object') {
+        if (typeof respData.total === 'number') serverTotal = respData.total;
+        if (typeof respData.totalPages === 'number') serverTotalPages = respData.totalPages;
+      }
     } catch {
-      // Ignored - move to next strategy
+      // Fall back to in-memory cache if network issue
     }
 
-    // Strategy 2: Alternate movies/years endpoint
-    if (list.length === 0) {
-      try {
-        const altUrl = this.config.years.moviesYears();
-        const altResponse = await this.http.get(altUrl, { signal });
-        list = extractYearList(altResponse.data);
-      } catch {
-        // Ignored
-      }
-    }
-
-    // Strategy 3: Admin list endpoint (/admin/years)
-    if (list.length === 0) {
-      try {
-        const adminUrl = this.config.years.adminList();
-        const adminResponse = await this.http.get(adminUrl, { signal });
-        list = extractYearList(adminResponse.data);
-      } catch {
-        // Ignored
-      }
-    }
-
-    // Update in-memory fallback cache with live data if available
+    // Update in-memory fallback cache with fresh live data
     if (list.length > 0) {
-      // Merge unique items by slug/id into fallbackCache
-      const existingSlugs = new Set(list.map((i) => i.slug));
-      const preservedCache = this.fallbackCache.filter((c) => !existingSlugs.has(c.slug));
-      this.fallbackCache = [...list, ...preservedCache];
+      this.fallbackCache = list;
     } else {
       list = [...this.fallbackCache];
     }
 
     // Client-side filtering & pagination guarantee
-    const term = search.toLowerCase().trim();
-    const filtered = list.filter((item) => {
-      const matchSearch =
-        !term || item.name.toLowerCase().includes(term) || item.slug.toLowerCase().includes(term);
-      const matchStatus = status === 'all' ? true : status === 'active' ? item.isActive : !item.isActive;
-      return matchSearch && matchStatus;
-    });
+    let filtered = list;
+    if (status !== 'all') {
+      filtered = filtered.filter((item) => (status === 'active' ? item.isActive : !item.isActive));
+    }
+    if (search) {
+      const term = search.toLowerCase().trim();
+      filtered = filtered.filter(
+        (item) => item.name.toLowerCase().includes(term) || item.slug.toLowerCase().includes(term)
+      );
+    }
 
-    const total = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const total =
+      serverTotal !== undefined && !search && status === 'all' ? serverTotal : filtered.length;
+    const totalPages =
+      serverTotalPages !== undefined && !search && status === 'all'
+        ? serverTotalPages
+        : Math.max(1, Math.ceil(total / limit));
     const safePage = Math.max(1, Math.min(page, totalPages));
-    const startIndex = (safePage - 1) * limit;
+
+    const items =
+      serverTotal !== undefined && !search && status === 'all'
+        ? filtered
+        : filtered.slice((safePage - 1) * limit, safePage * limit);
 
     return {
-      items: filtered.slice(startIndex, startIndex + limit),
+      items,
       total,
       page: safePage,
       limit,
@@ -245,6 +282,7 @@ export class YearAdminService implements IYearAdminService {
 
   /**
    * Creates a new release year. Validates data with Zod before calling API.
+   * Matches POST /api/v1/admin/years specification with trace headers.
    * @param payload Validated input for new year
    * @param signal Optional AbortSignal
    * @returns Newly created YearEntity
@@ -252,18 +290,40 @@ export class YearAdminService implements IYearAdminService {
   async create(payload: CreateYearInput, signal?: AbortSignal): Promise<YearEntity> {
     const validated = createYearSchema.parse(payload);
     const endpoint = this.config.years.create();
+    const requestTrace = generateTraceId();
+
+    const requestBody = {
+      name: validated.name,
+      slug: validated.slug,
+      description: validated.description || '',
+      isActive: Boolean(validated.isActive),
+    };
 
     try {
       const response = await this.http.post(
         endpoint,
+        requestBody,
         {
-          name: validated.name,
-          slug: validated.slug,
-          description: validated.description || '',
-          isActive: validated.isActive,
-        },
-        { signal }
+          signal,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'x-request-trace': requestTrace,
+          },
+        }
       );
+
+      // Check enterprise responseStatus (e.g. responseCode: "000000")
+      if (
+        response.data?.responseStatus &&
+        response.data.responseStatus.responseCode &&
+        response.data.responseStatus.responseCode !== '000000'
+      ) {
+        throw new Error(
+          response.data.responseStatus.responseMessage ||
+          ADMIN_YEAR_CONSTANTS.MESSAGES.CREATE_ERROR
+        );
+      }
 
       // Unpack responseData / data / item
       const record = extractYearRecord(response.data);
@@ -299,26 +359,61 @@ export class YearAdminService implements IYearAdminService {
 
   /**
    * Updates an existing release year with validation and enterprise error normalization.
-   * @param id Entity ID
+   * Matches PUT /api/v1/admin/years/:id specification with trace header and response unwrapping.
+   * @param id Entity ID (MongoDB ObjectId or unique key)
    * @param payload Update data
    * @param signal AbortSignal
    */
   async update(id: string, payload: UpdateYearInput, signal?: AbortSignal): Promise<YearEntity> {
     const validated = updateYearSchema.parse(payload);
     const endpoint = this.config.years.update(id);
+    const requestTrace = generateTraceId();
+
+    const requestBody = {
+      name: validated.name,
+      slug: validated.slug,
+      description: validated.description || '',
+      isActive: Boolean(validated.isActive),
+    };
 
     try {
       let response;
       try {
-        response = await this.http.put(endpoint, validated, { signal });
+        response = await this.http.put(endpoint, requestBody, {
+          signal,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'x-request-trace': requestTrace,
+          },
+        });
       } catch (putErr) {
-        // If backend accepts PATCH instead of PUT, attempt PATCH
+        // If backend accepts PATCH instead of PUT (HTTP 405 Method Not Allowed), fall back to PATCH
         const putError = parseApiError(putErr);
         if (putError.statusCode === 405) {
-          response = await this.http.patch(endpoint, validated, { signal });
+          response = await this.http.patch(endpoint, requestBody, {
+            signal,
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'x-request-trace': requestTrace,
+            },
+          });
         } else {
           throw putErr;
         }
+      }
+
+      // Check enterprise responseStatus (e.g. responseCode: "000000")
+      if (
+        response.data?.responseStatus &&
+        response.data.responseStatus.responseCode &&
+        response.data.responseStatus.responseCode !== '000000'
+      ) {
+        throw new Error(
+          response.data.responseStatus.responseMessage ||
+          ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_ERROR
+        );
       }
 
       const record = extractYearRecord(response.data);
@@ -329,7 +424,14 @@ export class YearAdminService implements IYearAdminService {
         isActive: validated.isActive,
       });
 
-      this.fallbackCache = this.fallbackCache.map((item) => (item.id === id ? { ...item, ...updated } : item));
+      // Ensure id preserves the target id
+      if (!updated.id || updated.id.startsWith('yr-')) {
+        updated.id = id;
+      }
+
+      this.fallbackCache = this.fallbackCache.map((item) =>
+        item.id === id || item.id === updated.id ? { ...item, ...updated } : item
+      );
       return updated;
     } catch (error) {
       const parsedError = parseApiError(error, ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_ERROR);
@@ -343,8 +445,14 @@ export class YearAdminService implements IYearAdminService {
             ...this.fallbackCache[index],
             name: validated.name || this.fallbackCache[index].name,
             slug: validated.slug || this.fallbackCache[index].slug,
-            description: validated.description !== undefined ? validated.description : this.fallbackCache[index].description,
-            isActive: validated.isActive !== undefined ? validated.isActive : this.fallbackCache[index].isActive,
+            description:
+              validated.description !== undefined
+                ? validated.description
+                : this.fallbackCache[index].description,
+            isActive:
+              validated.isActive !== undefined
+                ? validated.isActive
+                : this.fallbackCache[index].isActive,
             updatedAt: new Date().toISOString(),
           };
           this.fallbackCache[index] = updated;
@@ -361,8 +469,16 @@ export class YearAdminService implements IYearAdminService {
    */
   async delete(id: string, signal?: AbortSignal): Promise<boolean> {
     const endpoint = this.config.years.delete(id);
+    const requestTrace = generateTraceId();
+
     try {
-      await this.http.delete(endpoint, { signal });
+      await this.http.delete(endpoint, {
+        signal,
+        headers: {
+          'Accept': 'application/json',
+          'x-request-trace': requestTrace,
+        },
+      });
     } catch {
       // Allow local removal if backend delete is not yet deployed
     }
@@ -374,18 +490,52 @@ export class YearAdminService implements IYearAdminService {
    * Toggles the active status of a release year.
    */
   async toggleStatus(id: string, signal?: AbortSignal): Promise<YearEntity> {
-    const endpoint = this.config.years.toggleStatus(id);
+    const target = this.fallbackCache.find((i) => i.id === id);
+    const newActive = target ? !target.isActive : true;
+    const requestTrace = generateTraceId();
+
+    // Strategy 1: PATCH /admin/years/:id/status
     try {
-      const response = await this.http.patch(endpoint, {}, { signal });
+      const endpoint = this.config.years.toggleStatus(id);
+      const response = await this.http.patch(
+        endpoint,
+        { isActive: newActive },
+        {
+          signal,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'x-request-trace': requestTrace,
+          },
+        }
+      );
       const record = extractYearRecord(response.data);
       const updated = normalizeYearEntity(record);
       this.fallbackCache = this.fallbackCache.map((item) => (item.id === id ? updated : item));
       return updated;
     } catch {
+      // Strategy 2: If PATCH /status fails, update via PUT /admin/years/:id
+      if (target) {
+        try {
+          return await this.update(
+            id,
+            {
+              name: target.name,
+              slug: target.slug,
+              description: target.description,
+              isActive: newActive,
+            },
+            signal
+          );
+        } catch {
+          // Ignored - fall back to local in-memory toggle
+        }
+      }
+
       const index = this.fallbackCache.findIndex((i) => i.id === id);
       if (index !== -1) {
-        const target = this.fallbackCache[index];
-        const updated = { ...target, isActive: !target.isActive, updatedAt: new Date().toISOString() };
+        const item = this.fallbackCache[index];
+        const updated = { ...item, isActive: !item.isActive, updatedAt: new Date().toISOString() };
         this.fallbackCache[index] = updated;
         return updated;
       }

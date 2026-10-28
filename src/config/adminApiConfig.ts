@@ -13,6 +13,8 @@ const stripTrailingSlash = (url: string | undefined | null): string =>
  * Respects NEXT_PUBLIC_CORE_API_URL first, followed by NEXT_PUBLIC_API_URL, and defaults to local.
  */
 export const ADMIN_BASE_API_URL: string = (() => {
+  const adminUrl = stripTrailingSlash(process.env.NEXT_PUBLIC_ADMIN_API_URL);
+  if (adminUrl) return adminUrl;
   const coreUrl = stripTrailingSlash(process.env.NEXT_PUBLIC_CORE_API_URL);
   if (coreUrl) return coreUrl;
   const standardUrl = stripTrailingSlash(process.env.NEXT_PUBLIC_API_URL);
@@ -47,12 +49,12 @@ export function buildQueryUrl(
  */
 export const ADMIN_API_CONFIG_MAP = Object.freeze({
   years: {
-    /** Primary GET /api/v1/years (or GET /api/v1/admin/years) */
+    /** Primary GET /api/v1/years */
     list: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
-      buildQueryUrl(`${ADMIN_BASE_API_URL}/years`, params),
-    /** Alternate GET /api/v1/admin/years */
+      buildQueryUrl(`${ADMIN_BASE_API_URL}/years`, { ...params, _t: Date.now() }),
+    /** Standard GET /api/v1/years alias */
     adminList: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
-      buildQueryUrl(`${ADMIN_BASE_API_URL}/admin/years`, params),
+      buildQueryUrl(`${ADMIN_BASE_API_URL}/years`, { ...params, _t: Date.now() }),
     /** Public GET /api/v1/years */
     publicList: () => `${ADMIN_BASE_API_URL}/years`,
     /** Alternate GET /api/v1/movies/years */

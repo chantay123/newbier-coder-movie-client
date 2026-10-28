@@ -73,8 +73,8 @@ export const endpoints = {
       toggleVisibility: (id: string) => `${API_URL}/admin/movies/${id}/visibility`
     },
     years: {
-      getAll: (page = 1, limit = 10, search?: string) =>
-        buildUrl(`${API_URL}/admin/years`, { page, limit, ...(search ? { search } : {}) }),
+      getAll: (page = 1, limit = 20, search?: string) =>
+        buildUrl(`${API_URL}/years`, { page, limit, ...(search ? { search } : {}) }),
       getPublicAll: () => `${API_URL}/years`,
       getById: (id: string) => `${API_URL}/admin/years/${id}`,
       create: () => `${API_URL}/admin/years`,

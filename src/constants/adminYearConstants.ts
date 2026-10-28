@@ -7,7 +7,7 @@
 export const ADMIN_YEAR_CONSTANTS = Object.freeze({
   PAGINATION: {
     DEFAULT_PAGE: 1,
-    DEFAULT_PAGE_SIZE: 10,
+    DEFAULT_PAGE_SIZE: 20,
     PAGE_SIZE_OPTIONS: [10, 20, 50] as const,
   },
   VALIDATION: {

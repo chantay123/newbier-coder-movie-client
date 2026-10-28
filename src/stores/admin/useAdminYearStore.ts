@@ -114,8 +114,11 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
    * Fetches release years from backend with current filter and pagination state.
    */
   fetchYears: async (service = defaultYearAdminService, signal?: AbortSignal): Promise<void> => {
-    const { searchTerm, statusFilter, currentPage, pageSize } = get();
-    set({ isLoading: true, error: null });
+    const { searchTerm, statusFilter, currentPage, pageSize, years: currentYears } = get();
+    // Only show skeleton loader on initial empty load to prevent UI flickering on refresh
+    if (currentYears.length === 0) {
+      set({ isLoading: true, error: null });
+    }
 
     try {
       const params: YearFilterParams = {
@@ -127,11 +130,26 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
 
       const result = await service.getAll(params, signal);
 
-      const activeCount = result.items.filter((item) => item.isActive).length;
-      const inactiveCount = result.items.length - activeCount;
+      // Protect against read-after-write replication lag:
+      // If a local item was updated more recently than the server's response, preserve the local updated version
+      const currentMap = new Map(get().years.map((y) => [y.id, y]));
+      const reconciledItems = result.items.map((serverItem) => {
+        const localItem = currentMap.get(serverItem.id);
+        if (localItem) {
+          const localTime = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+          const serverTime = serverItem.updatedAt ? new Date(serverItem.updatedAt).getTime() : 0;
+          if (localTime > serverTime) {
+            return { ...serverItem, ...localItem };
+          }
+        }
+        return serverItem;
+      });
+
+      const activeCount = reconciledItems.filter((item) => item.isActive).length;
+      const inactiveCount = reconciledItems.length - activeCount;
 
       set({
-        years: result.items,
+        years: reconciledItems,
         total: result.total,
         totalPages: result.totalPages,
         activeCount,
@@ -200,8 +218,15 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
     try {
       const updated = await service.update(id, payload, signal);
 
+      const entityWithTimestamp: YearEntity = {
+        ...updated,
+        updatedAt: updated.updatedAt || new Date().toISOString(),
+      };
+
       set((state) => {
-        const nextYears = state.years.map((y) => (y.id === id ? updated : y));
+        const nextYears = state.years.map((y) =>
+          y.id === id || y.id === entityWithTimestamp.id ? entityWithTimestamp : y
+        );
         const activeCount = nextYears.filter((y) => y.isActive).length;
         const inactiveCount = nextYears.length - activeCount;
 
@@ -216,8 +241,8 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
         };
       });
 
-      toastNotification.success(ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_SUCCESS(updated.name));
-      return updated;
+      toastNotification.success(ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_SUCCESS(entityWithTimestamp.name));
+      return entityWithTimestamp;
     } catch (err) {
       const parsed = parseApiError(err, ADMIN_YEAR_CONSTANTS.MESSAGES.UPDATE_ERROR);
 

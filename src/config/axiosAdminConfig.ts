@@ -1,7 +1,11 @@
 // src/config/axiosAdminConfig.ts
 import axios from 'axios';
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const baseURL =
+  process.env.NEXT_PUBLIC_ADMIN_API_URL ||
+  process.env.NEXT_PUBLIC_CORE_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://core-movie-service.onrender.com/api/v1';
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -37,6 +41,23 @@ axiosInstance.interceptors.request.use((config) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Ensure x-request-trace distributed tracing header is always populated
+  if (!config.headers['x-request-trace']) {
+    const traceId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    config.headers['x-request-trace'] = traceId;
+  }
+
+  // Ensure Accept & Content-Type
+  if (!config.headers['Accept']) {
+    config.headers['Accept'] = 'application/json';
+  }
+  if (!config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json';
   }
 
   if (config.method === 'patch' || config.method === 'PATCH') {
