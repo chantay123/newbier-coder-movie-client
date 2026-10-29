@@ -63,6 +63,15 @@ export const partialYearUpdateSchema = createYearSchema.partial();
 export type PartialYearUpdateInput = z.infer<typeof partialYearUpdateSchema>;
 
 /**
+ * Validation schema for toggling release year status.
+ * Matches backend PATCH /api/v1/admin/years/:id/status body { isActive: boolean }
+ */
+export const toggleYearStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+export type ToggleYearStatusInput = z.infer<typeof toggleYearStatusSchema>;
+
+/**
  * Domain entity representing a release year in the database.
  */
 export interface YearEntity {

@@ -792,3 +792,12 @@
     transform: rotate(360deg);
   }
 }
+
+
+/* Disabled state for status toggle switch */
+.toggleDisabled,
+.toggleSwitch input:disabled + .toggleSlider {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}

@@ -26,6 +26,7 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
   const totalPages = useAdminYearStore((state) => state.totalPages);
   const isLoading = useAdminYearStore((state) => state.isLoading);
   const isSubmitting = useAdminYearStore((state) => state.isSubmitting);
+  const togglingId = useAdminYearStore((state) => state.togglingId);
   const isCreateModalOpen = useAdminYearStore((state) => state.isCreateModalOpen);
   const isEditModalOpen = useAdminYearStore((state) => state.isEditModalOpen);
   const selectedYear = useAdminYearStore((state) => state.selectedYear);
@@ -81,6 +82,7 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
     totalPages,
     isLoading,
     isSubmitting,
+    togglingId,
     isCreateModalOpen,
     isEditModalOpen,
     selectedYear,
@@ -93,7 +95,13 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
     openEditModal,
     closeEditModal,
     deleteYear: (id: string) => deleteYear(id, service),
-    toggleStatus: (id: string) => toggleStatus(id, service),
+    toggleStatus: async (id: string, targetState?: boolean) => {
+      try {
+        return await toggleStatus(id, targetState, service);
+      } catch {
+        return null;
+      }
+    },
     refresh: handleRefresh,
   };
 }

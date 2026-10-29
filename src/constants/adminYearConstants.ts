@@ -27,6 +27,8 @@ export const ADMIN_YEAR_CONSTANTS = Object.freeze({
     TOGGLE_STATUS_SUCCESS: (yearName: string, isActive: boolean) =>
       `Đã ${isActive ? 'kích hoạt' : 'tạm ẩn'} năm "${yearName}".`,
     TOGGLE_STATUS_ERROR: 'Không thể thay đổi trạng thái năm phát hành.',
+    CONCURRENT_404_ERROR:
+      'Bản ghi năm phát hành này không tồn tại hoặc đang được quản trị viên khác thao tác/thay đổi (404 Not Found). Danh sách đã được tự động làm mới.',
     VALIDATION_NAME_REQUIRED: 'Vui lòng nhập năm phát hành.',
     VALIDATION_NAME_INVALID: 'Năm phát hành phải là số 4 chữ số hợp lệ.',
     VALIDATION_SLUG_REQUIRED: 'Mã định danh (Slug) không được để trống.',
