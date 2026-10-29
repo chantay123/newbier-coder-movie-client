@@ -37,6 +37,7 @@ export interface AdminYearState {
   // UI & Loading States
   isLoading: boolean;
   isSubmitting: boolean;
+  togglingId: string | null;
   error: string | null;
 
   // Modal State
@@ -68,9 +69,10 @@ export interface AdminYearActions {
   ) => Promise<boolean>;
   toggleStatus: (
     id: string,
+    targetState?: boolean,
     service?: IYearAdminService,
     signal?: AbortSignal
-  ) => Promise<YearEntity>;
+  ) => Promise<YearEntity | null>;
 
   // Filters & Pagination
   setSearchTerm: (term: string) => void;
@@ -101,6 +103,7 @@ const initialState: AdminYearState = {
   totalPages: 1,
   isLoading: false,
   isSubmitting: false,
+  togglingId: null,
   error: null,
   isCreateModalOpen: false,
   isEditModalOpen: false,
@@ -299,17 +302,24 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
 
   /**
    * Toggles active/inactive status of a release year.
+   * Employs optimistic UI update with automatic rollback on error.
+   * Provides item-level toggling lock to prevent duplicate submissions.
+   * Handles 404 concurrent modifications with clear, dedicated notification.
    */
   toggleStatus: async (
     id: string,
+    targetState?: boolean,
     service = defaultYearAdminService,
     signal?: AbortSignal
-  ): Promise<YearEntity> => {
+  ): Promise<YearEntity | null> => {
     const previousYears = get().years;
     const target = previousYears.find((y) => y.id === id);
     if (!target) throw new Error('Target year not found');
 
-    const newActiveState = !target.isActive;
+    const newActiveState = targetState !== undefined ? targetState : !target.isActive;
+
+    // Track active toggling item to prevent duplicate submissions & update UI
+    set({ togglingId: id });
 
     // Optimistic UI update
     set((state) => ({
@@ -319,17 +329,58 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
     }));
 
     try {
-      const updated = await service.toggleStatus(id, signal);
-      toastNotification.info(
+      const updated = await service.toggleStatus(id, newActiveState, signal);
+
+      // Reconcile with latest server response
+      set((state) => ({
+        years: state.years.map((y) =>
+          y.id === id ? { ...y, ...updated, isActive: updated.isActive } : y
+        ),
+        togglingId: null,
+      }));
+
+      // Success notification using react-toastify
+      toastNotification.success(
         ADMIN_YEAR_CONSTANTS.MESSAGES.TOGGLE_STATUS_SUCCESS(updated.name, updated.isActive)
       );
+
       return updated;
     } catch (err) {
-      // Revert optimistic update on failure
-      set({ years: previousYears });
       const parsed = parseApiError(err, ADMIN_YEAR_CONSTANTS.MESSAGES.TOGGLE_STATUS_ERROR);
-      toastNotification.error(parsed.message);
-      throw parsed;
+
+      // Special handling for HTTP 404:
+      // When 2 admins modify the same item concurrently and the item is deleted/missing on the server,
+      // purge the ghost item from the store and notify the admin with an explicit message.
+      if (parsed.statusCode === 404 || parsed.code === 'NOT_FOUND') {
+        set((state) => {
+          const nextYears = state.years.filter((y) => y.id !== id);
+          const activeCount = nextYears.filter((y) => y.isActive).length;
+          const inactiveCount = nextYears.length - activeCount;
+          return {
+            years: nextYears,
+            total: Math.max(0, state.total - 1),
+            activeCount,
+            inactiveCount,
+            togglingId: null,
+            error: ADMIN_YEAR_CONSTANTS.MESSAGES.CONCURRENT_404_ERROR,
+          };
+        });
+
+        toastNotification.error(ADMIN_YEAR_CONSTANTS.MESSAGES.CONCURRENT_404_ERROR);
+      } else {
+        // Revert optimistic update for other failures
+        set({ years: previousYears, togglingId: null, error: parsed.message });
+
+        if (parsed.statusCode === 401) {
+          toastNotification.error(ADMIN_YEAR_CONSTANTS.MESSAGES.UNAUTHORIZED_ERROR);
+        } else if (parsed.statusCode === 403) {
+          toastNotification.error(ADMIN_YEAR_CONSTANTS.MESSAGES.FORBIDDEN_ERROR);
+        } else {
+          toastNotification.error(parsed.message || ADMIN_YEAR_CONSTANTS.MESSAGES.TOGGLE_STATUS_ERROR);
+        }
+      }
+
+      return null;
     }
   },
 

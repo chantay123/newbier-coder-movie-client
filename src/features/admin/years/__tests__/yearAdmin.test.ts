@@ -131,6 +131,52 @@ describe('Admin Year Feature Unit Tests', () => {
       expect(res.items.length).toBe(1);
       expect(res.items[0].name).toBe('2026');
     });
+
+    it('should toggle year status via PATCH /admin/years/:id/status', async () => {
+      const mockPatch = jest.fn().mockResolvedValue({
+        data: {
+          data: {
+            id: 'yr-2026',
+            name: '2026',
+            slug: '2026',
+            isActive: false,
+          },
+        },
+      });
+
+      const mockHttp = {
+        patch: mockPatch,
+      } as unknown as AxiosInstance;
+
+      const service = new YearAdminService(mockHttp);
+      const updated = await service.toggleStatus('yr-2026', false);
+
+      expect(mockPatch).toHaveBeenCalledWith(
+        expect.stringContaining('/admin/years/yr-2026/status'),
+        { isActive: false },
+        expect.any(Object)
+      );
+      expect(updated.isActive).toBe(false);
+    });
+
+    it('should throw 404 error when another admin modified/deleted item concurrently', async () => {
+      const mockPatch = jest.fn().mockRejectedValue({
+        isAxiosError: true,
+        response: {
+          status: 404,
+          data: { message: 'Year record not found' },
+        },
+      });
+
+      const mockHttp = {
+        patch: mockPatch,
+      } as unknown as AxiosInstance;
+
+      const service = new YearAdminService(mockHttp);
+      await expect(service.toggleStatus('yr-nonexistent', true)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+    });
   });
 
   describe('Admin Zustand Store: useAdminYearStore', () => {
@@ -237,6 +283,55 @@ describe('Admin Year Feature Unit Tests', () => {
       const state = useAdminYearStore.getState();
       expect(state.years.find((y) => y.id === 'yr-ghost')).toBeUndefined();
       expect(state.total).toBe(0);
+    });
+
+    it('should handle concurrent 404 error during toggleStatus: purge item and update counts', async () => {
+      useAdminYearStore.setState({
+        years: [
+          { id: 'yr-concurrent', name: '2023', slug: '2023', description: '', isActive: true, movieCount: 1 },
+          { id: 'yr-keep', name: '2024', slug: '2024', description: '', isActive: true, movieCount: 2 },
+        ],
+        total: 2,
+        activeCount: 2,
+        inactiveCount: 0,
+      });
+
+      const mockService = {
+        toggleStatus: jest.fn().mockRejectedValue({
+          isAxiosError: true,
+          response: {
+            status: 404,
+            data: { message: 'Entity not found' },
+          },
+        }),
+      } as any;
+
+      const result = await useAdminYearStore.getState().toggleStatus('yr-concurrent', false, mockService);
+      expect(result).toBeNull();
+
+      const state = useAdminYearStore.getState();
+      // Concurrent 404 purged yr-concurrent
+      expect(state.years.find((y) => y.id === 'yr-concurrent')).toBeUndefined();
+      expect(state.years.find((y) => y.id === 'yr-keep')).toBeDefined();
+      expect(state.total).toBe(1);
+      expect(state.activeCount).toBe(1);
+      expect(state.togglingId).toBeNull();
+    });
+  });
+
+  describe('YearClientService: Filter inactive years for client navbar and filter', () => {
+    it('should strictly exclude inactive years from public list', async () => {
+      const { YearClientService } = await import('@/features/client/years/services/yearClientService');
+      const service = new YearClientService();
+      const activeYears = await service.getActiveYears();
+
+      // Ensure every single item returned is active
+      const hasInactive = activeYears.some((y) => y.isActive === false);
+      expect(hasInactive).toBe(false);
+
+      // Verify yr-2018 (which has isActive: false in INITIAL_YEARS) is excluded
+      const yr2018 = activeYears.find((y) => y.slug === '2018' || y.name === '2018');
+      expect(yr2018).toBeUndefined();
     });
   });
 });

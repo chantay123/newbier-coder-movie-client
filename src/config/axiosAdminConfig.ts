@@ -60,14 +60,8 @@ axiosInstance.interceptors.request.use((config) => {
     config.headers['Content-Type'] = 'application/json';
   }
 
-  if (config.method === 'patch' || config.method === 'PATCH') {
-    config.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
-    config.headers['Access-Control-Allow-Origin'] = '*';
-  }
-
   return config;
 }, (error) => {
-
   return Promise.reject(error);
 });
 
@@ -80,17 +74,10 @@ axiosInstance.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const url = error.config?.url || '<unknown>';
       const method = (error.config?.method || 'get').toUpperCase();
-      // eslint-disable-next-line no-console
-
-      // Theo yêu cầu #9: KHÔNG tự động xóa token/redirect login khi lỗi
-      // có thể do endpoint public, lỗi mạng, hoặc token hết hạn cần refresh.
-      // Để AuthContext (useAuth) quyết định khi nào cần logout dựa trên
-      // trạng thái session tổng thể.
     }
 
     if (error.response && error.response.status === 403) {
-      // eslint-disable-next-line no-console
-
+      // Forbidden
     }
 
     return Promise.reject(error);

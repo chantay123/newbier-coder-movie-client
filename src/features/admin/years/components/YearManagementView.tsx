@@ -52,6 +52,7 @@ export default function YearManagementView({
     pageSize,
     totalPages,
     isLoading,
+    togglingId,
     isCreateModalOpen,
     isEditModalOpen,
     selectedYear,
@@ -78,6 +79,14 @@ export default function YearManagementView({
     if (!yearToDelete) return;
     await deleteYear(yearToDelete.id);
     setYearToDelete(null);
+  };
+
+  const handleToggleStatus = async (id: string, targetState: boolean) => {
+    try {
+      await toggleStatus(id, targetState);
+    } catch {
+      // Error notifications are handled centrally in the Zustand store
+    }
   };
 
   return (
@@ -288,11 +297,25 @@ export default function YearManagementView({
                         {/* Status Toggle Switch */}
                         <td>
                           <div className={styles.statusCell}>
-                            <label className={styles.toggleSwitch}>
+                            <label
+                              className={`${styles.toggleSwitch} ${
+                                togglingId === item.id ? styles.toggleDisabled : ''
+                              }`}
+                              title={
+                                togglingId === item.id
+                                  ? 'Đang cập nhật trạng thái...'
+                                  : item.isActive
+                                  ? `Nhấn để tạm ẩn năm ${item.name}`
+                                  : `Nhấn để kích hoạt năm ${item.name}`
+                              }
+                            >
                               <input
                                 type="checkbox"
+                                role="switch"
+                                aria-checked={item.isActive}
                                 checked={item.isActive}
-                                onChange={() => toggleStatus(item.id)}
+                                disabled={togglingId === item.id}
+                                onChange={() => handleToggleStatus(item.id, !item.isActive)}
                                 aria-label={`Thay đổi trạng thái kích hoạt năm ${item.name}`}
                               />
                               <span className={styles.toggleSlider}></span>
@@ -302,7 +325,11 @@ export default function YearManagementView({
                                 item.isActive ? styles.statusActive : styles.statusInactive
                               }`}
                             >
-                              {item.isActive ? 'Kích hoạt' : 'Tạm ẩn'}
+                              {togglingId === item.id
+                                ? 'Đang lưu...'
+                                : item.isActive
+                                ? 'Kích hoạt'
+                                : 'Tạm ẩn'}
                             </span>
                           </div>
                         </td>

@@ -23,7 +23,7 @@ interface DropdownNavItem {
   id: string;
   label: string;
   type: 'dropdown';
-  dropdownType: 'genres' | 'countries';
+  dropdownType: 'genres' | 'countries' | 'years';
   items: TaxonomyNavItem[];
   matchPrefix?: string;
 }
@@ -113,6 +113,14 @@ export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
     dropdownType: 'countries',
     items: COUNTRY_NAV_ITEMS,
     matchPrefix: '/country'
+  },
+  {
+    id: 'nam-phat-hanh',
+    label: 'Năm',
+    type: 'dropdown',
+    dropdownType: 'years',
+    items: [],
+    matchPrefix: '/search'
   },
   {
     id: 'dien-vien',

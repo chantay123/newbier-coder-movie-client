@@ -39,6 +39,7 @@ const movieService = movieServiceRaw as unknown as {
 };
 import { LOCAL_DEFAULT_POSTER } from '@/config/movieFallbackConfig';
 import { TMDB_CONFIG } from '@/config/systemConfig';
+import { useClientYears } from '@/features/client/years/hooks/useClientYears';
 import {
   MAIN_NAV_ITEMS,
   USER_NAV_ITEMS,
@@ -82,7 +83,7 @@ interface NavItemBase {
   href?: string;
   matchExact?: boolean;
   matchPrefix?: string;
-  dropdownType?: 'genres' | 'countries';
+  dropdownType?: 'genres' | 'countries' | 'years';
   items?: NavSubItem[];
 }
 
@@ -228,9 +229,12 @@ const Navbar: React.FC = () => {
   // Navigation Dropdown States
   const [showGenresDropdown, setShowGenresDropdown] = useState<boolean>(false);
   const [showCountriesDropdown, setShowCountriesDropdown] = useState<boolean>(false);
-  const [lockedDropdown, setLockedDropdown] = useState<'genres' | 'countries' | null>(null);
+  const [showYearsDropdown, setShowYearsDropdown] = useState<boolean>(false);
+  const [lockedDropdown, setLockedDropdown] = useState<'genres' | 'countries' | 'years' | null>(null);
   const [mobileGenresOpen, setMobileGenresOpen] = useState<boolean>(false);
   const [mobileCountriesOpen, setMobileCountriesOpen] = useState<boolean>(false);
+  const [mobileYearsOpen, setMobileYearsOpen] = useState<boolean>(false);
+  const { activeYears } = useClientYears();
   const dropdownCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Dual Search Dropdown States
@@ -281,6 +285,7 @@ const Navbar: React.FC = () => {
   const mobileSearchWrapperRef = useRef<HTMLDivElement | null>(null);
   const genresDropdownRef = useRef<HTMLLIElement | null>(null);
   const countriesDropdownRef = useRef<HTMLLIElement | null>(null);
+  const yearsDropdownRef = useRef<HTMLLIElement | null>(null);
   const feedbackRef = useRef<HTMLDivElement | null>(null);
   const navRef = useRef<HTMLUListElement | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -299,8 +304,18 @@ const Navbar: React.FC = () => {
 
   const isGenreActive = (): boolean => router.pathname.startsWith('/genre');
   const isCountryActive = (): boolean => router.pathname.startsWith('/country');
+  const isYearActive = (): boolean => Boolean(router.query.year);
 
-  const handleDropdownMouseEnter = (type: 'genres' | 'countries'): void => {
+  const handleDropdownMouseEnter = (type: 'genres' | 'countries' | 'years'): void => {
+    if (dropdownCloseTimeoutRef.current) {
+      clearTimeout(dropdownCloseTimeoutRef.current);
+    }
+    setShowGenresDropdown(type === 'genres');
+    setShowCountriesDropdown(type === 'countries');
+    setShowYearsDropdown(type === 'years');
+  };
+
+  const _unusedOldLeave1 = (type?: string): void => {
     if (dropdownCloseTimeoutRef.current) {
       clearTimeout(dropdownCloseTimeoutRef.current);
     }
@@ -313,7 +328,23 @@ const Navbar: React.FC = () => {
     }
   };
 
-  const handleDropdownMouseLeave = (type: 'genres' | 'countries'): void => {
+  const handleDropdownMouseLeave = (type: 'genres' | 'countries' | 'years'): void => {
+    if (lockedDropdown === type) return;
+    if (dropdownCloseTimeoutRef.current) {
+      clearTimeout(dropdownCloseTimeoutRef.current);
+    }
+    dropdownCloseTimeoutRef.current = setTimeout(() => {
+      if (type === 'genres') {
+        setShowGenresDropdown(false);
+      } else if (type === 'countries') {
+        setShowCountriesDropdown(false);
+      } else if (type === 'years') {
+        setShowYearsDropdown(false);
+      }
+    }, 380);
+  };
+
+  const _unusedOldLeave2 = (type?: string): void => {
     if (lockedDropdown === type) return;
     if (dropdownCloseTimeoutRef.current) {
       clearTimeout(dropdownCloseTimeoutRef.current);
@@ -327,7 +358,24 @@ const Navbar: React.FC = () => {
     }, 380);
   };
 
-  const handleDropdownClick = (type: 'genres' | 'countries'): void => {
+  const handleDropdownClick = (type: 'genres' | 'countries' | 'years'): void => {
+    if (dropdownCloseTimeoutRef.current) {
+      clearTimeout(dropdownCloseTimeoutRef.current);
+    }
+    if (lockedDropdown === type) {
+      setLockedDropdown(null);
+      setShowGenresDropdown(false);
+      setShowCountriesDropdown(false);
+      setShowYearsDropdown(false);
+    } else {
+      setLockedDropdown(type);
+      setShowGenresDropdown(type === 'genres');
+      setShowCountriesDropdown(type === 'countries');
+      setShowYearsDropdown(type === 'years');
+    }
+  };
+
+  const _unusedOldClick = (type: 'genres' | 'countries' = 'genres'): void => {
     if (dropdownCloseTimeoutRef.current) {
       clearTimeout(dropdownCloseTimeoutRef.current);
     }
@@ -864,23 +912,62 @@ const Navbar: React.FC = () => {
             {MAIN_NAV_ITEMS.map((navItem: NavItemBase) => {
               if (navItem.type === 'dropdown') {
                 const isGenres = navItem.dropdownType === 'genres';
-                const isOpen = isGenres ? showGenresDropdown : showCountriesDropdown;
-                const ref = isGenres ? genresDropdownRef : countriesDropdownRef;
+                const isCountries = navItem.dropdownType === 'countries';
+                const isYears = navItem.dropdownType === 'years';
+                const isOpen = isGenres
+                  ? showGenresDropdown
+                  : isCountries
+                  ? showCountriesDropdown
+                  : showYearsDropdown;
+                const ref = isGenres
+                  ? genresDropdownRef
+                  : isCountries
+                  ? countriesDropdownRef
+                  : yearsDropdownRef;
                 const isLocked = lockedDropdown === navItem.dropdownType;
-                const active = (navItem.matchPrefix ? router.pathname.startsWith(navItem.matchPrefix) : false) || isLocked;
+
+                const active =
+                  (navItem.matchPrefix ? router.pathname.startsWith(navItem.matchPrefix) : false) ||
+                  isLocked ||
+                  (isYears && isYearActive());
+
+                // Strictly filter out inactive years for client rendering
+                const subItems: NavSubItem[] = isYears
+                  ? activeYears
+                      .filter((y) => y.isActive !== false)
+                      .map((y) => ({
+                        slug: y.slug,
+                        name: y.name,
+                        href: `/search?year=${encodeURIComponent(y.name)}`,
+                      }))
+                  : navItem.items || [];
+                const popoverClass = isGenres
+                  ? 'genres-popover'
+                  : isCountries
+                  ? 'countries-popover'
+                  : 'years-popover';
+                const gridClass = isGenres
+                  ? 'genres-grid'
+                  : isCountries
+                  ? 'countries-grid'
+                  : 'years-grid';
+                // Active navigation item rendered below
+
+
+
 
                 return (
                   <li
                     key={navItem.id}
                     className={`nav-item dropdown-wrapper ${active ? 'active' : ''}`}
                     ref={ref}
-                    onMouseEnter={() => handleDropdownMouseEnter(navItem.dropdownType as 'genres' | 'countries')}
-                    onMouseLeave={() => handleDropdownMouseLeave(navItem.dropdownType as 'genres' | 'countries')}
+                    onMouseEnter={() => handleDropdownMouseEnter(navItem.dropdownType as 'genres' | 'countries' | 'years')}
+                    onMouseLeave={() => handleDropdownMouseLeave(navItem.dropdownType as 'genres' | 'countries' | 'years')}
                   >
                     <button
                       type="button"
                       className={`nav-link nav-link-btn ${active ? 'active' : ''}`}
-                      onClick={() => handleDropdownClick(navItem.dropdownType as 'genres' | 'countries')}
+                      onClick={() => handleDropdownClick(navItem.dropdownType as 'genres' | 'countries' | 'years')}
                       aria-expanded={isOpen}
                     >
                       <span>{navItem.label}</span>
@@ -888,9 +975,9 @@ const Navbar: React.FC = () => {
                     </button>
 
                     {isOpen && (
-                      <div className={`custom-dropdown-popover ${isGenres ? 'genres-popover' : 'countries-popover'} animate-fade-in d-none d-lg-block`}>
-                        <div className={isGenres ? 'genres-grid' : 'countries-grid'}>
-                          {(navItem.items || []).map((subItem) => (
+                      <div className={`custom-dropdown-popover ${popoverClass} animate-fade-in d-none d-lg-block`}>
+                        <div className={gridClass}>
+                          {subItems.map((subItem) => (
                             <Link
                               key={subItem.slug}
                               href={subItem.href}
@@ -898,6 +985,7 @@ const Navbar: React.FC = () => {
                               onClick={() => {
                                 setShowGenresDropdown(false);
                                 setShowCountriesDropdown(false);
+                                setShowYearsDropdown(false);
                                 setLockedDropdown(null);
                               }}
                             >
@@ -913,7 +1001,7 @@ const Navbar: React.FC = () => {
                     <div className="d-lg-none">
                       {isOpen && (
                         <div className="mobile-submenu">
-                          {(navItem.items || []).map((subItem) => (
+                          {subItems.map((subItem) => (
                             <Link
                               key={subItem.slug}
                               href={subItem.href}
@@ -1275,6 +1363,19 @@ const Navbar: React.FC = () => {
           gap: 4px 8px;
         }
 
+        .years-popover {
+          width: 360px;
+          max-width: calc(100vw - 32px);
+          left: 50%;
+          transform: translateX(-50%);
+        }
+
+        .years-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 6px 8px;
+        }
+
         .countries-popover {
           width: 520px;
           max-width: calc(100vw - 32px);
@@ -1286,6 +1387,19 @@ const Navbar: React.FC = () => {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 4px 8px;
+        }
+
+        .years-popover {
+          width: 360px;
+          max-width: calc(100vw - 32px);
+          left: 50%;
+          transform: translateX(-50%);
+        }
+
+        .years-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 6px 8px;
         }
 
         .dropdown-grid-link {

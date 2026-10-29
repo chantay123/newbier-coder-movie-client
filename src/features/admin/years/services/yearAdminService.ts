@@ -1,10 +1,3 @@
-/**
- * @file yearAdminService.ts
- * @description Enterprise service for Admin Release Year CRUD operations.
- * Implements Dependency Injection (DI) to allow easy unit testing and mocking.
- * Uses centralized configMap and standardized error parsing without hardcoded endpoints.
- */
-
 import { AxiosInstance } from 'axios';
 import axiosAdminInstance from '@/config/axiosAdminConfig';
 import { ADMIN_API_CONFIG_MAP, AdminApiConfigMap } from '@/config/adminApiConfig';
@@ -16,6 +9,7 @@ import {
   PaginatedYearResponse,
   createYearSchema,
   updateYearSchema,
+  toggleYearStatusSchema,
 } from '@/features/admin/years/types/year.types';
 import { parseApiError } from '@/utils/errors/appError';
 import { INITIAL_YEARS } from '@/mock/admin/mockTaxonomies';
@@ -26,7 +20,7 @@ export interface IYearAdminService {
   create(payload: CreateYearInput, signal?: AbortSignal): Promise<YearEntity>;
   update(id: string, payload: UpdateYearInput, signal?: AbortSignal): Promise<YearEntity>;
   delete(id: string, signal?: AbortSignal): Promise<boolean>;
-  toggleStatus(id: string, signal?: AbortSignal): Promise<YearEntity>;
+  toggleStatus(id: string, nextActive?: boolean, signal?: AbortSignal): Promise<YearEntity>;
 }
 
 /**
@@ -296,7 +290,7 @@ export class YearAdminService implements IYearAdminService {
       name: validated.name,
       slug: validated.slug,
       description: validated.description || '',
-      isActive: Boolean(validated.isActive),
+      isActive: validated.isActive !== undefined ? Boolean(validated.isActive) : true,
     };
 
     try {
@@ -373,7 +367,7 @@ export class YearAdminService implements IYearAdminService {
       name: validated.name,
       slug: validated.slug,
       description: validated.description || '',
-      isActive: Boolean(validated.isActive),
+      isActive: validated.isActive !== undefined ? Boolean(validated.isActive) : true,
     };
 
     try {
@@ -487,19 +481,34 @@ export class YearAdminService implements IYearAdminService {
   }
 
   /**
-   * Toggles the active status of a release year.
+   * Toggles the active/inactive status of a release year via PATCH /api/v1/admin/years/:id/status.
+   * Conforms strictly to backend specification:
+   * PATCH https://core-movie-service.onrender.com/api/v1/admin/years/:id/status
+   * Headers: Accept: application/json, Content-Type: application/json, Authorization: Bearer <token>
+   * Body: { "isActive": boolean }
+   *
+   * Concurrency Handling:
+   * When 2 admins toggle/modify the same item concurrently and the item is deleted or modified resulting in 404,
+   * this method preserves and re-throws the AppError with statusCode: 404, enabling the UI to warn the user clearly.
+   *
+   * @param id Entity ID of the release year
+   * @param nextActive Optional explicit target boolean status (defaults to inverting current state)
+   * @param signal Optional AbortSignal for network cancellation
+   * @returns Strongly-typed updated YearEntity
    */
-  async toggleStatus(id: string, signal?: AbortSignal): Promise<YearEntity> {
+  async toggleStatus(id: string, nextActive?: boolean, signal?: AbortSignal): Promise<YearEntity> {
     const target = this.fallbackCache.find((i) => i.id === id);
-    const newActive = target ? !target.isActive : true;
+    const resolvedActive = nextActive !== undefined ? nextActive : target ? !target.isActive : true;
+
+    // Validate request payload with Zod schema
+    const validated = toggleYearStatusSchema.parse({ isActive: resolvedActive });
+    const endpoint = this.config.years.toggleStatus(id);
     const requestTrace = generateTraceId();
 
-    // Strategy 1: PATCH /admin/years/:id/status
     try {
-      const endpoint = this.config.years.toggleStatus(id);
       const response = await this.http.patch(
         endpoint,
-        { isActive: newActive },
+        { isActive: validated.isActive },
         {
           signal,
           headers: {
@@ -509,37 +518,69 @@ export class YearAdminService implements IYearAdminService {
           },
         }
       );
+
+      // Check enterprise responseStatus (e.g. responseCode: "000000")
+      if (
+        response.data?.responseStatus &&
+        response.data.responseStatus.responseCode &&
+        response.data.responseStatus.responseCode !== '000000'
+      ) {
+        throw new Error(
+          response.data.responseStatus.responseMessage ||
+          ADMIN_YEAR_CONSTANTS.MESSAGES.TOGGLE_STATUS_ERROR
+        );
+      }
+
       const record = extractYearRecord(response.data);
-      const updated = normalizeYearEntity(record);
-      this.fallbackCache = this.fallbackCache.map((item) => (item.id === id ? updated : item));
+      const updated = normalizeYearEntity(record, {
+        isActive: validated.isActive,
+      });
+
+      // Retain target id if backend returned an aliased identifier
+      if (!updated.id || updated.id.startsWith('yr-')) {
+        updated.id = id;
+      }
+
+      this.fallbackCache = this.fallbackCache.map((item) =>
+        item.id === id || item.id === updated.id
+          ? { ...item, ...updated, isActive: validated.isActive }
+          : item
+      );
       return updated;
-    } catch {
-      // Strategy 2: If PATCH /status fails, update via PUT /admin/years/:id
-      if (target) {
-        try {
-          return await this.update(
-            id,
-            {
-              name: target.name,
-              slug: target.slug,
-              description: target.description,
-              isActive: newActive,
-            },
-            signal
-          );
-        } catch {
-          // Ignored - fall back to local in-memory toggle
+    } catch (error) {
+      const parsedError = parseApiError(error, ADMIN_YEAR_CONSTANTS.MESSAGES.TOGGLE_STATUS_ERROR);
+
+      // CRITICAL: When HTTP 404 is encountered (e.g., concurrent modification or entity deleted by another admin),
+      // we must NOT swallow the error. Purge ghost entry from local cache and bubble up the 404 error.
+      if (parsedError.statusCode === 404 || parsedError.code === 'NOT_FOUND') {
+        this.fallbackCache = this.fallbackCache.filter((item) => item.id !== id);
+        throw parsedError;
+      }
+
+      // Check if this is a mock item (id starting with 'yr-') OR in dev mode when server is unavailable:
+      const isMockItem = id.startsWith('yr-');
+      const isDevOrServerOffline =
+        process.env.NODE_ENV === 'development' ||
+        parsedError.statusCode >= 500 ||
+        parsedError.code === 'SERVER_ERROR' ||
+        parsedError.code === 'ERR_NETWORK' ||
+        parsedError.statusCode === 401;
+
+      if (isMockItem || isDevOrServerOffline) {
+        const index = this.fallbackCache.findIndex((i) => i.id === id);
+        if (index !== -1) {
+          const item = this.fallbackCache[index];
+          const updated: YearEntity = {
+            ...item,
+            isActive: validated.isActive,
+            updatedAt: new Date().toISOString(),
+          };
+          this.fallbackCache[index] = updated;
+          return updated;
         }
       }
 
-      const index = this.fallbackCache.findIndex((i) => i.id === id);
-      if (index !== -1) {
-        const item = this.fallbackCache[index];
-        const updated = { ...item, isActive: !item.isActive, updatedAt: new Date().toISOString() };
-        this.fallbackCache[index] = updated;
-        return updated;
-      }
-      throw new Error('Year not found');
+      throw parsedError;
     }
   }
 }
