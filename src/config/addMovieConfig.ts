@@ -202,7 +202,7 @@ export const POPULAR_ACTORS: string[] = [
   'IU (Lee Ji-eun)'
 ];
 
-// 13. Preset Showtimes (Lịch chiếu phim phổ biến từ hệ thống)
+// 13. The preset showtimes, the popular broadcast slots of the system.
 export interface ShowtimeTemplate {
   id: string;
   text: string;
@@ -221,7 +221,7 @@ export const PRESET_SHOWTIME_TEMPLATES: ShowtimeTemplate[] = [
 
 export const PRESET_SHOWTIMES: string[] = PRESET_SHOWTIME_TEMPLATES.map(t => t.text);
 
-// 14. Preset Release Description Templates (Mô tả thời điểm ra mắt dự kiến)
+// 14. The preset release description templates, for the planned release date.
 export interface ReleaseDescTemplate {
   id: string;
   text: string;

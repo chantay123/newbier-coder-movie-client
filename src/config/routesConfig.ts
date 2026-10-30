@@ -1,10 +1,9 @@
 /**
- * @file routesConfig.ts
- * @description Tập trung khai báo các route và cấu hình tính năng theo route.
+ * The central declaration of the routes and of the feature flags per route.
  */
 
 /**
- * Khai báo route tiêu chuẩn của ứng dụng.
+ * The standard routes of the application.
  */
 export const ROUTES = {
   HOME: '/',
@@ -26,7 +25,8 @@ export const ROUTES = {
 } as const;
 
 /**
- * Các route hiển thị full-bleed cinematic hero banner, không có padding đầu trang mặc định.
+ * The routes that show a full-bleed cinematic hero banner, without the
+ * default top padding.
  */
 export const FULL_BLEED_ROUTES: readonly string[] = [
   ROUTES.HOME,
@@ -34,10 +34,10 @@ export const FULL_BLEED_ROUTES: readonly string[] = [
 ];
 
 /**
- * Kiểm tra một pathname có nên render full-bleed hay không.
+ * Tells whether a pathname has to be rendered as full-bleed.
  *
- * @param pathname Đường dẫn hiện tại (ví dụ '/' hoặc '/movie/batman')
- * @returns True nếu route có hero banner full-bleed
+ * @param pathname - The current path, for example "/" or "/movie/batman".
+ * @returns `true` when the route has a full-bleed hero banner.
  */
 export const isFullBleedRoute = (pathname: string | null | undefined): boolean => {
   if (!pathname) return false;
@@ -45,7 +45,7 @@ export const isFullBleedRoute = (pathname: string | null | undefined): boolean =
 };
 
 /**
- * Các route mặc định không hiển thị quảng cáo banner.
+ * The routes that do not show a banner advertisement by default.
  */
 export const DEFAULT_AD_EXCLUDED_PATHS: readonly string[] = [
   ROUTES.AUTH_PREFIX,
@@ -62,10 +62,11 @@ export const DEFAULT_AD_EXCLUDED_PATHS: readonly string[] = [
 ];
 
 /**
- * Lấy danh sách route cần ẩn quảng cáo.
- * Ưu tiên cấu hình từ biến môi trường trên cấu hình mặc định.
+ * Returns the list of routes where the advertisement has to be hidden.
  *
- * @returns Mảng các route prefix cần loại khỏi quảng cáo
+ * The environment variable takes priority over the default configuration.
+ *
+ * @returns The route prefixes that are excluded from the advertisements.
  */
 export const getAdExcludedPaths = (): string[] => {
   const envConfig = process.env.NEXT_PUBLIC_AD_EXCLUDED_PATHS;
@@ -79,11 +80,13 @@ export const getAdExcludedPaths = (): string[] => {
 };
 
 /**
- * Kiểm tra xem quảng cáo có nên hiển thị cho pathname hiện tại không.
+ * Tells whether the advertisement can be shown on the current path.
  *
- * @param pathname Đường dẫn hiện tại (ví dụ '/admin/dashboard')
- * @param hideHomepageAds Cờ từ AdContext để ẩn quảng cáo trang chủ
- * @returns True nếu quảng cáo được phép hiển thị, False nếu cần ẩn
+ * @param pathname - The current path, for example "/admin/dashboard".
+ * @param hideHomepageAds - The flag sent by `AdContext` to hide the
+ *                          advertisements of the home page.
+ * @returns `true` when the advertisement is allowed, `false` when it has
+ *          to be hidden.
  */
 export const isAdVisibleForPath = (pathname: string | null | undefined, hideHomepageAds: boolean): boolean => {
   if (hideHomepageAds) return false;

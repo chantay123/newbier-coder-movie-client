@@ -1,25 +1,33 @@
 /**
- * @file homeSectionsConfig.ts
- * @description Hệ thống đăng ký Section và chiến lược Fallback cho trang chủ.
- * Gom các layout orders, props tuỳ chỉnh, nhãn text và thời điểm load cho từng section.
+ * The registry of the home page sections and of their fallback strategy.
+ *
+ * The file gathers the layout order, the custom props, the UI labels and
+ * the load moment of every section.
  *
  * ARCHITECTURE - BATCHED SEQUENTIAL LOADING:
- * - Mỗi section khai báo `loadAfterScroll`.
- * - `loadAfterScroll: false`: Tải cùng batch với section trước đó.
- * - `loadAfterScroll: true`: Điểm dừng - chờ user scroll tới mới load.
- * - `BATCH_LOADING_CONFIG.delayMs`: Thời gian chờ (mặc định 2000ms) với spinner trước khi reveal batch.
+ * - Every section declares `loadAfterScroll`.
+ * - `loadAfterScroll: false`: the section loads in the same batch as the
+ *   previous one.
+ * - `loadAfterScroll: true`: it is a stop point, the section only loads
+ *   when the user scrolls to it.
+ * - `BATCH_LOADING_CONFIG.delayMs`: the waiting time (2000ms by default)
+ *   with a spinner before a batch is revealed.
  */
 
 import movieService from '@/API/services/movieService';
 import { SYSTEM_CONFIG } from './systemConfig';
 
-/** Thời gian chờ mặc định (ms) trước khi reveal batch khi scroll breakpoint.
- * Giảm từ 2000ms xuống 1200ms để cải thiện perceived performance. */
+/**
+ * The default waiting time (ms) before a batch is revealed when the scroll
+ * breakpoint is reached.
+ *
+ * It was reduced from 2000ms to 1200ms to improve the perceived performance.
+ */
 export const BATCH_LOADING_CONFIG = {
   delayMs: 1200
 } as const;
 
-/** Dictionary ngôn ngữ UI. */
+/** The dictionary of the UI labels. */
 export const HOME_I18N = {
   vi: {
     heroTitle: 'Phim Nổi Bật',
@@ -72,23 +80,28 @@ export const HOME_I18N = {
 export type LocaleKey = keyof typeof HOME_I18N;
 type Locale = typeof HOME_I18N[LocaleKey];
 
-/** Ngôn ngữ hiện tại, đồng bộ với SYSTEM_CONFIG */
+/** The current language. It is kept in sync with `SYSTEM_CONFIG`. */
 export const CURRENT_LOCALE = (SYSTEM_CONFIG.locale || 'vi') as LocaleKey;
 
-/** Hàm dịch theo key i18n */
+/**
+ * Translates a UI label.
+ *
+ * @param key - The key of the label inside the locale dictionary.
+ * @returns The translated text, or the key itself when it is missing.
+ */
 export const t = (key: keyof Locale): string => HOME_I18N[CURRENT_LOCALE]?.[key] || key;
 
-/** Loại card size hỗ trợ */
+/** The supported card sizes. */
 export type CardSize = 'sm' | 'md' | 'lg';
 
-/** Hàm loader của section */
+/** The loader function of a section. */
 export type SectionLoader = (
   mock?: unknown[],
   page?: number,
   limit?: number
 ) => Promise<unknown[]>;
 
-/** Options tuỳ chỉnh cho mỗi section */
+/** The custom options of a section. */
 export interface SectionOverrides {
   id: string;
   enabled?: boolean;
@@ -109,7 +122,7 @@ export interface SectionOverrides {
   defaultCategory?: string;
 }
 
-/** Item rail cho section country */
+/** A rail item of the country section. */
 export interface RailItem {
   id: string;
   countrySlug?: string;
@@ -121,7 +134,7 @@ export interface RailItem {
   load: (fallback?: unknown[]) => Promise<unknown[]>;
 }
 
-/** Section đầy đủ */
+/** A complete section. */
 export interface HomeSection {
   id: string;
   enabled: boolean;
@@ -142,7 +155,13 @@ export interface HomeSection {
   defaultCategory?: string;
 }
 
-/** Factory tạo section config với default schema */
+/**
+ * Builds a section config from the default schema.
+ *
+ * @param options - The custom options of the section. Every missing value
+ *                  falls back to the default of the schema.
+ * @returns The complete section.
+ */
 export function defineSection(options: SectionOverrides): HomeSection {
   return {
     id: options.id,
@@ -165,7 +184,14 @@ export function defineSection(options: SectionOverrides): HomeSection {
   };
 }
 
-/** Fetcher tuần tự - trả về mảng đầu tiên có dữ liệu */
+/**
+ * Runs the steps one after the other and returns the first list with data.
+ *
+ * @param steps - The loaders to try, in order.
+ * @param fallback - The data used when the API mode is `mock_only` or when
+ *                   every step failed and the mode allows the mock data.
+ * @returns The first non-empty list, or the fallback.
+ */
 export async function fetchFirstAvailable(
   steps: Array<() => Promise<unknown[]>> = [],
   fallback: unknown[] = []
@@ -178,16 +204,16 @@ export async function fetchFirstAvailable(
       const data = await step();
       if (Array.isArray(data) && data.length > 0) return data;
     } catch {
-      // Bỏ qua, chuyển sang bước fallback tiếp theo
+      // The error is ignored and the next fallback step is tried.
     }
   }
 
   return mode === 'api_only' ? [] : fallback;
 }
 
-/** Hệ thống đăng ký các Section cho trang chủ */
+/** The registry of the home page sections. */
 export const HOME_SECTIONS: Record<string, HomeSection> = {
-  // === BATCH 1: Tải ngay khi mở trang ===
+  // === BATCH 1: loaded as soon as the page opens ===
   hero: defineSection({
     id: 'hero',
     isFullWidth: true,
@@ -230,7 +256,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     ], mock)
   }),
 
-  // === BATCH 2: Tải khi scroll tới (breakpoint 1) ===
+  // === BATCH 2: loaded when the user scrolls to them (breakpoint 1) ===
   country: defineSection({
     id: 'country',
     minHeight: 320,
@@ -292,7 +318,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     ], mock)
   }),
 
-  // === BATCH 3: Tải khi scroll tới (breakpoint 2) ===
+  // === BATCH 3: loaded when the user scrolls to them (breakpoint 2) ===
   latest: defineSection({
     id: 'latest',
     minHeight: 480,
@@ -322,7 +348,7 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     loadAfterScroll: false
   }),
 
-  // === BATCH 4: SECTION CUỐI - LAZY ===
+  // === BATCH 4: the last sections, loaded lazily ===
   upcoming: defineSection({
     id: 'upcoming',
     enabled: false,
@@ -333,7 +359,12 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
   })
 };
 
-/** Thứ tự hiển thị section. Đổi array để đổi thứ tự, xoá ID để ẩn section tạm thời. */
+/**
+ * The display order of the sections.
+ *
+ * Change the array to change the order, and remove an id to hide a section
+ * temporarily.
+ */
 export const HOME_SECTION_ORDER: readonly string[] = [
   'hero',
   'carousel_3d',

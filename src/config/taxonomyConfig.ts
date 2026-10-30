@@ -1,23 +1,32 @@
 /**
- * @file taxonomyConfig.ts
- * @description Hệ thống phân loại tập trung cho backend Fastify và routing frontend.
- * Ánh xạ slug thuần (không dấu) sang slug database, nhãn hiển thị tiếng Việt, badge,
- * và từ khoá tìm kiếm dự phòng, theo schema thống nhất và mở rộng.
+ * The central taxonomy system for the Fastify backend and the frontend
+ * routing.
+ *
+ * It maps a clean slug (without accents) to the database slug, the
+ * Vietnamese display label, the badge and the fallback search keyword,
+ * with one shared and extensible schema.
  */
 
 /**
- * Factory tạo item phân loại chuẩn hoá.
- * Áp dụng schema đồng nhất cho mọi loại: thể loại, quốc gia, định dạng, tag.
+ * Builds a normalized taxonomy item.
  *
- * @param params Các tham số cấu hình
- * @param params.slug Slug thuần, không dấu, dùng cho URL (ví dụ 'han-quoc', 'hoat-hinh')
- * @param params.backendSlugs Các slug lưu trong database (có dấu tiếng Việt)
- * @param params.nameVi Nhãn hiển thị tiếng Việt
- * @param params.nameEn Nhãn tiếng Anh
- * @param [params.badge='CINEMA'] Nhãn badge ngắn cho header card và nhãn
- * @param [params.searchKeyword] Từ khoá tìm kiếm dự phòng cho endpoint search
- * @param [params.baseRoute='/'] Base route (e.g. '/country', '/genre')
- * @returns Normalized taxonomy entity
+ * The same schema is used for every kind of taxonomy: category, country,
+ * format and tag.
+ *
+ * @param params - The configuration of the item.
+ * @param params.slug - The clean slug without accents, used in the URL,
+ *                      such as "han-quoc" or "hoat-hinh".
+ * @param params.backendSlugs - The slugs stored in the database, with the
+ *                              Vietnamese accents.
+ * @param params.nameVi - The Vietnamese display label.
+ * @param params.nameEn - The English display label.
+ * @param params.badge - The short badge used by the card header. It
+ *                       defaults to "CINEMA".
+ * @param params.searchKeyword - The fallback keyword used by the search
+ *                               endpoint.
+ * @param params.baseRoute - The base route of the item, such as "/country"
+ *                           or "/genre".
+ * @returns The normalized taxonomy entity.
  */
 export function createTaxonomyItem({
   slug,
@@ -51,7 +60,7 @@ export function createTaxonomyItem({
 }
 
 /**
- * Hệ thống các quốc gia.
+ * The registry of the countries.
  */
 export const TAXONOMY_COUNTRIES = {
   'han-quoc': createTaxonomyItem({
@@ -138,7 +147,7 @@ export const TAXONOMY_COUNTRIES = {
 } as const;
 
 /**
- * Hệ thống các thể loại phim.
+ * The registry of the movie categories.
  */
 export const TAXONOMY_CATEGORIES = {
   'hoat-hinh': createTaxonomyItem({
@@ -216,7 +225,7 @@ export const TAXONOMY_CATEGORIES = {
 } as const;
 
 /**
- * Hệ thống các định dạng phim.
+ * The registry of the movie formats.
  */
 export const TAXONOMY_FORMATS = {
   'phim-bo': createTaxonomyItem({
@@ -246,11 +255,13 @@ export const TAXONOMY_FORMATS = {
 } as const;
 
 /**
- * Tra cứu metadata quốc gia từ slug đầu vào.
- * Hỗ trợ cả slug thuần và slug có dấu.
+ * Looks up the metadata of a country from the given slug.
  *
- * @param slug Slug đầu vào (thuần hoặc có dấu)
- * @returns Metadata quốc gia hoặc item mặc định
+ * Both the clean slug and the slug with accents are supported.
+ *
+ * @param slug - The slug to look for, clean or with accents.
+ * @returns The metadata of the country, or a default item built from the
+ *          slug when the country is unknown.
  */
 export function resolveCountryTaxonomy(slug: string | null | undefined) {
   if (!slug) return null;
@@ -276,11 +287,13 @@ export function resolveCountryTaxonomy(slug: string | null | undefined) {
 }
 
 /**
- * Tra cứu metadata thể loại từ slug đầu vào.
- * Hỗ trợ cả slug thuần và slug có dấu.
+ * Looks up the metadata of a category from the given slug.
  *
- * @param slug Slug đầu vào (thuần hoặc có dấu)
- * @returns Metadata thể loại hoặc item mặc định
+ * Both the clean slug and the slug with accents are supported.
+ *
+ * @param slug - The slug to look for, clean or with accents.
+ * @returns The metadata of the category, or a default item built from the
+ *          slug when the category is unknown.
  */
 export function resolveCategoryTaxonomy(slug: string | null | undefined) {
   if (!slug) return null;
@@ -306,11 +319,13 @@ export function resolveCategoryTaxonomy(slug: string | null | undefined) {
 }
 
 /**
- * Tra cứu metadata định dạng từ slug đầu vào.
- * Hỗ trợ cả slug thuần và slug alias.
+ * Looks up the metadata of a format from the given slug.
  *
- * @param slug Slug đầu vào
- * @returns Metadata định dạng hoặc item mặc định
+ * The clean slug and the alias slugs are both supported.
+ *
+ * @param slug - The slug to look for.
+ * @returns The metadata of the format, or a default item built from the
+ *          slug when the format is unknown.
  */
 export function resolveFormatTaxonomy(slug: string | null | undefined) {
   if (!slug) return null;

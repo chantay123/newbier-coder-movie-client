@@ -1,15 +1,17 @@
 /**
- * @file navigationConfig.ts
- * @description Hệ thống điều hướng tập trung cho Header, Footer và Profile Menu.
- * Đồng bộ Navbar với TAXONOMY_CATEGORIES và TAXONOMY_COUNTRIES.
+ * The central navigation system for the header, the footer and the profile
+ * menu.
+ *
+ * The navbar stays in sync with `TAXONOMY_CATEGORIES` and
+ * `TAXONOMY_COUNTRIES`.
  */
 
 import { TAXONOMY_CATEGORIES, TAXONOMY_COUNTRIES } from './taxonomyConfig';
 import { ROUTES } from './routesConfig';
 
 /**
- * Item dropdown cho navbar, được tạo từ taxonomy items.
- * Taxonomy items có cấu trúc { nameVi, slug, href, badge }.
+ * A dropdown item of the navbar, built from a taxonomy item.
+ * A taxonomy item has the shape `{ nameVi, slug, href, badge }`.
  */
 interface TaxonomyNavItem {
   name: string;
@@ -18,7 +20,7 @@ interface TaxonomyNavItem {
   badge: string;
 }
 
-/** Item dropdown trong navbar */
+/** A dropdown item of the navbar. */
 interface DropdownNavItem {
   id: string;
   label: string;
@@ -28,7 +30,7 @@ interface DropdownNavItem {
   matchPrefix?: string;
 }
 
-/** Link trong navbar */
+/** A link of the navbar. */
 interface LinkNavItem {
   id: string;
   label: string;
@@ -38,10 +40,10 @@ interface LinkNavItem {
   matchExact?: boolean;
 }
 
-/** Tất cả các loại item navbar */
+/** All the kinds of navbar item. */
 type NavbarNavItem = DropdownNavItem | LinkNavItem;
 
-/** User menu item */
+/** An item of the user menu. */
 interface UserNavItem {
   id: string;
   label: string;
@@ -51,7 +53,7 @@ interface UserNavItem {
 }
 
 /**
- * Danh sách thể loại đã chuẩn hoá cho dropdown điều hướng.
+ * The normalized list of categories used by the navigation dropdown.
  */
 export const GENRE_NAV_ITEMS: TaxonomyNavItem[] = Object.values(TAXONOMY_CATEGORIES).map((cat) => ({
   name: cat.nameVi,
@@ -61,7 +63,7 @@ export const GENRE_NAV_ITEMS: TaxonomyNavItem[] = Object.values(TAXONOMY_CATEGOR
 }));
 
 /**
- * Danh sách quốc gia đã chuẩn hoá cho dropdown điều hướng.
+ * The normalized list of countries used by the navigation dropdown.
  */
 export const COUNTRY_NAV_ITEMS: TaxonomyNavItem[] = Object.values(TAXONOMY_COUNTRIES).map((country) => ({
   name: country.nameVi,
@@ -71,10 +73,11 @@ export const COUNTRY_NAV_ITEMS: TaxonomyNavItem[] = Object.values(TAXONOMY_COUNT
 }));
 
 /**
- * Các mục điều hướng chính của Navbar, đúng theo spec sản phẩm:
- * 1. Chủ Đề (Dropdown)  2. Duyệt tìm (/search)
- * 3. Phim Lẻ (/movies)  4. Phim Bộ (/series)
- * 5. Quốc gia (Dropdown)  6. Diễn Viên (/performer)  7. Lịch Chiếu (/browse/schedule)
+ * The main navigation items of the navbar, following the product spec:
+ * 1. Genres (dropdown)  2. Browse (/search)
+ * 3. Movies (/movies)  4. Series (/series)
+ * 5. Countries (dropdown)  6. Performers (/performer)
+ * 7. Schedule (/browse/schedule)
  */
 export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
   {
@@ -125,16 +128,18 @@ export const MAIN_NAV_ITEMS: NavbarNavItem[] = [
     id: 'lich-chieu',
     label: 'Lịch Chiếu',
     type: 'link',
-    // `/schedule` 404 vì file thật nằm ở src/pages/client/browse/schedule.tsx.
-    // next.config.ts rewrite `/browse/:path*` → `/client/browse/:path*`, nên
-    // phải dùng `/browse/schedule` để khớp với ROUTES.MOVIES/SERIES.
+    // `/schedule` answers 404, because the real file is located at
+    // `src/pages/client/browse/schedule.tsx`. The rewrite
+    // `/browse/:path*` → `/client/browse/:path*` of `next.config.ts` means
+    // the link has to be `/browse/schedule`, to match
+    // `ROUTES.MOVIES` and `ROUTES.SERIES`.
     href: ROUTES.SCHEDULE,
     matchPrefix: '/browse/schedule'
   }
 ];
 
 /**
- * Các mục menu dropdown trong tài khoản người dùng.
+ * The items of the dropdown menu of the user account.
  */
 export const USER_NAV_ITEMS: UserNavItem[] = [
   {
@@ -168,7 +173,7 @@ export const USER_NAV_ITEMS: UserNavItem[] = [
 ];
 
 /**
- * Cấu hình tìm kiếm nhanh trên Navbar.
+ * The configuration of the quick search in the navbar.
  */
 export const NAVBAR_SEARCH_CONFIG = {
   debounceMs: 250,
