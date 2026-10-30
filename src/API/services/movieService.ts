@@ -1,7 +1,9 @@
 /**
- * @file movieService.ts
- * @description Movie API Service an toàn & resilient, không bao giờ ném exception ra ngoài.
- * Tự động chuẩn hoá envelope backend và fallback rỗng mượt mà.
+ * Movie API service.
+ *
+ * The service is defensive: it never throws an exception to the caller.
+ * Every request goes through `safeFetchJson`, which normalizes the backend
+ * envelopes and falls back to an empty result instead of crashing the UI.
  */
 
 import { MOVIE_CONFIG } from '@/config/movieConfig';
@@ -11,8 +13,10 @@ import {
   resolveCategoryTaxonomy
 } from '@/config/taxonomyConfig';
 import { pickMovieImage } from '@/utils/imageSource';
+import { apiRoute } from '@/config/apiRoutes';
 
-// Lazy import authService để tránh circular dependency giữa auth và movie.
+// The auth service is imported lazily to avoid a circular dependency
+// between the auth and the movie modules.
 const getAuthService = async (): Promise<{
   refreshToken: () => Promise<string>;
   logout: () => Promise<void>;
@@ -26,8 +30,14 @@ const getAuthService = async (): Promise<{
 };
 
 /**
- * Decode JWT exp (chỉ đọc payload, KHÔNG verify signature).
- * Trả về timestamp (ms) khi token hết hạn, hoặc null nếu không parse được.
+ * Reads the expiry date of a JWT.
+ *
+ * Only the payload is decoded, the signature is NOT verified. The value is
+ * used to refresh the token early, so verifying the signature is not needed.
+ *
+ * @param token - The JWT to read.
+ * @returns The expiry timestamp in milliseconds, or `null` when the token
+ *          cannot be parsed.
  */
 const readJwtExp = (token: string | null): number | null => {
   if (!token) return null;
@@ -44,11 +54,14 @@ const readJwtExp = (token: string | null): number | null => {
 };
 
 /**
- * Đảm bảo token còn hạn trước khi gửi request.
- * - Token còn > 60s: trả về ngay
- * - Token sắp hết hạn (≤ 60s): gọi refresh TRƯỚC
- * - Single-flight: nếu nhiều request cùng lúc, chỉ refresh 1 lần
- * - Refresh fail: trả token cũ (để request fail tự nhiên với 401)
+ * Makes sure the access token is still valid before a request is sent.
+ *
+ * - The token is still valid for more than 60 seconds: it is returned as is.
+ * - The token expires in 60 seconds or less: the refresh runs FIRST.
+ * - Single-flight: when many requests run at the same time, only one
+ *   refresh is sent.
+ * - The refresh fails: the old token is returned, so the request fails on
+ *   its own with a 401.
  */
 let _tokenRefreshInFlight: Promise<string | null> | null = null;
 
@@ -94,12 +107,12 @@ const ensureFreshToken = async (): Promise<string | null> => {
   return _tokenRefreshInFlight;
 };
 
-/** Movie entity thô từ backend */
+/** A raw movie entity as it comes from the backend. */
 export interface RawMovie {
   [key: string]: unknown;
 }
 
-/** Phản hồi backend dạng envelope chuẩn v1 */
+/** The standard v1 envelope returned by the backend. */
 export interface EnvelopeResponse<T = unknown> {
   responseStatus?: { responseCode?: string; responseMessage?: string };
   responseData?: T;
@@ -108,7 +121,7 @@ export interface EnvelopeResponse<T = unknown> {
   [key: string]: unknown;
 }
 
-/** Tùy chọn fetch */
+/** The options accepted by the fetch helpers. */
 export interface FetchOptions {
   method?: string;
   headers?: Record<string, string>;
@@ -117,7 +130,7 @@ export interface FetchOptions {
   timeout?: number;
 }
 
-/** Lấy base URL từ movieConfig (nguồn duy nhất từ env) */
+/** The base URL comes from `movieConfig`, the only place reading the env. */
 const getBaseUrl = (): string => MOVIE_CONFIG.apiBaseUrl;
 
 /**
@@ -143,12 +156,15 @@ const withImageAliases = (m: RawMovie): RawMovie => {
 };
 
 /**
- * Chuẩn hoá movie list từ nhiều envelope backend khác nhau về một Array sạch.
- * Hỗ trợ: Fastify Enterprise ({ responseData: [...] } hoặc { responseData: { data: [...] } }),
- * legacy ({ data: { movies: [...] } }), và raw array.
+ * Normalizes a movie list coming from different backend envelopes into one
+ * clean array.
  *
- * @param json Raw JSON response
- * @returns Mảng phim đã chuẩn hoá
+ * Supported shapes: Fastify Enterprise (`{ responseData: [...] }` or
+ * `{ responseData: { data: [...] } }`), the legacy shape
+ * (`{ data: { movies: [...] } }`) and a raw array.
+ *
+ * @param json - The raw JSON response.
+ * @returns The normalized array of movies.
  */
 export const extractMovieList = (json: unknown): RawMovie[] => {
   if (!json) return [];
@@ -159,7 +175,7 @@ export const extractMovieList = (json: unknown): RawMovie[] => {
   const tryArray = (v: unknown): RawMovie[] | null =>
     Array.isArray(v) ? (v as RawMovie[]).map(withImageAliases) : null;
 
-  // 1. Direct envelope arrays
+  // 1. The array sits directly in one of the known envelope keys.
   let found = tryArray(env.responseData)
     || tryArray((env.responseData as { data?: unknown[] } | undefined)?.data)
     || tryArray((env.responseData as { items?: unknown[] } | undefined)?.items)
@@ -175,8 +191,8 @@ export const extractMovieList = (json: unknown): RawMovie[] => {
     || tryArray(env.results);
   if (found) return found;
 
-  // 2. Sometimes the API returns the array directly nested one level deep
-  //    under responseData (e.g. { responseData: { items: [...] } })
+  // 2. Sometimes the API nests the array one level deeper, for example
+  //    `{ responseData: { items: [...] } }`.
   for (const key of Object.keys(env)) {
     const v = (env as Record<string, unknown>)[key];
     if (v && typeof v === 'object') {
@@ -191,14 +207,16 @@ export const extractMovieList = (json: unknown): RawMovie[] => {
 };
 
 /**
- * Safe HTTP Fetcher (Zero-Crash & Resilient).
- * Không bao giờ throw exception ra ngoài, không spam log đỏ.
- * Trả về dữ liệu đã chuẩn hoá hoặc fallback an toàn.
+ * A safe HTTP fetcher that never crashes the app.
  *
- * @param endpoint API path
- * @param options Custom fetch options (headers, signal, timeout)
- * @param fallback Giá trị trả về khi request fail hoặc trả non-200
- * @returns Promise resolve dữ liệu hoặc fallback
+ * The function never throws an exception and never floods the console with
+ * red errors. It returns the normalized data, or a safe fallback.
+ *
+ * @param endpoint - The API path.
+ * @param options - The custom fetch options (headers, signal, timeout).
+ * @param fallback - The value returned when the request fails or does not
+ *                   answer with a 2xx status.
+ * @returns The parsed data, or the fallback.
  */
 export async function safeFetchJson<T = unknown>(
   endpoint: string,
@@ -218,11 +236,15 @@ export async function safeFetchJson<T = unknown>(
     const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => controller.abort(), timeoutMs);
     const signal = options.signal || controller.signal;
 
-    // Đảm bảo token còn hạn trước khi gửi (proactive refresh).
-    // - Đọc từ localStorage + sessionStorage (authService.login lưu vào
-    //   sessionStorage khi user KHÔNG tick Remember me).
-    // - Nếu token sắp hết hạn (≤ 60s) → gọi /auth/refresh-token TRƯỚC.
-    // - Nếu refresh fail → trả token cũ, request sẽ fail tự nhiên với 401.
+    // The token is refreshed before sending, so a request rarely fails with
+    // an expired token.
+    // - The token is read from localStorage and from sessionStorage, because
+    //   `authService.login` stores it in sessionStorage when the user does
+    //   not tick "Remember me".
+    // - When the token expires in 60 seconds or less, `/auth/refresh-token`
+    //   runs FIRST.
+    // - When the refresh fails, the old token is used and the request fails
+    //   on its own with a 401.
     const token = await ensureFreshToken();
 
     const headers: Record<string, string> = {
@@ -241,35 +263,27 @@ export async function safeFetchJson<T = unknown>(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      // Controlled diagnostic - log an toàn (endpoint, status, message),
-      // TUYỆT ĐỐI không log token/cookie/header Authorization.
+      // A controlled diagnostic: only the endpoint, the status and the
+      // message are logged. The token, the cookies and the Authorization
+      // header are never written to the console.
       return fallback;
     }
 
     const json = (await response.json()) as EnvelopeResponse;
 
-    if (SYSTEM_CONFIG.debugMovies && /\/movies(\?|$|\/)/.test(endpoint)) {
-      // eslint-disable-next-line no-console
-
-    }
-
     return json as unknown as T;
   } catch (err) {
-    if (SYSTEM_CONFIG.debugMovies && endpoint.includes('/movies')) {
-      // eslint-disable-next-line no-console
-
-    }
     return fallback;
   }
 }
 
 /**
- * Fetch một endpoint và trích xuất mảng phim đã chuẩn hoá.
+ * Fetches an endpoint and extracts the normalized array of movies.
  *
- * @param endpoint API path
- * @param limit Số lượng tối đa trả về
- * @param options Fetch options
- * @returns Promise resolve mảng phim
+ * @param endpoint - The API path.
+ * @param limit - The maximum number of movies returned.
+ * @param options - The fetch options.
+ * @returns The array of movies.
  */
 export async function safeFetchMovieList(
   endpoint: string,
@@ -281,48 +295,64 @@ export async function safeFetchMovieList(
   return typeof limit === 'number' && limit > 0 ? list.slice(0, limit) : list;
 }
 
-/** Service object chính cho movie API */
+/** The main service object for the movie API. */
 const movieService = {
   /**
-   * Lấy phim mới nhất cho Hero spotlight. Over-fetch (gấp 4 lần hoặc
-   * tối thiểu 24 phim) để sau khi filter trailer vẫn còn đủ phim hiển thị.
+   * Loads the latest movies for the hero spotlight.
    *
-   * CHỈ HIỂN THỊ PHIM CÓ TRAILER: đa số phim mới nhất trả về từ
-   * `/movies/latest` đều có `trailer: null` (xem payload thật: 6 phim
-   * đầu đều null, phim thứ 7-8 mới có trailer). Nếu lấy đúng `limit=6`
-   * rồi filter sẽ ra 0 phim, khiến HeroBannerSkeleton kẹt vĩnh viễn.
+   * The service over-fetches (4 times the limit, or at least 24 movies) so
+   * there are still enough movies left after the trailer filter.
+   *
+   * ONLY MOVIES WITH A TRAILER ARE SHOWN: most of the movies returned by
+   * `/movies/latest` have `trailer: null` (in the real payload the first 6
+   * movies are null and only the 7th and 8th have a trailer). Asking for
+   * exactly `limit=6` and filtering would return 0 movies, which would leave
+   * the HeroBannerSkeleton spinning forever.
+   *
+   * @param limit - The number of movies the caller wants.
+   * @param signal - The abort signal of the caller.
+   * @returns The list of movies.
    */
   getHeroMovies: (limit = 6, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList('/movies/latest', Math.max(limit * 4, 24), { signal }),
+    safeFetchMovieList(apiRoute(`moviesLatest`), Math.max(limit * 4, 24), { signal }),
 
-  /** Lấy phim thịnh hành */
+  /** Loads the trending movies. */
   getTrendingMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList('/movies/trending', undefined, { signal }),
+    safeFetchMovieList(apiRoute(`moviesTrending`), undefined, { signal }),
 
-  /** Lấy phim đánh giá cao */
+  /** Loads the top rated movies. */
   getTopRatedMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList('/movies/top-rated', undefined, { signal }),
+    safeFetchMovieList(apiRoute(`moviesTopRated`), undefined, { signal }),
 
-  /** Lấy phim theo trang & giới hạn */
+  /** Loads one page of movies. */
   getMoviesPage: (page = 1, limit = 10, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(`/movies?page=${page}&limit=${limit}`, limit, { signal }),
+    safeFetchMovieList(apiRoute(`moviesList`) + `?page=${page}&limit=${limit}`, limit, { signal }),
 
-  /** Lấy phim mới (không giới hạn) */
+  /** Loads the latest movies without a limit. */
   getLatestMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList('/movies', undefined, { signal }),
+    safeFetchMovieList(apiRoute(`moviesList`), undefined, { signal }),
 
   /**
-   * Lấy danh sách phim trang chủ theo spec: `GET /api/v1/movies?page=1&limit=20`.
-   * Trả về mảng phim chuẩn hoá (hoặc [] khi fail).
+   * Loads the home page movie list.
+   *
+   * Endpoint: `GET /api/v1/movies?page=1&limit=20`.
+   *
+   * @param signal - The abort signal of the caller.
+   * @returns The normalized array of movies, or an empty array on failure.
    */
   getHomeMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList('/movies?page=1&limit=20', 20, { signal }),
+    safeFetchMovieList(apiRoute(`moviesList`) + '?page=1&limit=20', 20, { signal }),
 
   /**
-   * Lấy phim theo slug quốc gia với fallback đa tầng:
-   * 1. Query slug backend đã đăng ký từ taxonomyConfig
-   * 2. Search keyword fallback từ taxonomyConfig
-   * 3. Filter client-side từ danh sách tổng quát
+   * Loads the movies of a country with a multi-level fallback:
+   * 1. Query the slug registered in the backend through `taxonomyConfig`.
+   * 2. Search by the keyword defined in `taxonomyConfig`.
+   * 3. Filter the general list on the client side.
+   *
+   * @param countrySlug - The slug of the country.
+   * @param limit - The maximum number of movies returned.
+   * @param signal - The abort signal of the caller.
+   * @returns The list of movies.
    */
   getMoviesByCountry: async (countrySlug: string, limit = 20, signal?: AbortSignal): Promise<RawMovie[]> => {
     if (!countrySlug) return [];
@@ -330,45 +360,47 @@ const movieService = {
     const meta = resolveCountryTaxonomy(countrySlug);
     const variants: string[] = meta?.backendSlugs || [countrySlug];
 
-    // Over-fetch: chỉ một phần nhỏ phim có `trailer`, và caller (Country
-    // rail) thường lọc trailer sau đó. Lấy gấp 4 lần để đảm bảo vẫn
-    // còn đủ dữ liệu sau filter, tránh rail rỗng.
+    // The service over-fetches: only a small part of the movies have a
+    // `trailer`, and the caller (the country rail) filters the trailer after
+    // that. Fetching 4 times the limit keeps enough data after the filter,
+    // so the rail does not end up empty.
     const fetchLimit = Math.max(limit * 4, 40);
 
-    // Tier 1: Query backend /countries/{slug}/movies
+    // Tier 1: query the backend route `/countries/{slug}/movies`.
     for (const v of variants) {
       const list = await safeFetchMovieList(
-        `/countries/${encodeURIComponent(v)}/movies`,
+        apiRoute(`moviesByCountry`, encodeURIComponent(v)),
         fetchLimit,
         { signal }
       );
       if (Array.isArray(list) && list.length > 0) return list;
     }
 
-    // Tier 2: Search keyword fallback
+    // Tier 2: search by keyword as a fallback.
     const keyword = meta?.searchKeyword;
     if (keyword) {
       const searchList = await safeFetchMovieList(
-        `/movies/search?q=${encodeURIComponent(keyword)}`,
+        apiRoute(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
         fetchLimit,
         { signal }
       );
       if (Array.isArray(searchList) && searchList.length > 0) return searchList;
     }
 
-    // Tier 3: Fetch general movies and filter client-side.
+    // Tier 3: fetch the general movie list and filter it on the client side.
     //
-    // LỖI CŨ: dùng `countrySlug.split('-')[0]` = "han" / "trung" làm
-    // keyword match — quá ngắn, trùng với nhiều chuỗi không liên quan
-    // (ví dụ "trung" match cả "trung-thu-2024", "han" match cả "hanh"),
-    // dẫn tới danh sách gồm phim các nước khác, một số không có
-    // poster hợp lệ → hiển thị ảnh lỗi.
+    // OLD BUG: `countrySlug.split('-')[0]` was used as the keyword match, so
+    // "han" or "trung" was matched. Those fragments are too short and they
+    // also match unrelated strings ("trung" matches "trung-thu-2024" and
+    // "han" matches "hanh"), which filled the list with movies from other
+    // countries. Some of them had no valid poster and showed a broken image.
     //
-    // SỬA: match cả `slug` đầy đủ VÀ `name` đầy đủ của country object
-    // (case-insensitive), đồng thời kiểm tra cả slug cuối cùng phân
-    // tách bằng dấu "-". Ví dụ "han-quoc" sẽ match `country.slug ===
-    // "han-quoc"` hay `country.name` chứa "hàn" / "han quoc".
-    const all = await safeFetchMovieList('/movies?page=1&limit=100', undefined, { signal });
+    // FIX: the full `slug` AND the full `name` of the country object are
+    // matched (case-insensitive), and the last token of the slug split by
+    // "-" is checked too. For example "han-quoc" matches
+    // `country.slug === "han-quoc"` or a `country.name` containing
+    // "han quoc" (South Korea).
+    const all = await safeFetchMovieList(apiRoute(`moviesList`) + '?page=1&limit=100', undefined, { signal });
     if (Array.isArray(all) && all.length > 0) {
       const slugTokens = countrySlug.split('-').filter(Boolean);
       const filtered = all.filter((m) => {
@@ -377,8 +409,8 @@ const movieService = {
           const country = c as { slug?: string; name?: string };
           const s = (country.slug || '').toLowerCase();
           const n = (country.name || '').toLowerCase();
-          // Ưu tiên match exact slug trước, rồi đến mọi token trong slug
-          // xuất hiện trong country.slug, cuối cùng mới tới country.name.
+          // The exact slug is checked first, then every token of the slug
+          // inside `country.slug`, and only at the end `country.name`.
           if (s === countrySlug) return true;
           if (slugTokens.every((tok) => s.includes(tok))) return true;
           if (n.includes(countrySlug)) return true;
@@ -394,12 +426,18 @@ const movieService = {
   },
 
   /**
-   * Lấy phim theo slug thể loại với fallback đa tầng:
-   * 1. Query slug backend đã đăng ký từ taxonomyConfig
-   * 2. Search keyword fallback từ taxonomyConfig
-   * 3. (REMOVED) Legacy endpoint `/movies/category/${slug}` - backend trả 404
-   *    cho route này, gây log lỗi không cần thiết. Nếu cả Tier 1 và Tier 2
-   *    không trả về phim, trả [] thay vì gọi thêm endpoint không tồn tại.
+   * Loads the movies of a category with a multi-level fallback:
+   * 1. Query the slug registered in the backend through `taxonomyConfig`.
+   * 2. Search by the keyword defined in `taxonomyConfig`.
+   * 3. The legacy endpoint `/movies/category/${slug}` was REMOVED, because
+   *    the backend answers 404 for that route and it only produced useless
+   *    error logs. When Tier 1 and Tier 2 both return nothing, an empty
+   *    array is returned instead of calling a route that does not exist.
+   *
+   * @param categorySlug - The slug of the category.
+   * @param limit - The maximum number of movies returned.
+   * @param signal - The abort signal of the caller.
+   * @returns The list of movies.
    */
   getMoviesByCategory: async (categorySlug: string, limit = 20, signal?: AbortSignal): Promise<RawMovie[]> => {
     if (!categorySlug) return [];
@@ -407,53 +445,55 @@ const movieService = {
     const meta = resolveCategoryTaxonomy(categorySlug);
     const variants: string[] = meta?.backendSlugs || [categorySlug];
 
-    // Over-fetch: chỉ một phần nhỏ phim có `trailer`, và caller thường lọc
-    // trailer sau đó. Lấy gấp 3x để đảm bảo vẫn còn đủ dữ liệu sau filter.
+    // The service over-fetches: only a small part of the movies have a
+    // `trailer`, and the caller usually filters the trailer after that.
+    // Fetching 3 times the limit keeps enough data after the filter.
     const fetchLimit = Math.max(limit * 3, 24);
 
-    // Tier 1: Query backend /categories/{slug}/movies
+    // Tier 1: query the backend route `/categories/{slug}/movies`.
     for (const v of variants) {
       const list = await safeFetchMovieList(
-        `/categories/${encodeURIComponent(v)}/movies`,
+        apiRoute(`categoriesBySlugMovies`, encodeURIComponent(v)),
         fetchLimit,
         { signal }
       );
       if (Array.isArray(list) && list.length > 0) return list;
     }
 
-    // Tier 2: Search keyword fallback
+    // Tier 2: search by keyword as a fallback.
     const keyword = meta?.searchKeyword;
     if (keyword) {
       const searchList = await safeFetchMovieList(
-        `/movies/search?q=${encodeURIComponent(keyword)}`,
+        apiRoute(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
         fetchLimit,
         { signal }
       );
       if (Array.isArray(searchList) && searchList.length > 0) return searchList;
     }
 
-    // Không fallback sang /movies/category/${slug} nữa - endpoint đó 404
-    // trên backend. Trả về mảng rỗng cho an toàn.
+    // There is no fallback on `/movies/category/${slug}` anymore, because
+    // that endpoint answers 404 on the backend. An empty array is returned
+    // to stay safe.
     return [];
   },
 
-  /** Lấy chi tiết phim theo slug */
+  /** Loads the details of a movie by slug. */
   getMovieDetails: (slug: string, signal?: AbortSignal): Promise<EnvelopeResponse | null> =>
-    safeFetchJson<EnvelopeResponse>(`/movies/${slug}`, { signal }, null),
+    safeFetchJson<EnvelopeResponse>(apiRoute(`moviesDetail`, slug), { signal }, null),
 
   /**
    * Multi-source fallback resolution cho Top 10 movies.
    */
   getTop10Movies: async (signal?: AbortSignal): Promise<RawMovie[]> => {
-    // 1. Trending
+    // 1. The trending movies.
     let movies = await movieService.getTrendingMovies(signal);
     if (Array.isArray(movies) && movies.length > 0) return movies.slice(0, 10);
 
-    // 2. Top rated
+    // 2. The top rated movies.
     movies = await movieService.getTopRatedMovies(signal);
     if (Array.isArray(movies) && movies.length > 0) return movies.slice(0, 10);
 
-    // 3. General movies page
+    // 3. The first page of the general movie list.
     movies = await movieService.getMoviesPage(1, 10, signal);
     if (Array.isArray(movies) && movies.length > 0) return movies.slice(0, 10);
 
@@ -461,7 +501,14 @@ const movieService = {
   },
 
   /**
-   * Tìm kiếm phim với query và filter.
+   * Searches the movies with a query and a set of filters.
+   *
+   * @param query - The text typed by the user.
+   * @param filters - The optional filters (category, country, year, type,
+   *                  duration).
+   * @param page - The page to load, starting at 1.
+   * @param size - The number of results per page.
+   * @returns The hits of the search, plus the total and the max score.
    */
   searchMovies: async (
     query: string,
@@ -481,8 +528,12 @@ const movieService = {
     params.append('search_description', 'true');
     params.append('search_all_fields', 'true');
 
+    // Backend v1: the search route is `/movies/search` (verified: `/search`
+    // answers 404 "Route not found", `/movies/search` answers 401 "Missing
+    // Bearer token"). The route `/search` used to be called here, so every
+    // search page received an empty list.
     const result = await safeFetchJson<EnvelopeResponse<{ hits?: RawMovie[]; total?: number; maxScore?: number }>>(
-      `/search?${params.toString()}`,
+      apiRoute(`moviesSearch`) + `?${params.toString()}`,
       {},
       { hits: [], total: 0, maxScore: 0 }
     );
@@ -497,7 +548,11 @@ const movieService = {
   },
 
   /**
-   * Lấy phim mới nhất với metadata phân trang.
+   * Loads the newest movies with the pagination metadata.
+   *
+   * @param page - The page to load, starting at 1.
+   * @param size - The number of movies per page.
+   * @returns The movies of the page and the pagination metadata.
    */
   getNewestMovies: async (page = 1, size = 20): Promise<{ items: RawMovie[]; pagination: { currentPage: number; totalPages: number; totalItems: number } }> => {
     const params = new URLSearchParams();
@@ -505,7 +560,7 @@ const movieService = {
     params.append('size', String(size));
     params.append('sort', 'newest');
 
-    const result = await safeFetchJson<EnvelopeResponse>(`/movies?${params.toString()}`, {}, null);
+    const result = await safeFetchJson<EnvelopeResponse>(apiRoute(`moviesList`) + `?${params.toString()}`, {}, null);
     const items = extractMovieList(result);
 
     return {

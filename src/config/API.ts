@@ -1,112 +1,151 @@
 /**
- * @file API.ts
- * @description Khai báo tập trung các URL endpoint của backend.
+ * API.ts
+ *
+ * Central declaration of the backend endpoints.
+ *
+ * The endpoints are declared with their OPAQUE TOKEN, not with their real
+ * path. The real path lives in the server-only environment variable
+ * `API_ROUTE_MAP`, and the proxy in `src/pages/api/backend/[...segments].ts`
+ * translates the token back into the path on the server.
+ *
+ * WHY THE ENDPOINTS ARE RELATIVE PATHS
+ * Every consumer of `endpoints` passes the result to the shared axios
+ * instance (`axiosInstance` / `axiosAdminConfig`), which already carries the
+ * base URL in its `baseURL` option. When a URL is absolute, axios IGNORES
+ * `baseURL`; when it is relative, axios JOINS it with `baseURL`.
+ *
+ * The endpoints are therefore relative paths (`tXXXX/...`). That keeps a
+ * single source of truth for the base URL and avoids a duplicated prefix
+ * such as `/api/backend/api/backend/movies`.
+ *
+ * `API_URL` is still exported for the few callers that use a plain `fetch()`
+ * and therefore need the base URL themselves.
  */
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import { getApiBaseUrl } from './apiBase';
+import { apiRoute, withQuery, type ApiRouteKey } from '@/config/apiRoutes';
 
-/** Helper tạo URL endpoint cho các route có query params */
+export const API_URL = getApiBaseUrl();
+
+/**
+ * Builds an endpoint URL with query parameters.
+ *
+ * @param base - The endpoint path without a query string.
+ * @param params - Optional query parameters. Empty values are skipped.
+ * @returns The URL with an encoded query string, or the base URL unchanged.
+ */
 function buildUrl(base: string, params?: Record<string, string | number>): string {
-  if (!params) return base;
-  const query = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-    .join('&');
-  return query ? `${base}?${query}` : base;
+  return withQuery(base, params);
+}
+
+/**
+ * Builds the path of an endpoint, with its path parameters.
+ *
+ * @param key - The endpoint name.
+ * @param params - The path parameters, in order.
+ * @returns The relative path of the endpoint.
+ */
+function route(key: ApiRouteKey, ...params: (string | number)[]): string {
+  return apiRoute(key, ...params);
 }
 
 export const endpoints = {
   movies: {
-    detail: (slug: string) => `${API_URL}/movies/${slug}`,
-    related: (category: string, limit: number) => `${API_URL}/movies?category=${category}&limit=${limit}`,
-    search: (query: string) => `${API_URL}/movies/search?q=${encodeURIComponent(query)}`
+    detail: (slug: string) => route('moviesDetail', slug),
+    list: (page = 1, limit = 100) => buildUrl(route('moviesList'), { page, limit }),
+    related: (category: string, limit: number) =>
+      buildUrl(route('moviesList'), { category, limit }),
+    search: (query: string) => buildUrl(route('moviesSearch'), { q: query })
   },
   crawl: {
-    movies: () => `${API_URL}/crawl/movies`,
-    moviesAll: () => `${API_URL}/crawl/moviesall`
+    movies: () => route('crawlMovies'),
+    moviesAll: () => route('crawlMoviesAll')
   },
   /**
-   * Watch history — path đã verify trực tiếp với backend production
-   * (2026-10-20). Route cũ `/history/*` trả 404 "Route not found".
-   *   GET    /users/me/history        → 401 (list, cần Bearer token)
-   *   POST   /users/me/history        → 400 (add, cần Bearer token + body)
-   *   DELETE /users/me/history/:id    → 401 (xóa 1 item)
-   *   DELETE /users/me/history        → 401 (xóa toàn bộ)
-   * Baseline `/users/me/zzz-nope` → 404 nên 401 ở đây là route thật, không
-   * phải false-positive của `/users/me/:param`.
+   * Watch history. The paths were verified directly against the production
+   * backend on 2026-10-20. The old `/history/*` routes returned
+   * `404 Route not found`.
+   *   GET    /users/me/history        -> 401 (list, needs a Bearer token)
+   *   POST   /users/me/history        -> 400 (add, needs a Bearer token and a body)
+   *   DELETE /users/me/history/:id    -> 401 (remove one item)
+   *   DELETE /users/me/history        -> 401 (remove all items)
+   * The baseline `/users/me/zzz-nope` returns 404, so the 401 responses here
+   * prove the routes exist and are not a false positive of
+   * `/users/me/:param`.
    */
   history: {
-    getAll: (limit = 10, page = 1) => buildUrl(`${API_URL}/users/me/history`, { limit, page }),
-    add: () => `${API_URL}/users/me/history`,
-    addById: (_movieId: string) => `${API_URL}/users/me/history`,
-    delete: (historyId: string) => `${API_URL}/users/me/history/${historyId}`,
-    clear: () => `${API_URL}/users/me/history`,
+    getAll: (limit = 10, page = 1) => buildUrl(route('usersMeHistory'), { limit, page }),
+    add: () => route('usersMeHistory'),
+    addById: (_movieId: string) => route('usersMeHistory'),
+    delete: (historyId: string) => route('usersMeHistory', historyId),
+    clear: () => route('usersMeHistory'),
     getUserHistory: (userId: string, limit = 10, page = 1) =>
-      buildUrl(`${API_URL}/users/${userId}/history`, { limit, page })
+      buildUrl(route('usersHistoryByUser', userId), { limit, page })
   },
   /**
-   * Favorites — path đã được verify trực tiếp với backend production
-   * (2026-10-20). Route cũ `/favorites` trả 404 "Route not found".
-   *   GET    /users/me/favorites    → 401 (tồn tại, cần Bearer token)
-   *   POST   /movies/:slug/favorite → 401 (tồn tại, cần Bearer token)
-   *   DELETE /movies/:slug/favorite → 401 (tồn tại, cần Bearer token)
-   * Toggle dùng slug (không phải id) — đã đúng ở useMovieDetail.ts.
+   * Favorites. The paths were verified directly against the production backend
+   * on 2026-10-20. The old `/favorites` route returned `404 Route not found`.
+   *   GET    /users/me/favorites    -> 401 (exists, needs a Bearer token)
+   *   POST   /movies/:slug/favorite -> 401 (exists, needs a Bearer token)
+   *   DELETE /movies/:slug/favorite -> 401 (exists, needs a Bearer token)
+   * The toggle uses the slug and not the id, which is what
+   * `useMovieDetail.ts` already does.
    */
   favorites: {
-    getAll: () => `${API_URL}/users/me/favorites`,
-    add: (movieSlug: string) => `${API_URL}/movies/${encodeURIComponent(movieSlug)}/favorite`,
-    remove: (movieSlug: string) => `${API_URL}/movies/${encodeURIComponent(movieSlug)}/favorite`,
-    check: (movieSlug: string) =>
-      `${API_URL}/users/me/favorites?slug=${encodeURIComponent(movieSlug)}`
+    getAll: () => route('usersMeFavorites'),
+    add: (movieSlug: string) => route('moviesFavorite', movieSlug),
+    remove: (movieSlug: string) => route('moviesFavorite', movieSlug),
+    check: (movieSlug: string) => buildUrl(route('usersMeFavorites'), { slug: movieSlug })
   },
   search: {
-    find: () => `${API_URL}/search`
+    // Backend v1 has no `/search` route, the real one is `/movies/search`.
+    find: () => route('moviesSearch')
   },
   admin: {
     movies: {
-      getAll: (page = 1, limit = 10) => buildUrl(`${API_URL}/admin/movies`, { page, limit }),
-      getById: (id: string) => `${API_URL}/admin/movies/${id}`,
-      create: () => `${API_URL}/admin/movies`,
-      update: (id: string) => `${API_URL}/admin/movies/${id}`,
-      delete: (id: string) => `${API_URL}/admin/movies/${id}`,
-      uploadThumbnail: (id: string) => `${API_URL}/admin/movies/${id}/thumbnail`,
-      toggleVisibility: (id: string) => `${API_URL}/admin/movies/${id}/visibility`
+      getAll: (page = 1, limit = 10) => buildUrl(route('adminMoviesList'), { page, limit }),
+      getById: (id: string) => route('adminMoviesById', id),
+      create: () => route('adminMoviesCreate'),
+      update: (id: string) => route('adminMoviesUpdate', id),
+      delete: (id: string) => route('adminMoviesDelete', id),
+      uploadThumbnail: (id: string) => route('adminMoviesThumbnail', id),
+      toggleVisibility: (id: string) => route('adminMoviesVisibility', id)
     },
     users: {
-      getAll: (page = 1, limit = 10) => buildUrl(`${API_URL}/admin/users`, { page, limit }),
-      getById: (id: string) => `${API_URL}/admin/users/${id}`,
-      create: () => `${API_URL}/admin/users`,
-      update: (id: string) => `${API_URL}/admin/users/${id}`,
-      delete: (id: string) => `${API_URL}/admin/users/${id}`,
-      updateRole: (id: string) => `${API_URL}/admin/users/${id}/role`,
-      ban: (id: string) => `${API_URL}/admin/users/${id}/ban`,
-      unban: (id: string) => `${API_URL}/admin/users/${id}/unban`,
-      toggleStatus: (id: string) => `${API_URL}/admin/users/${id}/toggle-status`,
-      uploadAvatar: (id: string) => `${API_URL}/admin/users/${id}/avatar`
+      getAll: (page = 1, limit = 10) => buildUrl(route('adminUsersList'), { page, limit }),
+      getById: (id: string) => route('adminUsersById', id),
+      create: () => route('adminUsersCreate'),
+      update: (id: string) => route('adminUsersUpdate', id),
+      delete: (id: string) => route('adminUsersDelete', id),
+      updateRole: (id: string) => route('adminUsersRole', id),
+      ban: (id: string) => route('adminUsersBan', id),
+      unban: (id: string) => route('adminUsersUnban', id),
+      toggleStatus: (id: string) => route('adminUsersToggleStatus', id),
+      uploadAvatar: (id: string) => route('adminUsersAvatar', id)
     },
     roles: {
-      getAll: () => `${API_URL}/admin/roles`
+      getAll: () => route('adminRolesList')
     },
     accountTypes: {
-      getAll: () => `${API_URL}/admin/account-types`
+      getAll: () => route('adminAccountTypes')
     },
     dashboard: {
-      stats: () => `${API_URL}/admin/dashboard/stats`,
-      recentMovies: () => `${API_URL}/admin/dashboard/recent-movies`,
-      topMovies: () => `${API_URL}/admin/dashboard/top-movies`
+      stats: () => route('adminDashboardStats'),
+      recentMovies: () => route('adminDashboardRecentMovies'),
+      topMovies: () => route('adminDashboardTopMovies')
     },
     premium: {
-      getAllPackages: () => `${API_URL}/subscription/packages`,
-      getPackageById: (id: string) => `${API_URL}/subscription/packages/${id}`,
-      createPackage: () => `${API_URL}/subscription/admin/packages`,
-      updatePackage: (id: string) => `${API_URL}/subscription/admin/packages/${id}`,
-      deletePackage: (id: string) => `${API_URL}/subscription/admin/packages/${id}`,
-      getAllSubscriptions: () => `${API_URL}/subscription/admin/subscriptions`,
-      getPendingSubscriptions: () => `${API_URL}/subscription/admin/pending-subscriptions`,
+      getAllPackages: () => route('subscriptionPackages'),
+      getPackageById: (id: string) => route('subscriptionPackageById', id),
+      createPackage: () => route('subscriptionAdminPackages'),
+      updatePackage: (id: string) => route('subscriptionAdminPackageById', id),
+      deletePackage: (id: string) => route('subscriptionAdminPackageById', id),
+      getAllSubscriptions: () => route('subscriptionAdminSubscriptions'),
+      getPendingSubscriptions: () => route('subscriptionAdminPendingSubscriptions'),
       approveSubscription: (subscriptionId: string) =>
-        `${API_URL}/subscription/admin/approve/${subscriptionId}`,
+        route('subscriptionAdminApprove', subscriptionId),
       rejectSubscription: (subscriptionId: string) =>
-        `${API_URL}/subscription/admin/reject/${subscriptionId}`
+        route('subscriptionAdminReject', subscriptionId)
     }
   }
 } as const;

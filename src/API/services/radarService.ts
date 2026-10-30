@@ -5,6 +5,7 @@
  */
 import { safeFetchJson } from '@/API/services/movieService';
 import { filterMoviesWithValidTrailer } from '@/utils/trailer';
+import { apiRoute } from '@/config/apiRoutes';
 
 export type RadarPeriod = 'week' | 'month';
 export type RadarCategory = 'discussed' | 'favorite' | 'views';
@@ -47,7 +48,7 @@ export interface RadarPayload {
 export const radarService = {
   getTrendingRadar: async ({ period = 'week' }: { period?: RadarPeriod } = {}): Promise<RadarPayload> => {
     try {
-      const result = await safeFetchJson(`/movies/trending-radar?period=${period}`, {}, null) as { data?: RadarPayload & { breakthrough?: RadarItem[] } } | null;
+      const result = await safeFetchJson(apiRoute(`moviesTrendingRadar`) + `?period=${period}`, {}, null) as { data?: RadarPayload & { breakthrough?: RadarItem[] } } | null;
       const data = result?.data || (result as unknown as RadarPayload | null) || null;
       if (data && data.discussed && data.genres) {
         const breakthrough = data.views || data.breakthrough || [];
@@ -79,7 +80,7 @@ export const radarService = {
   getTopRankingsGrid: async ({ category = 'discussed', period = 'week', limit = 50 }: { category?: RadarCategory; period?: RadarPeriod; limit?: number } = {}): Promise<RadarItem[]> => {
     try {
       const result = await safeFetchJson(
-        `/movies/rankings-grid?category=${category}&period=${period}&limit=${limit}`,
+        apiRoute(`moviesRankingsGrid`) + `?category=${category}&period=${period}&limit=${limit}`,
         {},
         null
       ) as { data?: RadarItem[]; movies?: RadarItem[] } | RadarItem[] | null;

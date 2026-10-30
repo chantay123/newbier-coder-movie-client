@@ -1,25 +1,28 @@
 /**
- * @file axiosConfig.ts
- * @description Cấu hình axios dùng chung cho toàn bộ API layer.
- * Gom baseURL resolver, request/response interceptor, và chiến lược refresh-token.
+ * axiosConfig.ts
+ *
+ * The axios configuration shared by the whole API layer.
+ * It groups the base URL resolver, the request and response interceptors,
+ * and the refresh-token strategy.
  */
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { RT } from '@/config/apiRoutes';
 
-/** Bỏ slash cuối của URL một cách an toàn */
-const stripTrailingSlash = (value: string | undefined | null): string =>
-  value ? String(value).replace(/\/+$/, '') : '';
+export type { AxiosError };
 
-/** Resolver base URL tập trung — ưu tiên NEXT_PUBLIC_CORE_API_URL, fallback NEXT_PUBLIC_API_URL, mặc định localhost */
-const resolveBaseURL = (): string => {
-  const core = stripTrailingSlash(process.env.NEXT_PUBLIC_CORE_API_URL);
-  if (core) return core; // đã bao gồm /api/v1
-  const legacy = stripTrailingSlash(process.env.NEXT_PUBLIC_API_URL);
-  if (legacy) return legacy; // thường kết thúc bằng /api
-  return 'http://localhost:5000/api';
-};
-
-const baseURL = resolveBaseURL();
+/**
+ * The base URL of the axios instance.
+ *
+ * This file used to resolve the base URL on its own
+ * (`NEXT_PUBLIC_CORE_API_URL` -> `NEXT_PUBLIC_API_URL` ->
+ * `http://localhost:5000/api`) while `config/API.ts`, `adService`,
+ * `statsService` and others resolved it in a different way, so one app sent
+ * its requests to two different base URLs. Everything now shares
+ * `getApiBaseUrl()`.
+ */
+const baseURL = getApiBaseUrl();
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -31,61 +34,138 @@ const axiosInstance = axios.create({
   withCredentials: true
 });
 
-/** Đọc Bearer token hiện có từ localStorage / sessionStorage theo cơ chế
- * remember-me đã lưu trong authService. Khi remember-me tắt, access token
- * chỉ tồn tại trong sessionStorage (mất khi đóng tab) và refresh token
- * không có sẵn. */
-const REMEMBER_ME_KEY = 'remember_me';
+/**
+ * Reads the Bearer token from localStorage or sessionStorage, following the
+ * remember-me mechanism implemented in authService.
+ *
+ * WHY EVERY LOCATION IS READ
+ * `authService.login()` writes the token to:
+ *   - localStorage  -> when the user ticks "Remember me"
+ *   - sessionStorage -> when the user does not tick it, so the token only
+ *     lives inside the tab
+ * If only localStorage was read, every session login would send a request
+ * without the `Authorization` header and the backend would answer 401. In
+ * the UI that shows up as "You need to sign in" even though the user is
+ * signed in.
+ *
+ * That is why sessionStorage is read FIRST (the token of the current
+ * session), and localStorage is only the fallback. The `remember_me` flag
+ * decides whether the token PERSISTS across new tabs, not where it is read.
+ */
 const ACCESS_KEYS = ['auth_token', 'token'];
 
+/**
+ * Reads the access token from the browser storage.
+ *
+ * @returns The token, or null when no usable token is stored.
+ */
 const readAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
-  if (remembered) {
-    for (const key of ACCESS_KEYS) {
-      const value = localStorage.getItem(key);
-      if (value && value !== 'undefined' && value !== 'null') return value;
-    }
-    return null;
-  }
+
+  const isUsable = (value: string | null): value is string =>
+    Boolean(value) && value !== 'undefined' && value !== 'null';
+
+  // 1. sessionStorage - the token of the current login session.
   if (window.sessionStorage) {
     for (const key of ACCESS_KEYS) {
       const value = window.sessionStorage.getItem(key);
-      if (value && value !== 'undefined' && value !== 'null') return value;
+      if (isUsable(value)) return value;
     }
+    // The token granted by the NextAuth session (the AuthProvider stores it
+    // in sessionStorage).
+    const backendToken = window.sessionStorage.getItem('backendToken');
+    if (isUsable(backendToken)) return backendToken;
   }
-  // Fallback: tab reload trong cùng session — vẫn ưu tiên localStorage nếu có
+
+  // 2. localStorage - the token that persists across tabs (remember me), or
+  //    one left over from an earlier session in the same tab.
   for (const key of ACCESS_KEYS) {
     const value = localStorage.getItem(key);
-    if (value && value !== 'undefined' && value !== 'null') return value;
+    if (isUsable(value)) return value;
   }
+
   return null;
 };
 
-/** Mở rộng kiểu AxiosRequestConfig để đánh dấu đã retry */
+/** Extends AxiosRequestConfig with a flag that marks an already retried request. */
 interface RetryableRequest extends AxiosRequestConfig {
   _retry?: boolean;
 }
 
+/**
+ * The tokens of the endpoints that need the Bearer token.
+ *
+ * The request URLs carry the OPAQUE TOKEN of the endpoint, not the real
+ * path (that one lives on the server), so the tokens are used to recognize
+ * an endpoint here.
+ */
+const AUTH_REQUIRED_TOKENS = new Set<string>([
+  RT.subscriptionCurrent,
+  RT.subscriptionHistory,
+  RT.subscriptionAdminSubscriptions,
+  RT.subscriptionAdminPendingSubscriptions,
+  RT.userStatsWatch,
+  RT.userStatsWeeklyActivity,
+  RT.userStatsActivityWeek,
+  RT.userStatsGenreDistribution,
+  RT.userStatsDailyViewingTime,
+  RT.userStatsSeriesProgress,
+  RT.userStatsInProgressSeries,
+  RT.userStatsAchievements,
+  RT.usersMeHistory,
+  RT.usersMeFavorites,
+  RT.usersHistoryByUser,
+  RT.adminUsersList,
+  RT.adminUsersById,
+  RT.adminUsersCreate,
+  RT.adminUsersUpdate,
+  RT.adminUsersDelete,
+  RT.adminUsersRole,
+  RT.adminUsersBan,
+  RT.adminUsersUnban,
+  RT.adminUsersToggleStatus,
+  RT.adminUsersAvatar,
+]);
+
+/**
+ * The tokens of the authentication endpoints.
+ *
+ * A 401 on one of them must NOT trigger the refresh-and-retry flow: that
+ * would loop forever, because the refresh endpoint itself answers 401.
+ */
+const AUTH_ENDPOINT_TOKENS = new Set<string>([
+  RT.authLogin,
+  RT.authRefreshToken,
+  RT.authLogout,
+  RT.authRegister,
+]);
+
+/**
+ * Extracts the token of a request URL.
+ *
+ * @param url - The URL of the request.
+ * @returns The token, or an empty string when the URL carries none.
+ */
+const tokenOfUrl = (url: string | undefined): string => {
+  if (!url) return '';
+  // The URL is `<base>/<token>/<params...>`, so the token is the segment
+  // right after the base. Only the first segment that looks like a token
+  // is considered.
+  const match = url.match(/\/(t[0-9a-f]{8})(?:\/|$|\?)/);
+  return match ? match[1] : '';
+};
+
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = readAuthToken();
 
+  // The Bearer token is attached to EVERY request, so the backend can
+  // answer 401 on the endpoints that need it.
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    const importantEndpoints = ['/subscription/', '/user/', '/auth/'];
-    if (importantEndpoints.some((endpoint) => config.url?.includes(endpoint))) {
-      // Đã gắn token đầy đủ cho các endpoint quan trọng
-    }
-  } else {
-    const authRequiredEndpoints = [
-      '/subscription/current',
-      '/subscription/history',
-      '/user/'
-    ];
-
-    if (authRequiredEndpoints.some((endpoint) => config.url?.includes(endpoint))) {
-
-    }
+  } else if (AUTH_REQUIRED_TOKENS.has(tokenOfUrl(config.url))) {
+    // The endpoint needs a token but none is stored: the backend will
+    // answer 401 and the response interceptor handles it. A silent
+    // diagnostic helps to spot a broken session early.
   }
 
   if (config.method === 'patch' || config.method === 'PATCH') {
@@ -101,8 +181,10 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 axiosInstance.interceptors.response.use(
   (response) => {
-    if (response.config.url?.includes('favorites')) {
-      // Silent diagnostics - không cần log token hoặc payload
+    // The favorites endpoints are recognized by their opaque token, because
+    // the real path never reaches the client bundle.
+    if (tokenOfUrl(response.config.url) === RT.usersMeFavorites) {
+      // Silent diagnostics. The token and the payload are never logged.
     }
     return response;
   },
@@ -128,58 +210,22 @@ axiosInstance.interceptors.response.use(
     }
 
     // ---- MOCK-MODE 404 SHIM -----------------------------------------------
-    // The deployed backend (core-movie-service.onrender.com) is missing a
-    // handful of admin endpoints. Rather than letting every page spew 404s
-    // and break their error handlers, we recognise the known-missing routes
-    // here, fabricate a realistic empty response, and resolve the original
-    // request as if it had succeeded. Each branch documents the shape the
-    // caller expects so it's easy to remove when the real endpoint ships.
+    // The deployed backend is missing a handful of admin endpoints. Rather
+    // than letting every page spew 404s and break their error handlers, we
+    // recognise the known-missing routes here, fabricate a realistic empty
+    // response, and resolve the original request as if it had succeeded.
+    // Each branch documents the shape the caller expects so it's easy to
+    // remove when the real endpoint ships.
+    //
+    // NOTE: the endpoints are recognized by their OPAQUE TOKEN, because the
+    // real path never reaches the client bundle.
     if (status === 404) {
-      const path = (url || '').split('?')[0];
+      const token = tokenOfUrl(url);
 
-      // GET /admin/notifications → empty feed so the bell stays usable
-      if (path === '/admin/notifications') {
-        return { data: [], status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
-      }
-
-      // GET /admin/movies/categories → empty list, page already has its own
-      // mock categories (INITIAL_CATEGORIES) fallback
-      if (path === '/admin/movies/categories') {
+      // GET /admin/movies/categories -> empty list. The page already has its
+      // own mock categories (INITIAL_CATEGORIES) as a fallback.
+      if (token === RT.adminMoviesCategories) {
         return { data: { categories: [] }, status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
-      }
-
-      // GET /admin/dashboard/stats → flat stats object
-      if (path === '/admin/dashboard/stats') {
-        return {
-          data: {
-            data: {
-              totalMovies: 0, newUsers: 0, engagementRate: 0, reports: 0,
-              totalUsers: 0, totalViews: 0, totalComments: 0
-            }
-          },
-          status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg
-        } as never;
-      }
-
-      // GET /admin/dashboard/analytics → empty analytics blob
-      if (path === '/admin/dashboard/analytics') {
-        return {
-          data: { data: { viewsByDay: [], usersByDay: [], topMovies: [] } },
-          status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg
-        } as never;
-      }
-
-      // GET /admin/dashboard/feedback-stats → empty breakdown
-      if (path === '/admin/dashboard/feedback-stats') {
-        return {
-          data: { data: { byType: [], byStatus: [], byDay: { labels: [], data: [] } } },
-          status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg
-        } as never;
-      }
-
-      // GET /admin/reports/stats → empty report stats
-      if (path === '/admin/reports/stats') {
-        return { data: { data: {} }, status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
       }
     }
     // ---- END MOCK-MODE 404 SHIM -------------------------------------------
@@ -190,8 +236,8 @@ axiosInstance.interceptors.response.use(
     // retry", which spams the console. We short-circuit that specific
     // endpoint so it returns a clean "no subscription" payload.
     if (status === 401) {
-      const path = (url || '').split('?')[0];
-      if (path === '/subscription/current') {
+      const token = tokenOfUrl(url);
+      if (token === RT.subscriptionCurrent) {
         return {
           data: {
             data: {
@@ -222,11 +268,7 @@ axiosInstance.interceptors.response.use(
     // 401: try a single silent refresh, then retry the original request.
     // We never retry auth endpoints themselves (login/refresh/logout) to
     // avoid infinite refresh loops.
-    const isAuthEndpoint =
-      url.includes('/auth/login') ||
-      url.includes('/auth/refresh-token') ||
-      url.includes('/auth/logout') ||
-      url.includes('/auth/register');
+    const isAuthEndpoint = AUTH_ENDPOINT_TOKENS.has(tokenOfUrl(url));
 
     if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;

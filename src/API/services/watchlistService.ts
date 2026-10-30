@@ -1,10 +1,14 @@
 /**
- * @file watchlistService.ts
- * @description Watchlist API client (a separate "to-watch" list).
+ * watchlistService.ts
+ *
+ * Watchlist API client (a separate "to-watch" list).
  */
 import authService from './authService';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiRoutes';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+/** The backend base URL. It uses the shared resolver instead of reading the environment. */
+const API_URL = getApiBaseUrl();
 
 export interface WatchlistMovieInput {
   id?: string;
@@ -36,7 +40,7 @@ const watchlistService = {
   getWatchlist: async (): Promise<WatchlistMovie[]> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/watchlist`, {
+      const response = await fetch(apiUrl(`watchlistList`), {
         headers: { ...headers, Accept: 'application/json' }
       });
       if (!response.ok) {
@@ -57,7 +61,7 @@ const watchlistService = {
   addToWatchlist: async (movieData: WatchlistMovieInput): Promise<WatchlistOpResult> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/watchlist/add`, {
+      const response = await fetch(apiUrl(`watchlistAdd`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...headers },
         body: JSON.stringify(movieData)
@@ -80,7 +84,7 @@ const watchlistService = {
   isInWatchlist: async (movieId: string): Promise<boolean> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/watchlist/check/${movieId}`, {
+      const response = await fetch(apiUrl(`watchlistCheck`, movieId), {
         headers: { ...headers, Accept: 'application/json' }
       });
       const data = await response.json() as { data?: { isInWatchlist?: boolean }; isInWatchlist?: boolean };
@@ -95,7 +99,7 @@ const watchlistService = {
   removeFromWatchlist: async (movieId: string): Promise<WatchlistOpResult> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/watchlist/remove/${movieId}`, {
+      const response = await fetch(apiUrl(`watchlistRemove`, movieId), {
         method: 'DELETE',
         headers: { ...headers, Accept: 'application/json' }
       });
@@ -113,7 +117,7 @@ const watchlistService = {
   clearWatchlist: async (): Promise<WatchlistOpResult> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/watchlist/clear`, {
+      const response = await fetch(apiUrl(`watchlistClear`), {
         method: 'DELETE',
         headers: { ...headers, Accept: 'application/json' }
       });

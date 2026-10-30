@@ -4,6 +4,8 @@
  * admin-side approval/rejection, ad-benefits.
  */
 import api from '@/API/config/axiosConfig';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiRoute, apiUrl } from '@/config/apiRoutes';
 
 export interface SubscriptionPackage {
   _id: string;
@@ -75,7 +77,7 @@ const emptyAdBenefits = (authError = false): AdBenefits => ({
 const subscriptionService = {
   getAllPackages: async (): Promise<SubscriptionPackage[]> => {
     try {
-      const response = await api.get('/subscription/packages');
+      const response = await api.get(apiRoute(`subscriptionPackages`));
       return (response.data as { data: SubscriptionPackage[] }).data;
     } catch (error) {
 
@@ -85,7 +87,7 @@ const subscriptionService = {
 
   getPackageById: async (packageId: string): Promise<SubscriptionPackage> => {
     try {
-      const response = await api.get(`/subscription/packages/${packageId}`);
+      const response = await api.get(apiRoute(`subscriptionPackageById`, packageId));
       return (response.data as { data: SubscriptionPackage }).data;
     } catch (error) {
 
@@ -99,7 +101,7 @@ const subscriptionService = {
         packageId: data.packageId,
         paymentMethod: data.paymentMethod || 'bank_transfer'
       };
-      const response = await api.post('/subscription/subscribe', subscriptionData);
+      const response = await api.post(apiRoute(`subscriptionSubscribe`), subscriptionData);
       return { ...(response.data as object), success: true, _originalSuccess: (response.data as { success?: boolean }).success, _formatted: true };
     } catch (error) {
       const err = error as { response?: { status?: number; data?: { error?: string; details?: unknown } }; message?: string };
@@ -118,7 +120,7 @@ const subscriptionService = {
 
   confirmPayment: async (paymentId: string): Promise<Record<string, unknown>> => {
     try {
-      const response = await api.post('/subscription/confirm-payment', { paymentId });
+      const response = await api.post(apiRoute(`subscriptionConfirmPayment`), { paymentId });
       return response.data as Record<string, unknown>;
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -133,7 +135,7 @@ const subscriptionService = {
 
   cancelSubscription: async (): Promise<unknown> => {
     try {
-      const response = await api.post('/subscription/cancel');
+      const response = await api.post(apiRoute(`subscriptionCancel`));
       return response.data;
     } catch (error) {
 
@@ -143,7 +145,7 @@ const subscriptionService = {
 
   getCurrentSubscription: async (): Promise<SubscriptionCurrentPayload> => {
     try {
-      const response = await api.get('/subscription/current');
+      const response = await api.get(apiRoute(`subscriptionCurrent`));
       const data = (response.data as { data?: Partial<SubscriptionCurrentPayload> }).data || {};
       return {
         hasActiveSubscription: data.hasActiveSubscription || false,
@@ -171,7 +173,7 @@ const subscriptionService = {
       // It returns `{ hasActiveSubscription, subscription, daysLeft, isExpired }`.
       // We derive ad-block benefits locally from the package id so we never
       // hit a non-existent endpoint.
-      const response = await api.get('/subscription/current', {
+      const response = await api.get(apiRoute(`subscriptionCurrent`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const payload = (response.data as { data?: Partial<SubscriptionCurrentPayload> }).data || {};
@@ -200,7 +202,7 @@ const subscriptionService = {
 
   getSubscriptionHistory: async (): Promise<unknown> => {
     try {
-      const response = await api.get('/subscription/history');
+      const response = await api.get(apiRoute(`subscriptionHistory`));
       return (response.data as { data: unknown }).data;
     } catch (error) {
 
@@ -210,7 +212,7 @@ const subscriptionService = {
 
   updateAutoRenewal: async (autoRenewal: boolean): Promise<unknown> => {
     try {
-      const response = await api.put('/subscription/auto-renewal', { autoRenewal });
+      const response = await api.put(apiRoute(`subscriptionAutoRenewal`), { autoRenewal });
       return response.data;
     } catch (error) {
 
@@ -220,7 +222,7 @@ const subscriptionService = {
 
   getPendingSubscription: async (): Promise<unknown> => {
     try {
-      const response = await api.get('/subscription/pending');
+      const response = await api.get(apiRoute(`subscriptionPending`));
       return (response.data as { data: unknown }).data;
     } catch (error) {
 
@@ -241,8 +243,8 @@ const subscriptionService = {
       };
     }
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${baseUrl}/subscription/admin/pending-subscriptions`, {
+      const baseUrl = getApiBaseUrl();
+      const res = await fetch(apiUrl(`subscriptionAdminPendingSubscriptions`), {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       if (!res.ok) throw new Error(`API request failed with status ${res.status}: ${res.statusText}`);
@@ -300,8 +302,8 @@ const subscriptionService = {
       return 0;
     }
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${baseUrl}/subscription/admin/pending-count`, {
+      const baseUrl = getApiBaseUrl();
+      const res = await fetch(apiUrl(`subscriptionAdminPendingCount`), {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       if (!res.ok) throw new Error(`API request failed with status ${res.status}`);
@@ -315,7 +317,7 @@ const subscriptionService = {
 
   getAdminApprovedSubscriptions: async (): Promise<Subscription[]> => {
     try {
-      const response = await api.get('/subscription/admin/subscriptions');
+      const response = await api.get(apiRoute(`subscriptionAdminSubscriptions`));
       const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
       return all.filter((s) => s.status === 'approved' || s.status === 'active');
     } catch (error) {
@@ -326,7 +328,7 @@ const subscriptionService = {
 
   getAdminRejectedSubscriptions: async (): Promise<Subscription[]> => {
     try {
-      const response = await api.get('/subscription/admin/subscriptions');
+      const response = await api.get(apiRoute(`subscriptionAdminSubscriptions`));
       const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
       return all.filter((s) => s.status === 'rejected');
     } catch (error) {
@@ -337,7 +339,7 @@ const subscriptionService = {
 
   approveSubscription: async (subscriptionId: string): Promise<unknown> => {
     try {
-      const response = await api.post(`/subscription/admin/approve/${subscriptionId}`);
+      const response = await api.post(apiRoute(`subscriptionAdminApprove`, subscriptionId));
       return response.data;
     } catch (error) {
 
@@ -347,7 +349,7 @@ const subscriptionService = {
 
   rejectSubscription: async (subscriptionId: string, reason?: string): Promise<unknown> => {
     try {
-      const response = await api.post(`/subscription/admin/reject/${subscriptionId}`, { reason });
+      const response = await api.post(apiRoute(`subscriptionAdminReject`, subscriptionId), { reason });
       return response.data;
     } catch (error) {
 

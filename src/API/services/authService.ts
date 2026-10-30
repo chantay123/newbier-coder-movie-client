@@ -1,19 +1,29 @@
 ﻿/**
- * @file authService.ts
- * @description Service xác thực thống nhất cho toàn bộ frontend.
- * Gom login, register, refresh token, logout, profile, watchlist, user stats.
+ * authService.ts
+ *
+ * Unified authentication service for the whole frontend.
+ * It groups the login, register, refresh token, logout, profile, watchlist
+ * and user stats calls.
  */
 
 import { AUTH_CONFIG } from '@/config/authConfig';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiRoutes';
 
-/** Obfuscation key — biến environment để thay đổi khi cần */
+/** Obfuscation key. It is an environment variable so it can be changed when needed. */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
 
-/** Encode một string thành base64 có prefix để dễ nhận diện + xác thực */
+/**
+ * Encodes a string into base64 with a prefix, so the value is easy to
+ * recognize and to validate.
+ *
+ * @param plain - The clear text to encode.
+ * @returns The encoded string, or the clear text when encoding fails.
+ */
 const obfEncode = (plain: string): string => {
   try {
     const prefixed = OBFUSCATION_KEY + plain + OBFUSCATION_KEY;
-    // Base64 encode đơn giản
+    // Simple base64 encoding.
     return btoa(encodeURIComponent(prefixed).replace(/%([0-9A-F]{2})/g,
       (_: string, p1: string) => String.fromCharCode(parseInt(p1, 16))));
   } catch {
@@ -21,17 +31,22 @@ const obfEncode = (plain: string): string => {
   }
 };
 
-/** Decode string đã obfuscate */
+/**
+ * Decodes a string that was obfuscated by {@link obfEncode}.
+ *
+ * @param encoded - The encoded value.
+ * @returns The decoded string, or null when it cannot be decoded.
+ */
 const obfDecode = (encoded: string): string | null => {
   try {
     const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
       '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
     ).join(''));
-    // Strip prefix/suffix
+    // Strips the prefix and the suffix.
     if (decoded.startsWith(OBFUSCATION_KEY) && decoded.endsWith(OBFUSCATION_KEY)) {
       return decoded.slice(OBFUSCATION_KEY.length, -OBFUSCATION_KEY.length);
     }
-    // Legacy plain JSON — vẫn parse được
+    // Legacy plain JSON, still parsed correctly.
     JSON.parse(decoded);
     return decoded;
   } catch {
@@ -39,9 +54,18 @@ const obfDecode = (encoded: string): string | null => {
   }
 };
 
-const API_URL = process.env.NEXT_PUBLIC_CORE_API_URL
-    || process.env.NEXT_PUBLIC_API_URL
-  || 'http://localhost:5000/api';
+/**
+ * The base URL of the backend. It always ends with `/api/v1`.
+ *
+ * This file used to resolve the base on its own
+ * (`CORE_API_URL || API_URL || localhost/api`), and the logout and refresh
+ * endpoints built their own URL with
+ * `${API_URL.replace(/\/api\/?$/, '')}/api/v1/...`. That only worked when the
+ * environment variable ended with `/api`. With the correct contract value
+ * `/api/v1` the replacement did not match, so the URL became
+ * `/api/v1/api/v1/auth/...` and answered 404 "Route not found".
+ */
+const API_URL = getApiBaseUrl();
 
 /** Storage key constants — kept in sync between `login`, `refreshToken`,
  * `isLoggedIn`, `getAuthHeader`, and `_clearLocalSession`. */
@@ -89,7 +113,7 @@ const readRefreshToken = (): string | null => {
   return localStorage.getItem(STORAGE_KEYS.refreshToken);
 };
 
-/** Thông tin đăng nhập từ form */
+/** The login information coming from the form. */
 export interface LoginCredentials {
   username?: string;
   email?: string;
@@ -97,7 +121,7 @@ export interface LoginCredentials {
   rememberMe?: boolean;
 }
 
-/** Payload user trả về từ backend */
+/** The user payload returned by the backend. */
 export interface UserPayload {
   _id?: string;
   id?: string;
@@ -113,7 +137,7 @@ export interface UserPayload {
   [key: string]: unknown;
 }
 
-/** Token + user trả về khi login thành công */
+/** The token and the user returned after a successful login. */
 export interface LoginResult {
   success: true;
   user: UserPayload & { token: string };
@@ -122,7 +146,7 @@ export interface LoginResult {
   rememberMe?: boolean;
 }
 
-/** Thông tin đăng ký */
+/** The registration information. */
 export interface RegisterData {
   username: string;
   email: string;
@@ -131,20 +155,20 @@ export interface RegisterData {
   [key: string]: unknown;
 }
 
-/** Kết quả đăng ký */
+/** The result of a registration. */
 export interface RegisterResult {
   success: true;
   message: string;
   data: unknown;
 }
 
-/** Header auth dùng cho fetch */
+/** The authorization header used with fetch. */
 export interface AuthHeader {
   Authorization?: string;
   [key: string]: string | undefined;
 }
 
-/** Thông tin profile update */
+/** The profile update information. */
 export interface ProfileData {
   fullName?: string;
   address?: string;
@@ -155,21 +179,26 @@ export interface ProfileData {
   [key: string]: unknown;
 }
 
-/** Thông tin đổi mật khẩu */
+/** The password change information. */
 export interface PasswordData {
   currentPassword: string;
   newPassword: string;
   confirmPassword?: string;
 }
 
-/** Error mở rộng với code cho refresh flow */
+/** An extended error with a code, used by the refresh flow. */
 export interface ServiceError extends Error {
   code?: string;
   status?: number;
   cause?: unknown;
 }
 
-/** Decode an toàn phần payload của JWT */
+/**
+ * Safely decodes the payload part of a JWT.
+ *
+ * @param token - The JWT to read.
+ * @returns The decoded payload, or null when it cannot be parsed.
+ */
 const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
   try {
     const base64Url = token.split('.')[1];
@@ -184,7 +213,11 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
   }
 };
 
-/** Xoá toàn bộ artifact xác thực phía client */
+/**
+ * Removes every authentication artifact from the client side.
+ *
+ * @returns Nothing. Storage failures are swallowed on purpose.
+ */
 const clearLocalSession = (): void => {
   if (typeof window === 'undefined') return;
   try {
@@ -195,7 +228,7 @@ const clearLocalSession = (): void => {
     localStorage.removeItem(STORAGE_KEYS.isAccountLocked);
     localStorage.removeItem(REMEMBER_ME_KEY);
   } catch {
-    /* localStorage có thể bị disable (private mode) */
+    /* localStorage can be disabled (private mode) */
   }
   try {
     window.sessionStorage.removeItem(STORAGE_KEYS.sessionBackendToken);
@@ -203,7 +236,7 @@ const clearLocalSession = (): void => {
     window.sessionStorage.removeItem(STORAGE_KEYS.accessToken);
     window.sessionStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
   } catch {
-    /* sessionStorage có thể bị disable */
+    /* sessionStorage can be disabled */
   }
 };
 
@@ -216,7 +249,7 @@ const authService = {
       password: credentials.password
     };
 
-    const loginEndpoint = AUTH_CONFIG?.api?.endpoint || `${API_URL}/auth/login`;
+    const loginEndpoint = AUTH_CONFIG?.api?.endpoint || apiUrl(`authLogin`);
 
     const response = await fetch(loginEndpoint, {
       method: 'POST',
@@ -366,7 +399,8 @@ const authService = {
         }
         const user = resolveUser(rawAccessToken);
         if (rememberMe) {
-          // ✅ Legacy localStorage key — vẫn obfuscate để che thông tin
+          // Legacy localStorage key. It is still obfuscated to hide the
+          // information from the DevTools.
           localStorage.setItem(STORAGE_KEYS.user, obfEncode(JSON.stringify(user)));
         } else if (typeof window !== 'undefined' && window.sessionStorage) {
           window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, obfEncode(JSON.stringify(user)));
@@ -436,7 +470,7 @@ const authService = {
   },
 
   register: async (userData: RegisterData): Promise<RegisterResult> => {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const response = await fetch(apiUrl(`authRegister`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -482,7 +516,8 @@ const authService = {
   },
 
   logout: async (): Promise<void> => {
-    // Best-effort: clear local session ngay cả khi server không phản hồi.
+    // Best effort: the local session is cleared even when the server does not
+    // answer.
     try {
       if (typeof window === 'undefined') {
         clearLocalSession();
@@ -493,7 +528,7 @@ const authService = {
       const refreshToken = readRefreshToken();
 
       // Build URL the same way as login
-      const endpoint = `${API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/logout`;
+      const endpoint = apiUrl(`authLogout`);
 
       if (accessToken || refreshToken) {
         const headers: Record<string, string> = { 'Accept': 'application/json' };
@@ -507,7 +542,7 @@ const authService = {
             method: 'POST',
             headers,
             body,
-            // Không để backend chậm block local cleanup
+            // A slow backend must not block the local cleanup.
             keepalive: true
           });
         } catch (networkError) {
@@ -544,7 +579,7 @@ const authService = {
       throw err;
     }
 
-    const endpoint = `${API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/refresh-token`;
+    const endpoint = apiUrl(`authRefreshToken`);
 
     const promise = (async (): Promise<string> => {
       let response: Response;
@@ -666,7 +701,7 @@ const authService = {
             payload = null;
           }
           const exp = payload?.exp ? payload.exp * 1000 : null;
-          // Refresh proactively khi token sắp hết hạn
+          // The token is refreshed proactively when it is about to expire.
           if (exp && exp < Date.now() + 60000) {
             try {
               token = await authService.refreshToken();
@@ -735,7 +770,7 @@ const authService = {
       favoriteGenres: profileData.favoriteGenres
     };
 
-    const response = await fetch(`${API_URL}/auth/update-profile`, {
+    const response = await fetch(apiUrl(`authUpdateProfile`), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -807,7 +842,7 @@ const authService = {
     const formData = new FormData();
     formData.append('avatar', file);
 
-    const response = await fetch(`${API_URL}/auth/upload-avatar`, {
+    const response = await fetch(apiUrl(`authUploadAvatar`), {
       method: 'POST',
       headers: headers,
       body: formData
@@ -863,7 +898,7 @@ const authService = {
   getProfile: async (): Promise<UserPayload> => {
     const headers = await authService.getAuthHeader();
 
-    const response = await fetch(`${API_URL}/auth/user-detail`, { headers });
+    const response = await fetch(apiUrl(`authUserDetail`), { headers });
 
     const data = await response.json();
 
@@ -888,7 +923,7 @@ const authService = {
       confirmPassword: passwordData.confirmPassword || passwordData.newPassword
     };
 
-    const response = await fetch(`${API_URL}/auth/change-password`, {
+    const response = await fetch(apiUrl(`authChangePassword`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -925,7 +960,7 @@ const authService = {
   deleteAccount: async (): Promise<{ success: boolean; message: string }> => {
     const headers = await authService.getAuthHeader();
 
-    const response = await fetch(`${API_URL}/auth/delete-account`, {
+    const response = await fetch(apiUrl(`authDeleteAccount`), {
       method: 'DELETE',
       headers
     });
@@ -949,7 +984,7 @@ const authService = {
   getActivityHistory: async (): Promise<unknown> => {
     const headers = await authService.getAuthHeader();
 
-    const response = await fetch(`${API_URL}/auth/activity-history`, { headers });
+    const response = await fetch(apiUrl(`authActivityHistory`), { headers });
 
     const data = await response.json();
 
@@ -963,7 +998,7 @@ const authService = {
   getFavorites: async (): Promise<unknown> => {
     const headers = await authService.getAuthHeader();
 
-    const response = await fetch(`${API_URL}/auth/favorites`, { headers });
+    const response = await fetch(apiUrl(`authFavorites`), { headers });
 
     const data = await response.json();
 
@@ -975,7 +1010,7 @@ const authService = {
   },
 
   getWatchlist: async (): Promise<unknown> => {
-    // Dynamic import để tránh vòng import với watchlistService
+    // Dynamic import, to avoid an import cycle with watchlistService.
     const { default: watchlistService } = await import('./watchlistService');
     return watchlistService.getWatchlist();
   },
@@ -993,7 +1028,7 @@ const authService = {
   getStats: async (): Promise<unknown> => {
     const headers = await authService.getAuthHeader();
 
-    const response = await fetch(`${API_URL}/auth/stats`, { headers });
+    const response = await fetch(apiUrl(`authStats`), { headers });
 
     const data = await response.json();
 
@@ -1012,7 +1047,7 @@ const authService = {
   }> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/user-stats/watch-stats`, { headers });
+      const response = await fetch(apiUrl(`userStatsWatch`), { headers });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -1045,7 +1080,7 @@ const authService = {
   getUserWeeklyActivity: async (): Promise<number[]> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/user-stats/weekly-activity`, { headers });
+      const response = await fetch(apiUrl(`userStatsWeeklyActivity`), { headers });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -1063,7 +1098,7 @@ const authService = {
   getUserGenreDistribution: async (): Promise<unknown[]> => {
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/user-stats/genre-distribution`, { headers });
+      const response = await fetch(apiUrl(`userStatsGenreDistribution`), { headers });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -1095,7 +1130,7 @@ const authService = {
 
     try {
       const headers = await authService.getAuthHeader();
-      const response = await fetch(`${API_URL}/user-stats/achievements`, { headers });
+      const response = await fetch(apiUrl(`userStatsAchievements`), { headers });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
