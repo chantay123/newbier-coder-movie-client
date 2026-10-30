@@ -3,7 +3,7 @@ import MovieCarouselSection from './MovieCarouselSection';
 import { MOVIE_CONFIG } from '@/config/movieConfig';
 import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 import type { MovieLite } from '@/features/shared/components/MovieCard/MovieCardVertical';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 type CountryMovie = {
   country?: Array<{ slug?: string; name?: string }>;

@@ -4,20 +4,23 @@
  * The backend proxy.
  *
  * WHY THIS FILE EXISTS
- * The real backend paths must not appear in the client bundle. So the
- * frontend calls an opaque token (`/api/backend/t1a2b3c4`) and this route
- * translates that token back into the real path, using the SERVER-ONLY
- * `API_ROUTE_MAP` environment variable, before forwarding the request to
- * the backend.
+ * The backend host must not appear in the client bundle. So the frontend
+ * calls a SAME-ORIGIN path (`/api/backend/movies`) and this route forwards
+ * it to the backend, using the SERVER-ONLY `BACKEND_API_URL` variable.
  *
  * The result:
- *   - the client bundle contains tokens, never URLs;
+ *   - the client bundle contains no host, no port and no scheme;
  *   - the backend host never reaches the browser;
  *   - the browser only ever talks to the same origin.
  *
- * The path parameters are the segments AFTER the token. They are appended to
- * the real path in the same order, which is why the client does not need to
- * know where a parameter belongs.
+ * HOW THE PATH IS RESOLVED
+ * The first segment is the endpoint path. It is looked up in the optional
+ * server-only `API_ROUTE_MAP` variable first, so a backend path can be
+ * remapped on the server without rebuilding the frontend. When the map is
+ * empty (the normal case) the path is forwarded as it is.
+ *
+ * The remaining segments are appended to the path, which is why the client
+ * does not need to know where a parameter belongs.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -28,9 +31,9 @@ import { getServerApiBaseUrl } from '@/config/apiBase';
 const PREFIX = '/api/backend';
 
 /**
- * Reads and parses the server-only route map.
+ * Reads the optional server-only route map.
  *
- * `API_ROUTE_MAP` is a JSON object: `{ "t1a2b3c4": "/movies", ... }`.
+ * `API_ROUTE_MAP` is a JSON object: `{ "/old/path": "/new/path", ... }`.
  * It is stored WITHOUT the `NEXT_PUBLIC_` prefix, so Next.js replaces it
  * with `undefined` in the browser bundle.
  *
@@ -46,6 +49,28 @@ const readRouteMap = (): Record<string, string> => {
   } catch {
     return {};
   }
+};
+
+/**
+ * Applies the server-side path overrides.
+ *
+ * A key matches when the path STARTS with it, so a whole branch of the API
+ * can be remapped at once. The longest matching key wins, so a specific
+ * override always beats a generic one.
+ *
+ * @param path - The path of the request, for example `/search-history/12`.
+ * @param routeMap - The server-side overrides.
+ * @returns The remapped path, or the original one when nothing matches.
+ */
+const applyRouteMap = (path: string, routeMap: Record<string, string>): string => {
+  let bestKey = '';
+  for (const key of Object.keys(routeMap)) {
+    if (!path.startsWith(key)) continue;
+    if (key.length > bestKey.length) bestKey = key;
+  }
+  if (!bestKey) return path;
+  const replacement = routeMap[bestKey];
+  return `${replacement}${path.slice(bestKey.length)}`;
 };
 
 /**
@@ -65,30 +90,26 @@ const proxy = async (req: NextApiRequest, res: NextApiResponse): Promise<void> =
 
   // `req.query.segments` holds everything after `/api/backend`.
   const segments = (req.query.segments ?? []) as string[];
-  const [token, ...params] = segments;
+  const [head, ...params] = segments;
 
-  const template = token ? routeMap[token] : undefined;
-  if (!template) {
+  if (!head) {
     res.status(404).json({ success: false, message: 'Unknown route.' });
     return;
   }
 
-  // The path parameters are substituted in order. A template parameter that
-  // receives no value keeps its placeholder out of the URL.
-  const path = template.replace(/\{(\d+)\}/g, (match, index) => {
-    const value = params[Number(index)];
-    return value === undefined ? match : encodeURIComponent(value);
-  });
-
-  // The parameters that were not consumed by the template are appended, so a
+  // The path of the endpoint, with the remaining segments appended, so a
   // route can accept a variable number of them.
-  const consumed = (template.match(/\{(\d+)\}/g) || []).length;
-  const extra = params.slice(consumed).map((value) => encodeURIComponent(value));
+  const extra = params.map((value) => encodeURIComponent(value));
+  const rawPath = [`/${head}`, ...extra].join('/');
 
-  // The template starts with a slash, and the base URL ends with one too.
+  // The path is remapped when the server route map declares an override
+  // for it.
+  const path = applyRouteMap(rawPath, routeMap);
+
+  // The path starts with a slash, and the base URL ends with one too.
   // Joining them as is would produce a double slash (`/api/v1//movies`),
   // which the backend answers with `404 Route not found`.
-  const suffix = [path.replace(/^\/+/, ''), ...extra].join('/');
+  const suffix = path.replace(/^\/+/, '');
 
   const requestUrl = req.url ?? '';
   const queryIndex = requestUrl.indexOf('?');

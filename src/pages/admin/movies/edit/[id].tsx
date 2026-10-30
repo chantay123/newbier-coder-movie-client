@@ -44,7 +44,7 @@ import {
   SERVER_TEMPLATES
 } from '@/config/addMovieConfig';
 import { MOCK_ADMIN_MOVIES } from '@/mock/admin';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 interface EpisodeItem {
   name: string;
@@ -435,7 +435,7 @@ const EditMoviePage = () => {
     const fetchMovieData = async () => {
       try {
         setInitialLoading(true);
-        const res = await axios.get(apiRoute(`adminMoviesById`, currentId));
+        const res = await axios.get(apiPath(`adminMoviesById`, currentId));
         let fetched = res.data?.movie || res.data;
 
         if (!fetched || !fetched.name) {
@@ -787,7 +787,7 @@ const EditMoviePage = () => {
       };
 
       try {
-        await axios.put(apiRoute(`adminMoviesById`, movieId || (Array.isArray(id) ? id[0] : id)), payload);
+        await axios.put(apiPath(`adminMoviesById`, movieId || (Array.isArray(id) ? id[0] : id)), payload);
       } catch (apiErr) {
 
       }

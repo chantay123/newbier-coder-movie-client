@@ -21,7 +21,7 @@ import MovieWebSimulation from '@/features/admin/components/Movies/FormFields/Mo
 import QuickCreateTaxonomyModal, { QuickCreateType } from '@/features/admin/components/Movies/FormFields/QuickCreateTaxonomyModal';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 import {
   YEAR_STEPPER_CONFIG,
   FORM_VALIDATION_CONFIG,
@@ -670,7 +670,7 @@ const AddMoviePage = () => {
       };
 
       try {
-        const res = await axios.post(apiRoute(`adminMoviesList`), payload);
+        const res = await axios.post(apiPath(`adminMoviesList`), payload);
         if (res.data && res.data.success) {
           showCinemaAlert('Thêm phim mới thành công vào hệ thống!', 'success');
           setTimeout(() => router.push('/admin/movies'), 1200);

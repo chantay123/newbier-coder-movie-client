@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
 import AdminLayout from '@/layouts/AdminLayout';
 import Head from 'next/head';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 // Set Vietnamese locale for dayjs
 dayjs.locale('vi');

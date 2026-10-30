@@ -1,6 +1,6 @@
 import axiosInstance from '@/API/config/axiosConfig';
 import { MOCK_DASHBOARD_STATS, MOCK_ANALYTICS_DATA, MOCK_FEEDBACK_DATA } from '@/mock/admin';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 /**
  * Retrieves the summary statistics shown at the top of the admin dashboard.
@@ -21,7 +21,7 @@ export const getDashboardStats = async () => {
  */
 export const getMovieStatsByPeriod = async (period = 'week') => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminDashboardViewsByDay`));
+    const response = await axiosInstance.get(apiPath(`adminDashboardViewsByDay`));
 
     if (response.data && response.data.data) {
       return response.data.data;
@@ -57,7 +57,7 @@ export const getUserStatsByPeriod = async (period = 'week') => {
  */
 export const getMovieStatsByGenre = async () => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminDashboardGenreDistribution`));
+    const response = await axiosInstance.get(apiPath(`adminDashboardGenreDistribution`));
 
     if (response.data && response.data.data) {
       return response.data.data;
@@ -90,7 +90,7 @@ export const getAnalyticsData = async () => {
  */
 export const getRecentFeedbacks = async (limit = 5) => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminDashboardRecentFeedbacks`) + `?limit=${limit}`);
+    const response = await axiosInstance.get(apiPath(`adminDashboardRecentFeedbacks`) + `?limit=${limit}`);
 
     if (response.data && response.data.data) {
       return response.data.data.recentFeedbacks || [];

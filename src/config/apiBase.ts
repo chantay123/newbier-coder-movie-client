@@ -47,12 +47,9 @@
 /**
  * The same-origin path the browser uses to reach the backend API.
  *
- * The browser calls an OPAQUE TOKEN (`/api/backend/tf65666fc/...`) and the
- * proxy in `src/pages/api/backend/[...segments].ts` translates it back into
- * the real path. That is why no backend URL is present in the client
- * bundle.
- *
- * It MUST stay in sync with `API_ROUTE_PREFIX` in `src/config/apiRoutes.ts`.
+ * The browser calls a RELATIVE PATH (`/api/backend/movies/...`) and the
+ * proxy in `src/pages/api/backend/[...segments].ts` forwards it to the
+ * backend. That is why no backend URL is present in the client bundle.
  */
 export const CLIENT_PROXY_PREFIX = '/api/backend';
 

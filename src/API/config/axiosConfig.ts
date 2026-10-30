@@ -8,7 +8,7 @@
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { RT } from '@/config/apiRoutes';
+import { AP } from '@/config/apiPaths';
 
 export type { AxiosError };
 
@@ -93,66 +93,102 @@ interface RetryableRequest extends AxiosRequestConfig {
 }
 
 /**
- * The tokens of the endpoints that need the Bearer token.
+ * The paths of the endpoints that need the Bearer token.
  *
- * The request URLs carry the OPAQUE TOKEN of the endpoint, not the real
- * path (that one lives on the server), so the tokens are used to recognize
- * an endpoint here.
+ * The request URLs carry the RELATIVE PATH of the endpoint (the base URL is
+ * added by axios), so the paths are used to recognize an endpoint here.
  */
-const AUTH_REQUIRED_TOKENS = new Set<string>([
-  RT.subscriptionCurrent,
-  RT.subscriptionHistory,
-  RT.subscriptionAdminSubscriptions,
-  RT.subscriptionAdminPendingSubscriptions,
-  RT.userStatsWatch,
-  RT.userStatsWeeklyActivity,
-  RT.userStatsActivityWeek,
-  RT.userStatsGenreDistribution,
-  RT.userStatsDailyViewingTime,
-  RT.userStatsSeriesProgress,
-  RT.userStatsInProgressSeries,
-  RT.userStatsAchievements,
-  RT.usersMeHistory,
-  RT.usersMeFavorites,
-  RT.usersHistoryByUser,
-  RT.adminUsersList,
-  RT.adminUsersById,
-  RT.adminUsersCreate,
-  RT.adminUsersUpdate,
-  RT.adminUsersDelete,
-  RT.adminUsersRole,
-  RT.adminUsersBan,
-  RT.adminUsersUnban,
-  RT.adminUsersToggleStatus,
-  RT.adminUsersAvatar,
+const AUTH_REQUIRED_PATHS = new Set<string>([
+  AP.subscriptionCurrent,
+  AP.subscriptionHistory,
+  AP.subscriptionAdminSubscriptions,
+  AP.subscriptionAdminPendingSubscriptions,
+  AP.userStatsWatch,
+  AP.userStatsWeeklyActivity,
+  AP.userStatsActivityWeek,
+  AP.userStatsGenreDistribution,
+  AP.userStatsDailyViewingTime,
+  AP.userStatsSeriesProgress,
+  AP.userStatsInProgressSeries,
+  AP.userStatsAchievements,
+  AP.usersMeHistory,
+  AP.usersMeFavorites,
+  AP.usersHistoryByUser,
+  AP.adminUsersList,
+  AP.adminUsersById,
+  AP.adminUsersCreate,
+  AP.adminUsersUpdate,
+  AP.adminUsersDelete,
+  AP.adminUsersRole,
+  AP.adminUsersBan,
+  AP.adminUsersUnban,
+  AP.adminUsersToggleStatus,
+  AP.adminUsersAvatar,
 ]);
 
 /**
- * The tokens of the authentication endpoints.
+ * The paths of the authentication endpoints.
  *
  * A 401 on one of them must NOT trigger the refresh-and-retry flow: that
  * would loop forever, because the refresh endpoint itself answers 401.
  */
-const AUTH_ENDPOINT_TOKENS = new Set<string>([
-  RT.authLogin,
-  RT.authRefreshToken,
-  RT.authLogout,
-  RT.authRegister,
+const AUTH_ENDPOINT_PATHS = new Set<string>([
+  AP.authLogin,
+  AP.authRefreshToken,
+  AP.authLogout,
+  AP.authRegister,
 ]);
 
 /**
- * Extracts the token of a request URL.
+ * Builds a matcher for a path template.
+ *
+ * The templates of `AP` use `{0}`, `{1}`, ... for the path parameters, so
+ * they are turned into a regular expression that matches any value in
+ * their place. The match is anchored, so `/watchlist` does not match
+ * `/watchlist/add`.
+ *
+ * @param template - The path template, for example `/admin/users/{0}`.
+ * @returns The regular expression that matches the concrete paths.
+ */
+const pathMatcher = (template: string): RegExp => {
+  const pattern = template
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\\\{\d+\\\}/g, '[^/]+');
+  return new RegExp(`^${pattern}$`);
+};
+
+/**
+ * Tells whether a request URL targets a given endpoint.
+ *
+ * The URLs of the axios instance are relative paths (the base URL is added
+ * by axios), so the path of the URL is compared with the template of the
+ * endpoint.
  *
  * @param url - The URL of the request.
- * @returns The token, or an empty string when the URL carries none.
+ * @param template - The path template of the endpoint.
+ * @returns `true` when the URL targets the endpoint.
  */
-const tokenOfUrl = (url: string | undefined): string => {
-  if (!url) return '';
-  // The URL is `<base>/<token>/<params...>`, so the token is the segment
-  // right after the base. Only the first segment that looks like a token
-  // is considered.
-  const match = url.match(/\/(t[0-9a-f]{8})(?:\/|$|\?)/);
-  return match ? match[1] : '';
+const matchesEndpoint = (url: string | undefined, template: string): boolean => {
+  if (!url) return false;
+  const path = url.split('?')[0].replace(/\/+$/, '') || '/';
+  return pathMatcher(template).test(path);
+};
+
+/**
+ * Tells whether a request URL targets one of the given endpoints.
+ *
+ * @param url - The URL of the request.
+ * @param templates - The path templates of the endpoints.
+ * @returns `true` when the URL targets one of the endpoints.
+ */
+const matchesAnyEndpoint = (
+  url: string | undefined,
+  templates: Set<string>
+): boolean => {
+  for (const template of templates) {
+    if (matchesEndpoint(url, template)) return true;
+  }
+  return false;
 };
 
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -162,7 +198,7 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // answer 401 on the endpoints that need it.
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  } else if (AUTH_REQUIRED_TOKENS.has(tokenOfUrl(config.url))) {
+  } else if (matchesAnyEndpoint(config.url, AUTH_REQUIRED_PATHS)) {
     // The endpoint needs a token but none is stored: the backend will
     // answer 401 and the response interceptor handles it. A silent
     // diagnostic helps to spot a broken session early.
@@ -181,10 +217,9 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 axiosInstance.interceptors.response.use(
   (response) => {
-    // The favorites endpoints are recognized by their opaque token, because
-    // the real path never reaches the client bundle.
-    if (tokenOfUrl(response.config.url) === RT.usersMeFavorites) {
-      // Silent diagnostics. The token and the payload are never logged.
+    // The favorites endpoint is recognized by its path.
+    if (matchesEndpoint(response.config.url, AP.usersMeFavorites)) {
+      // Silent diagnostics. The path and the payload are never logged.
     }
     return response;
   },
@@ -217,14 +252,11 @@ axiosInstance.interceptors.response.use(
     // Each branch documents the shape the caller expects so it's easy to
     // remove when the real endpoint ships.
     //
-    // NOTE: the endpoints are recognized by their OPAQUE TOKEN, because the
-    // real path never reaches the client bundle.
+    // NOTE: the endpoints are recognized by their PATH.
     if (status === 404) {
-      const token = tokenOfUrl(url);
-
       // GET /admin/movies/categories -> empty list. The page already has its
       // own mock categories (INITIAL_CATEGORIES) as a fallback.
-      if (token === RT.adminMoviesCategories) {
+      if (matchesEndpoint(url, AP.adminMoviesCategories)) {
         return { data: { categories: [] }, status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
       }
     }
@@ -236,8 +268,7 @@ axiosInstance.interceptors.response.use(
     // retry", which spams the console. We short-circuit that specific
     // endpoint so it returns a clean "no subscription" payload.
     if (status === 401) {
-      const token = tokenOfUrl(url);
-      if (token === RT.subscriptionCurrent) {
+      if (matchesEndpoint(url, AP.subscriptionCurrent)) {
         return {
           data: {
             data: {
@@ -268,7 +299,7 @@ axiosInstance.interceptors.response.use(
     // 401: try a single silent refresh, then retry the original request.
     // We never retry auth endpoints themselves (login/refresh/logout) to
     // avoid infinite refresh loops.
-    const isAuthEndpoint = AUTH_ENDPOINT_TOKENS.has(tokenOfUrl(url));
+    const isAuthEndpoint = matchesAnyEndpoint(url, AUTH_ENDPOINT_PATHS);
 
     if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;

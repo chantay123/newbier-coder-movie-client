@@ -4,7 +4,7 @@
  * Returns live backend data or clean empty states without mock fallbacks.
  */
 import { safeFetchJson } from '@/API/services/movieService';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 export interface CommentItem {
   id: string;
@@ -23,7 +23,7 @@ export const commentService = {
   /** Top community comments within the given period. */
   getTopComments: async ({ period = 'week', limit = 6 }: { period?: 'week' | 'month' | 'all'; limit?: number } = {}): Promise<{ comments: CommentItem[]; total: number; period: string }> => {
     try {
-      const result = await safeFetchJson(apiRoute(`commentsTop`) + `?period=${period}&limit=${limit}`, {}, null) as { data?: { comments?: CommentItem[] }; comments?: CommentItem[]; total?: number } | null;
+      const result = await safeFetchJson(apiPath(`commentsTop`) + `?period=${period}&limit=${limit}`, {}, null) as { data?: { comments?: CommentItem[] }; comments?: CommentItem[]; total?: number } | null;
       const comments = result?.data?.comments || result?.comments || [];
 
       if (Array.isArray(comments) && comments.length > 0) {
@@ -42,7 +42,7 @@ export const commentService = {
   /** Realtime live-buzz comments stream across concurrent movies. */
   getLiveBuzzComments: async ({ limit = 12 }: { limit?: number } = {}): Promise<{ comments: CommentItem[] }> => {
     try {
-      const result = await safeFetchJson(apiRoute(`commentsLiveBuzz`) + `?limit=${limit}`, {}, null) as { data?: { comments?: CommentItem[] }; comments?: CommentItem[] } | null;
+      const result = await safeFetchJson(apiPath(`commentsLiveBuzz`) + `?limit=${limit}`, {}, null) as { data?: { comments?: CommentItem[] }; comments?: CommentItem[] } | null;
       const comments = result?.data?.comments || result?.comments || [];
       if (Array.isArray(comments) && comments.length > 0) {
         return { comments: comments.slice(0, limit) };

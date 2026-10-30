@@ -4,7 +4,7 @@
  * instance) because some endpoints are public and don't need credentials.
  */
 import { API_URL } from '@/config/API';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;

@@ -24,7 +24,7 @@ import styles from '@/styles/AdminSidebar.module.css';
 import loadingStyles from '@/styles/AdminLoading.module.css';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 interface MenuItem {
   path: string;

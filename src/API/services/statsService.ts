@@ -6,7 +6,7 @@
  */
 import axios from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 /** The backend base URL. It uses the shared resolver instead of reading the environment. */
 const API_URL = getApiBaseUrl();

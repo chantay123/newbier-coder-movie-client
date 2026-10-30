@@ -96,11 +96,10 @@ const nextConfig: NextConfig = {
     // The MEDIA proxy only.
     //
     // The API is NOT handled by a rewrite: it goes through the Next.js API
-    // route `src/pages/api/backend/[...segments].ts`, which resolves the
-    // opaque token into the real path. A rewrite on `/api/backend` would
-    // take precedence over that route and forward the TOKEN to the backend,
-    // which does not know it — every request would answer `404 Route not
-    // found`.
+    // route `src/pages/api/backend/[...segments].ts`, which forwards the
+    // request to the backend. A rewrite on `/api/backend` would take
+    // precedence over that route and would bypass the proxy, which is
+    // needed to keep the backend host out of the browser.
     if (backendOrigin) {
       // The uploaded assets (`/uploads/...`), which live at the ROOT of the
       // backend and therefore NOT under `/api/v1`.

@@ -3,10 +3,10 @@
  *
  * Central declaration of the backend endpoints.
  *
- * The endpoints are declared with their OPAQUE TOKEN, not with their real
- * path. The real path lives in the server-only environment variable
- * `API_ROUTE_MAP`, and the proxy in `src/pages/api/backend/[...segments].ts`
- * translates the token back into the path on the server.
+ * The endpoints are declared with their RELATIVE PATH. The base URL is
+ * resolved by `getApiBaseUrl()`, and the proxy in
+ * `src/pages/api/backend/[...segments].ts` forwards the request to the
+ * backend.
  *
  * WHY THE ENDPOINTS ARE RELATIVE PATHS
  * Every consumer of `endpoints` passes the result to the shared axios
@@ -14,7 +14,7 @@
  * base URL in its `baseURL` option. When a URL is absolute, axios IGNORES
  * `baseURL`; when it is relative, axios JOINS it with `baseURL`.
  *
- * The endpoints are therefore relative paths (`tXXXX/...`). That keeps a
+ * The endpoints are therefore relative paths (`/movies/...`). That keeps a
  * single source of truth for the base URL and avoids a duplicated prefix
  * such as `/api/backend/api/backend/movies`.
  *
@@ -23,7 +23,7 @@
  */
 
 import { getApiBaseUrl } from './apiBase';
-import { apiRoute, withQuery, type ApiRouteKey } from '@/config/apiRoutes';
+import { apiPath, withQuery, type ApiPathKey } from '@/config/apiPaths';
 
 export const API_URL = getApiBaseUrl();
 
@@ -45,8 +45,8 @@ function buildUrl(base: string, params?: Record<string, string | number>): strin
  * @param params - The path parameters, in order.
  * @returns The relative path of the endpoint.
  */
-function route(key: ApiRouteKey, ...params: (string | number)[]): string {
-  return apiRoute(key, ...params);
+function route(key: ApiPathKey, ...params: (string | number)[]): string {
+  return apiPath(key, ...params);
 }
 
 export const endpoints = {

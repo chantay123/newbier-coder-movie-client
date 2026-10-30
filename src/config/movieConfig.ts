@@ -11,7 +11,7 @@ import {
   LOCAL_DEFAULT_POSTER,
   MOVIE_FALLBACK_DEFAULTS
 } from './movieFallbackConfig';
-import { RT } from './apiRoutes';
+import { AP } from './apiPaths';
 
 export {
   HERO_FALLBACK_BACKDROPS,
@@ -48,19 +48,19 @@ export const MOVIE_CONFIG = {
     new: {
       id: 'new',
       title: 'Phim mới',
-      // The OPAQUE TOKEN of the endpoint. The real path lives on the
-      // server, so it never reaches the client bundle.
-      endpoint: RT.moviesLatest
+      // The relative path of the endpoint. The base URL is added by the
+      // shared API layer, so the backend host never reaches the client.
+      endpoint: AP.moviesLatest
     },
     series: {
       id: 'series',
       title: 'Phim bộ',
-      endpoint: RT.formatsSeriesMovies
+      endpoint: AP.formatsSeriesMovies
     },
     single: {
       id: 'single',
       title: 'Phim lẻ',
-      endpoint: RT.formatsSingleMovies
+      endpoint: AP.formatsSingleMovies
     }
   },
 
@@ -70,17 +70,6 @@ export const MOVIE_CONFIG = {
     itemsPerPage: SYSTEM_CONFIG.ui.itemsPerPage
   }
 } as const;
-
-/**
- * Returns the API endpoint configured for a category.
- *
- * @param categoryKey - The key that identifies the category.
- * @returns The full or the relative API endpoint.
- */
-export const getCategoryEndpoint = (categoryKey: string): string => {
-  const category = (MOVIE_CONFIG.categories as Record<string, { endpoint: string }>)[categoryKey];
-  return category ? category.endpoint : MOVIE_CONFIG.categories.new.endpoint;
-};
 
 /**
  * Tells whether the mock data mode is enabled.

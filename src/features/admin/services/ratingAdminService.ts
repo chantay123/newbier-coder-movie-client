@@ -3,7 +3,7 @@
  * @description Admin rating aggregation: fetch per-movie stats and trigger rating sync.
  */
 import axiosInstance from '@/API/config/axiosConfig';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 interface RatingUser {
   _id: string;
@@ -30,7 +30,7 @@ export interface RatingStats {
 
 export const getMovieRatings = async (movieId: string): Promise<RatingStats> => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminRatingsByMovie`, movieId));
+    const response = await axiosInstance.get(apiPath(`adminRatingsByMovie`, movieId));
     return (response.data as { data: RatingStats }).data;
   } catch (error) {
 
@@ -40,7 +40,7 @@ export const getMovieRatings = async (movieId: string): Promise<RatingStats> => 
 
 export const syncMovieRatings = async (movieId: string): Promise<unknown> => {
   try {
-    const response = await axiosInstance.post(apiRoute(`adminRatingsUpdateMovie`), { movieId });
+    const response = await axiosInstance.post(apiPath(`adminRatingsUpdateMovie`), { movieId });
     return (response.data as { data: unknown }).data;
   } catch (error) {
 
@@ -50,7 +50,7 @@ export const syncMovieRatings = async (movieId: string): Promise<unknown> => {
 
 export const syncAllMovieRatings = async (): Promise<unknown> => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminRatingsSyncAll`));
+    const response = await axiosInstance.get(apiPath(`adminRatingsSyncAll`));
     return (response.data as { data: unknown }).data;
   } catch (error) {
 

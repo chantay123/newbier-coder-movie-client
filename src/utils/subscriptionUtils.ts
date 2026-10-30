@@ -4,7 +4,7 @@
  * Utility functions that check the subscription and the payment state.
  */
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 /**
  * Checks whether the user has a pending payment request.

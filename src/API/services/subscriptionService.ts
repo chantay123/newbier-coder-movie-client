@@ -5,7 +5,7 @@
  */
 import api from '@/API/config/axiosConfig';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiRoute, apiUrl } from '@/config/apiRoutes';
+import { apiPath, apiUrl } from '@/config/apiPaths';
 
 export interface SubscriptionPackage {
   _id: string;
@@ -77,7 +77,7 @@ const emptyAdBenefits = (authError = false): AdBenefits => ({
 const subscriptionService = {
   getAllPackages: async (): Promise<SubscriptionPackage[]> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionPackages`));
+      const response = await api.get(apiPath(`subscriptionPackages`));
       return (response.data as { data: SubscriptionPackage[] }).data;
     } catch (error) {
 
@@ -87,7 +87,7 @@ const subscriptionService = {
 
   getPackageById: async (packageId: string): Promise<SubscriptionPackage> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionPackageById`, packageId));
+      const response = await api.get(apiPath(`subscriptionPackageById`, packageId));
       return (response.data as { data: SubscriptionPackage }).data;
     } catch (error) {
 
@@ -101,7 +101,7 @@ const subscriptionService = {
         packageId: data.packageId,
         paymentMethod: data.paymentMethod || 'bank_transfer'
       };
-      const response = await api.post(apiRoute(`subscriptionSubscribe`), subscriptionData);
+      const response = await api.post(apiPath(`subscriptionSubscribe`), subscriptionData);
       return { ...(response.data as object), success: true, _originalSuccess: (response.data as { success?: boolean }).success, _formatted: true };
     } catch (error) {
       const err = error as { response?: { status?: number; data?: { error?: string; details?: unknown } }; message?: string };
@@ -120,7 +120,7 @@ const subscriptionService = {
 
   confirmPayment: async (paymentId: string): Promise<Record<string, unknown>> => {
     try {
-      const response = await api.post(apiRoute(`subscriptionConfirmPayment`), { paymentId });
+      const response = await api.post(apiPath(`subscriptionConfirmPayment`), { paymentId });
       return response.data as Record<string, unknown>;
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -135,7 +135,7 @@ const subscriptionService = {
 
   cancelSubscription: async (): Promise<unknown> => {
     try {
-      const response = await api.post(apiRoute(`subscriptionCancel`));
+      const response = await api.post(apiPath(`subscriptionCancel`));
       return response.data;
     } catch (error) {
 
@@ -145,7 +145,7 @@ const subscriptionService = {
 
   getCurrentSubscription: async (): Promise<SubscriptionCurrentPayload> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionCurrent`));
+      const response = await api.get(apiPath(`subscriptionCurrent`));
       const data = (response.data as { data?: Partial<SubscriptionCurrentPayload> }).data || {};
       return {
         hasActiveSubscription: data.hasActiveSubscription || false,
@@ -173,7 +173,7 @@ const subscriptionService = {
       // It returns `{ hasActiveSubscription, subscription, daysLeft, isExpired }`.
       // We derive ad-block benefits locally from the package id so we never
       // hit a non-existent endpoint.
-      const response = await api.get(apiRoute(`subscriptionCurrent`), {
+      const response = await api.get(apiPath(`subscriptionCurrent`), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const payload = (response.data as { data?: Partial<SubscriptionCurrentPayload> }).data || {};
@@ -202,7 +202,7 @@ const subscriptionService = {
 
   getSubscriptionHistory: async (): Promise<unknown> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionHistory`));
+      const response = await api.get(apiPath(`subscriptionHistory`));
       return (response.data as { data: unknown }).data;
     } catch (error) {
 
@@ -212,7 +212,7 @@ const subscriptionService = {
 
   updateAutoRenewal: async (autoRenewal: boolean): Promise<unknown> => {
     try {
-      const response = await api.put(apiRoute(`subscriptionAutoRenewal`), { autoRenewal });
+      const response = await api.put(apiPath(`subscriptionAutoRenewal`), { autoRenewal });
       return response.data;
     } catch (error) {
 
@@ -222,7 +222,7 @@ const subscriptionService = {
 
   getPendingSubscription: async (): Promise<unknown> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionPending`));
+      const response = await api.get(apiPath(`subscriptionPending`));
       return (response.data as { data: unknown }).data;
     } catch (error) {
 
@@ -317,7 +317,7 @@ const subscriptionService = {
 
   getAdminApprovedSubscriptions: async (): Promise<Subscription[]> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionAdminSubscriptions`));
+      const response = await api.get(apiPath(`subscriptionAdminSubscriptions`));
       const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
       return all.filter((s) => s.status === 'approved' || s.status === 'active');
     } catch (error) {
@@ -328,7 +328,7 @@ const subscriptionService = {
 
   getAdminRejectedSubscriptions: async (): Promise<Subscription[]> => {
     try {
-      const response = await api.get(apiRoute(`subscriptionAdminSubscriptions`));
+      const response = await api.get(apiPath(`subscriptionAdminSubscriptions`));
       const all = ((response.data as { data?: Subscription[] }).data || []) as Subscription[];
       return all.filter((s) => s.status === 'rejected');
     } catch (error) {
@@ -339,7 +339,7 @@ const subscriptionService = {
 
   approveSubscription: async (subscriptionId: string): Promise<unknown> => {
     try {
-      const response = await api.post(apiRoute(`subscriptionAdminApprove`, subscriptionId));
+      const response = await api.post(apiPath(`subscriptionAdminApprove`, subscriptionId));
       return response.data;
     } catch (error) {
 
@@ -349,7 +349,7 @@ const subscriptionService = {
 
   rejectSubscription: async (subscriptionId: string, reason?: string): Promise<unknown> => {
     try {
-      const response = await api.post(apiRoute(`subscriptionAdminReject`, subscriptionId), { reason });
+      const response = await api.post(apiPath(`subscriptionAdminReject`, subscriptionId), { reason });
       return response.data;
     } catch (error) {
 

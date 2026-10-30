@@ -4,7 +4,7 @@
  */
 import axiosInstance from '@/API/config/axiosConfig';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiRoute, apiUrl } from '@/config/apiRoutes';
+import { apiPath, apiUrl } from '@/config/apiPaths';
 
 interface WatchLaterMovieRecord {
   _id?: string;
@@ -111,7 +111,7 @@ const watchLaterService = {
       return [];
     }
     try {
-      const response = await axiosInstance.get(apiRoute(`watchlaterList`));
+      const response = await axiosInstance.get(apiPath(`watchlaterList`));
       if (response.status === 200) {
         const payload = response.data as { statusCode?: number; data?: WatchLaterMovieInput[]; message?: string };
         if (payload.statusCode === 200) {
@@ -153,7 +153,7 @@ const watchLaterService = {
       else if (movieData.slug) payload.movieSlug = movieData.slug;
       else throw new Error('Movie ID or slug is required');
 
-      const response = await axiosInstance.post(apiRoute(`watchlaterList`), payload);
+      const response = await axiosInstance.post(apiPath(`watchlaterList`), payload);
       const data = response.data as { message?: string; data?: { exists?: boolean; alreadyExists?: boolean } };
       return {
         success: response.status === 200,
@@ -172,7 +172,7 @@ const watchLaterService = {
 
   removeFromWatchLater: async (movieId: string): Promise<WatchLaterOpResult> => {
     try {
-      const response = await axiosInstance.delete(apiRoute(`watchlaterDelete`, movieId));
+      const response = await axiosInstance.delete(apiPath(`watchlaterDelete`, movieId));
       const data = response.data as { success?: boolean; message?: string };
       return {
         success: response.status === 200 && Boolean(data.success),
@@ -189,7 +189,7 @@ const watchLaterService = {
 
   checkWatchLaterStatus: async (movieSlug: string): Promise<boolean> => {
     try {
-      const response = await axiosInstance.get(apiRoute(`watchlaterCheck`), { params: { movieSlug } });
+      const response = await axiosInstance.get(apiPath(`watchlaterCheck`), { params: { movieSlug } });
       const data = response.data as { success?: boolean; data?: { isInWatchLater?: boolean } };
       if (response.status === 200 && data.success) {
         return Boolean(data.data?.isInWatchLater);

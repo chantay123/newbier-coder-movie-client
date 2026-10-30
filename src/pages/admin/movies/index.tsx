@@ -58,7 +58,7 @@ import AdminPagination from '@/features/admin/components/Common/AdminPagination'
 import { ADMIN_MOVIES_I18N, ADMIN_COMMON_I18N } from '@/config/i18n/admin';
 import { MOCK_ADMIN_MOVIES, INITIAL_CATEGORIES } from '@/mock/admin';
 import axiosInstance from '@/API/config/axiosConfig';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 import {
   getMoviesForAdmin,
@@ -454,7 +454,7 @@ const MoviesAdmin = () => {
   }, [currentPage, moviesPerPage, sortField, sortDirection, selectedCategory, filterStatus, filterYear, filterType, isSearching]);  useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axiosInstance.get(apiRoute(`adminMoviesCategories`));
+        const response = await axiosInstance.get(apiPath(`adminMoviesCategories`));
         if (response.data && response.data.categories && response.data.categories.length > 0) {
           setCategories(response.data.categories);
           return;

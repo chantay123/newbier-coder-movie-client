@@ -10,7 +10,7 @@
  * uses `getApiBaseUrl()`.
  */
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 const API_URL = getApiBaseUrl();
 

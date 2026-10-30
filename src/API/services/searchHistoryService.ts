@@ -3,7 +3,7 @@
  * @description Per-user search history (saved queries + filters).
  */
 import axiosInstance from '@/API/config/axiosConfig';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 export interface SearchHistoryFilters {
   [key: string]: unknown;
@@ -30,7 +30,7 @@ export interface SearchHistoryResult {
 const searchHistoryService = {
   saveSearchHistory: async (query: string, filters: SearchHistoryFilters = {}): Promise<unknown> => {
     try {
-      const response = await axiosInstance.post(apiRoute(`searchHistoryList`), { query, filters });
+      const response = await axiosInstance.post(apiPath(`searchHistoryList`), { query, filters });
       const data = response.data as { success?: boolean; savedItem?: SearchHistoryItem; data?: SearchHistoryItem; message?: string };
       if (data?.success) {
         return {
@@ -49,7 +49,7 @@ const searchHistoryService = {
 
   getSearchHistory: async (limit = 8): Promise<SearchHistoryResult> => {
     try {
-      const response = await axiosInstance.get(apiRoute(`searchHistoryList`) + `?limit=${limit}`);
+      const response = await axiosInstance.get(apiPath(`searchHistoryList`) + `?limit=${limit}`);
       const data = response.data as { success?: boolean; data?: { searchHistory?: SearchHistoryItem[] } };
       if (data?.success) {
         return {
@@ -66,7 +66,7 @@ const searchHistoryService = {
 
   deleteSearchHistoryItem: async (id: string): Promise<unknown> => {
     try {
-      const response = await axiosInstance.delete(apiRoute(`searchHistoryById`, id));
+      const response = await axiosInstance.delete(apiPath(`searchHistoryById`, id));
       return response.data;
     } catch (error) {
 
@@ -77,7 +77,7 @@ const searchHistoryService = {
 
   clearSearchHistory: async (): Promise<unknown> => {
     try {
-      const response = await axiosInstance.delete(apiRoute(`searchHistoryList`));
+      const response = await axiosInstance.delete(apiPath(`searchHistoryList`));
       return response.data;
     } catch (error) {
 

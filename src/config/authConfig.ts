@@ -6,7 +6,7 @@
  */
 
 import { getApiBaseUrl } from './apiBase';
-import { apiUrl } from './apiRoutes';
+import { apiUrl } from './apiPaths';
 
 export const AUTH_CONFIG = {
   // The endpoint and the contract used by the backend authentication.
@@ -14,8 +14,8 @@ export const AUTH_CONFIG = {
     /**
      * The login endpoint of the backend.
      *
-     * The URL is built by `apiUrl()`, which returns the OPAQUE TOKEN in the
-     * browser and the real path on the server. The real path therefore
+     * The URL is built by `apiUrl()`, which returns the relative path
+     * joined with the base URL of the current runtime. The backend host
      * never reaches the client bundle.
      *
      * This URL used to be built by applying a manual string replacement to

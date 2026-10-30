@@ -13,7 +13,7 @@ import {
   resolveCategoryTaxonomy
 } from '@/config/taxonomyConfig';
 import { pickMovieImage } from '@/utils/imageSource';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 // The auth service is imported lazily to avoid a circular dependency
 // between the auth and the movie modules.
@@ -314,23 +314,23 @@ const movieService = {
    * @returns The list of movies.
    */
   getHeroMovies: (limit = 6, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiRoute(`moviesLatest`), Math.max(limit * 4, 24), { signal }),
+    safeFetchMovieList(apiPath(`moviesLatest`), Math.max(limit * 4, 24), { signal }),
 
   /** Loads the trending movies. */
   getTrendingMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiRoute(`moviesTrending`), undefined, { signal }),
+    safeFetchMovieList(apiPath(`moviesTrending`), undefined, { signal }),
 
   /** Loads the top rated movies. */
   getTopRatedMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiRoute(`moviesTopRated`), undefined, { signal }),
+    safeFetchMovieList(apiPath(`moviesTopRated`), undefined, { signal }),
 
   /** Loads one page of movies. */
   getMoviesPage: (page = 1, limit = 10, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiRoute(`moviesList`) + `?page=${page}&limit=${limit}`, limit, { signal }),
+    safeFetchMovieList(apiPath(`moviesList`) + `?page=${page}&limit=${limit}`, limit, { signal }),
 
   /** Loads the latest movies without a limit. */
   getLatestMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiRoute(`moviesList`), undefined, { signal }),
+    safeFetchMovieList(apiPath(`moviesList`), undefined, { signal }),
 
   /**
    * Loads the home page movie list.
@@ -341,7 +341,7 @@ const movieService = {
    * @returns The normalized array of movies, or an empty array on failure.
    */
   getHomeMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiRoute(`moviesList`) + '?page=1&limit=20', 20, { signal }),
+    safeFetchMovieList(apiPath(`moviesList`) + '?page=1&limit=20', 20, { signal }),
 
   /**
    * Loads the movies of a country with a multi-level fallback:
@@ -369,7 +369,7 @@ const movieService = {
     // Tier 1: query the backend route `/countries/{slug}/movies`.
     for (const v of variants) {
       const list = await safeFetchMovieList(
-        apiRoute(`moviesByCountry`, encodeURIComponent(v)),
+        apiPath(`moviesByCountry`, encodeURIComponent(v)),
         fetchLimit,
         { signal }
       );
@@ -380,7 +380,7 @@ const movieService = {
     const keyword = meta?.searchKeyword;
     if (keyword) {
       const searchList = await safeFetchMovieList(
-        apiRoute(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
+        apiPath(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
         fetchLimit,
         { signal }
       );
@@ -400,7 +400,7 @@ const movieService = {
     // "-" is checked too. For example "han-quoc" matches
     // `country.slug === "han-quoc"` or a `country.name` containing
     // "han quoc" (South Korea).
-    const all = await safeFetchMovieList(apiRoute(`moviesList`) + '?page=1&limit=100', undefined, { signal });
+    const all = await safeFetchMovieList(apiPath(`moviesList`) + '?page=1&limit=100', undefined, { signal });
     if (Array.isArray(all) && all.length > 0) {
       const slugTokens = countrySlug.split('-').filter(Boolean);
       const filtered = all.filter((m) => {
@@ -453,7 +453,7 @@ const movieService = {
     // Tier 1: query the backend route `/categories/{slug}/movies`.
     for (const v of variants) {
       const list = await safeFetchMovieList(
-        apiRoute(`categoriesBySlugMovies`, encodeURIComponent(v)),
+        apiPath(`categoriesBySlugMovies`, encodeURIComponent(v)),
         fetchLimit,
         { signal }
       );
@@ -464,7 +464,7 @@ const movieService = {
     const keyword = meta?.searchKeyword;
     if (keyword) {
       const searchList = await safeFetchMovieList(
-        apiRoute(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
+        apiPath(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
         fetchLimit,
         { signal }
       );
@@ -479,7 +479,7 @@ const movieService = {
 
   /** Loads the details of a movie by slug. */
   getMovieDetails: (slug: string, signal?: AbortSignal): Promise<EnvelopeResponse | null> =>
-    safeFetchJson<EnvelopeResponse>(apiRoute(`moviesDetail`, slug), { signal }, null),
+    safeFetchJson<EnvelopeResponse>(apiPath(`moviesDetail`, slug), { signal }, null),
 
   /**
    * Multi-source fallback resolution cho Top 10 movies.
@@ -533,7 +533,7 @@ const movieService = {
     // Bearer token"). The route `/search` used to be called here, so every
     // search page received an empty list.
     const result = await safeFetchJson<EnvelopeResponse<{ hits?: RawMovie[]; total?: number; maxScore?: number }>>(
-      apiRoute(`moviesSearch`) + `?${params.toString()}`,
+      apiPath(`moviesSearch`) + `?${params.toString()}`,
       {},
       { hits: [], total: 0, maxScore: 0 }
     );
@@ -560,7 +560,7 @@ const movieService = {
     params.append('size', String(size));
     params.append('sort', 'newest');
 
-    const result = await safeFetchJson<EnvelopeResponse>(apiRoute(`moviesList`) + `?${params.toString()}`, {}, null);
+    const result = await safeFetchJson<EnvelopeResponse>(apiPath(`moviesList`) + `?${params.toString()}`, {}, null);
     const items = extractMovieList(result);
 
     return {

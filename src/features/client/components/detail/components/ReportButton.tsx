@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 export interface ReportButtonProps {
   movieId?: string;

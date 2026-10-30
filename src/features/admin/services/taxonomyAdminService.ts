@@ -21,7 +21,7 @@
  * Mutations stay in-memory until backend deploys admin write routes.
  */
 import axiosInstance from '@/API/config/axiosConfig';
-import { apiRoute, type ApiRouteKey } from '@/config/apiRoutes';
+import { apiPath, type ApiPathKey } from '@/config/apiPaths';
 import {
   INITIAL_CATEGORIES,
   INITIAL_COUNTRIES,
@@ -94,10 +94,9 @@ function extractItems(raw: unknown): TaxonomyItem[] {
 /**
  * Maps a TaxonomyType to the KEY of its endpoint.
  *
- * The key is semantic, but the VALUE is an opaque token: the real path
- * never reaches the client bundle.
+ * The key is semantic and identifies the endpoint in `AP`.
  */
-function typeToRouteKey(type: TaxonomyType): ApiRouteKey {
+function typeToRouteKey(type: TaxonomyType): ApiPathKey {
   switch (type) {
     case 'formats':   return 'taxonomyFormats';
     case 'countries': return 'taxonomyCountries';
@@ -137,7 +136,7 @@ export class TaxonomyAdminService implements ITaxonomyAdminService {
    */
   async getAll(type: TaxonomyType): Promise<TaxonomyItem[]> {
     try {
-      const path = apiRoute(typeToRouteKey(type));
+      const path = apiPath(typeToRouteKey(type));
       const response = await axiosInstance.get(path);
       const items = extractItems(response.data);
       if (items.length > 0) {

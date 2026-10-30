@@ -6,7 +6,7 @@ import AdminLayout from '@/layouts/AdminLayout';
 import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from 'axios';
 import { getApiBaseUrl, getApiOrigin } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 import {
   FaEye, FaFilter, FaExclamationTriangle,
   FaClock, FaEnvelope, FaSearch, FaSort,

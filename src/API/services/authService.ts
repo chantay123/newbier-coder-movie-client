@@ -8,7 +8,7 @@
 
 import { AUTH_CONFIG } from '@/config/authConfig';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 /** Obfuscation key. It is an environment variable so it can be changed when needed. */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';

@@ -4,7 +4,7 @@
  * Per-user stats helpers (used by profile / dashboard).
  */
 import axiosInstance from '@/API/config/axiosConfig';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 export interface UserWatchTime {
   hours: number;
@@ -41,7 +41,7 @@ export const getUserWatchStats = async (): Promise<UserWatchStats> => {
     // NOTE: `axiosInstance` already has a base URL that ends with `/api/v1`.
     // The calls below used to use '/api/user-stats/...', so the real request
     // was `/api/v1/api/user-stats/...` and answered 404 "Route not found".
-    const response = await axiosInstance.get(apiRoute(`userStatsWatch`));
+    const response = await axiosInstance.get(apiPath(`userStatsWatch`));
     const data = (response.data as { data?: UserWatchStats }).data;
     return data || emptyWatchStats;
   } catch (error) {
@@ -52,7 +52,7 @@ export const getUserWatchStats = async (): Promise<UserWatchStats> => {
 
 export const getUserActivityByWeek = async (): Promise<WeeklyActivity> => {
   try {
-    const response = await axiosInstance.get(apiRoute(`userStatsActivityWeek`));
+    const response = await axiosInstance.get(apiPath(`userStatsActivityWeek`));
     const data = (response.data as { data?: WeeklyActivity }).data;
     return data || emptyWeek;
   } catch (error) {
@@ -63,7 +63,7 @@ export const getUserActivityByWeek = async (): Promise<WeeklyActivity> => {
 
 export const getUserGenreDistribution = async (): Promise<GenreDistribution> => {
   try {
-    const response = await axiosInstance.get(apiRoute(`userStatsGenreDistribution`));
+    const response = await axiosInstance.get(apiPath(`userStatsGenreDistribution`));
     const data = (response.data as { data?: GenreDistribution }).data;
     return data || [];
   } catch (error) {

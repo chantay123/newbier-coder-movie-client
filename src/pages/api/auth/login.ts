@@ -16,7 +16,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 interface ErrorResponse {
   message: string;

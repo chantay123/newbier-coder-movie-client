@@ -40,7 +40,7 @@ const movieService = movieServiceRaw as unknown as {
 };
 import { LOCAL_DEFAULT_POSTER } from '@/config/movieFallbackConfig';
 import { TMDB_CONFIG } from '@/config/systemConfig';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 import {
   MAIN_NAV_ITEMS,
   USER_NAV_ITEMS,
@@ -410,11 +410,11 @@ const Navbar: React.FC = () => {
         setSearchActorsResult(Array.isArray(tmdbActors) ? tmdbActors : []);
       } else {
         const [moviesResp, tmdbActors] = await Promise.all([
-          safeFetchJson(apiRoute(`moviesList`) + `?search=${encodeURIComponent(q)}&limit=${NAVBAR_SEARCH_CONFIG.movieLimit}`, {}, null)
+          safeFetchJson(apiPath(`moviesList`) + `?search=${encodeURIComponent(q)}&limit=${NAVBAR_SEARCH_CONFIG.movieLimit}`, {}, null)
             .then((res: unknown) => {
               const list = extractMovieList(res);
               if (Array.isArray(list) && list.length > 0) return list;
-              return safeFetchJson(apiRoute(`moviesSearch`) + `?q=${encodeURIComponent(q)}`, {}, [])
+              return safeFetchJson(apiPath(`moviesSearch`) + `?q=${encodeURIComponent(q)}`, {}, [])
                 .then(extractMovieList);
             })
             .catch(() => []),

@@ -7,7 +7,7 @@
  */
 import axiosInstance from '@/API/config/axiosConfig';
 import { MOCK_ADMIN_MOVIES, MockMovieItem } from '@/mock/admin/mockMovies';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 export interface AdminMovie {
   _id: string;
@@ -188,7 +188,7 @@ export const getMoviesForAdmin = async (
   try {
     // The API is called on the endpoint `/movies`, because the backend has
     // no `/admin/movies` route.
-    const response = await axiosInstance.get(apiRoute(`moviesList`), {
+    const response = await axiosInstance.get(apiPath(`moviesList`), {
       params: {
         page,
         limit,
@@ -261,7 +261,7 @@ export const searchMoviesWithElasticsearch = async (
 
   try {
     // The search is tried through the API first.
-    const response = await axiosInstance.get(apiRoute(`moviesSearch`), {
+    const response = await axiosInstance.get(apiPath(`moviesSearch`), {
       params: {
         page,
         limit,
@@ -317,7 +317,7 @@ export const searchMoviesWithElasticsearch = async (
 
 export const checkElasticsearchStatus = async (): Promise<ElasticsearchStatus> => {
   try {
-    const response = await axiosInstance.get(apiRoute(`searchStatus`), { timeout: 5000 });
+    const response = await axiosInstance.get(apiPath(`searchStatus`), { timeout: 5000 });
     if (response.data) {
       return {
         status: response.data.status === 'active' ? 'active' : 'inactive',
@@ -336,7 +336,7 @@ export const checkElasticsearchStatus = async (): Promise<ElasticsearchStatus> =
 
 export const deleteMovieByAdmin = async (movieId: string): Promise<void> => {
   try {
-    await axiosInstance.delete(apiRoute(`moviesDetail`, movieId));
+    await axiosInstance.delete(apiPath(`moviesDetail`, movieId));
   } catch (error) {
     // The delete falls back to the mock when the API fails.
     console.warn('[AdminMovies] Delete API unavailable, mock delete:', movieId);
@@ -347,7 +347,7 @@ export const deleteMovieByAdmin = async (movieId: string): Promise<void> => {
 
 export const toggleMovieVisibility = async (movieId: string): Promise<{ movie: AdminMovie; isHidden: boolean }> => {
   try {
-    const response = await axiosInstance.patch(apiRoute(`moviesVisibility`, movieId));
+    const response = await axiosInstance.patch(apiPath(`moviesVisibility`, movieId));
     return {
       movie: response.data.movie || { _id: movieId, name: '', origin_name: '', slug: '' },
       isHidden: response.data.isHidden ?? true
@@ -373,7 +373,7 @@ export const createMovieByAdmin = async (
   movieData: Record<string, unknown>
 ): Promise<{ movie: AdminMovie; success: boolean }> => {
   try {
-    const response = await axiosInstance.post(apiRoute(`moviesList`), movieData);
+    const response = await axiosInstance.post(apiPath(`moviesList`), movieData);
     return {
       movie: response.data.movie,
       success: true

@@ -3,11 +3,11 @@
  * @description Admin email broadcast: maintenance alerts and custom announcements.
  */
 import axios from '@/API/config/axiosConfig';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 export const sendMaintenanceNotification = async (data: Record<string, unknown>): Promise<unknown> => {
   try {
-    const response = await axios.post(apiRoute(`notificationsSendMaintenance`), data);
+    const response = await axios.post(apiPath(`notificationsSendMaintenance`), data);
     return response.data;
   } catch (error) {
 
@@ -17,7 +17,7 @@ export const sendMaintenanceNotification = async (data: Record<string, unknown>)
 
 export const sendCustomNotification = async (data: Record<string, unknown>): Promise<unknown> => {
   try {
-    const response = await axios.post(apiRoute(`notificationsSendCustom`), data);
+    const response = await axios.post(apiPath(`notificationsSendCustom`), data);
     return response.data;
   } catch (error) {
 
@@ -41,7 +41,7 @@ export const getNotificationHistory = async (
 ): Promise<NotificationHistory | unknown> => {
   try {
     const { page = 1, limit = 10 } = params;
-    const response = await axios.get(apiRoute(`notificationsHistory`), {
+    const response = await axios.get(apiPath(`notificationsHistory`), {
       params: { page, limit }
     });
     const data = response.data as { success?: boolean; data?: { logs?: unknown[]; pagination?: { pages?: number } } };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import styles from '@/styles/UserRatingDetails.module.css';
 import { RatingContext } from './RatingStats';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 /** User rating entry */
 export interface UserRating {

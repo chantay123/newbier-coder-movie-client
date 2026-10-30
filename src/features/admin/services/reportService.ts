@@ -1,6 +1,6 @@
 import axiosInstance from '@/API/config/axiosConfig';
 import { MOCK_REPORT_DATA } from '@/mock/admin';
-import { apiRoute } from '@/config/apiRoutes';
+import { apiPath } from '@/config/apiPaths';
 
 /**
  * Query parameters accepted by the report list endpoint.
@@ -47,7 +47,7 @@ interface ReportData {
  */
 export const getReports = async (params: ReportParams = {}) => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminReportsList`), { params });
+    const response = await axiosInstance.get(apiPath(`adminReportsList`), { params });
     return response.data.data;
   } catch (error) {
     // The axiosConfig interceptor already logged the `[API] ...` message,
@@ -65,7 +65,7 @@ export const getReports = async (params: ReportParams = {}) => {
  */
 export const getReportById = async (reportId: string) => {
   try {
-    const response = await axiosInstance.get(apiRoute(`adminReportsById`, reportId));
+    const response = await axiosInstance.get(apiPath(`adminReportsById`, reportId));
     return response.data.data;
   } catch (error) {
     // The axiosConfig interceptor already logged the `[API] ...` message,
@@ -84,7 +84,7 @@ export const getReportById = async (reportId: string) => {
  */
 export const updateReport = async (reportId: string, updateData: UpdateReportData) => {
   try {
-    const response = await axiosInstance.patch(apiRoute(`adminReportsById`, reportId), updateData);
+    const response = await axiosInstance.patch(apiPath(`adminReportsById`, reportId), updateData);
     return response.data.data;
   } catch (error) {
     // The axiosConfig interceptor already logged the `[API] ...` message,
@@ -102,7 +102,7 @@ export const updateReport = async (reportId: string, updateData: UpdateReportDat
  */
 export const deleteReport = async (reportId: string) => {
   try {
-    const response = await axiosInstance.delete(apiRoute(`adminReportsById`, reportId));
+    const response = await axiosInstance.delete(apiPath(`adminReportsById`, reportId));
     return response.data.data;
   } catch (error) {
     // The axiosConfig interceptor already logged the `[API] ...` message,
@@ -129,7 +129,7 @@ export const getReportStats = async () => {
  */
 export const createReport = async (reportData: ReportData) => {
   try {
-    const response = await axiosInstance.post(apiRoute(`reportCreate`), reportData);
+    const response = await axiosInstance.post(apiPath(`reportCreate`), reportData);
     return response.data.data;
   } catch (error) {
     // The axiosConfig interceptor already logged the `[API] ...` message,
@@ -146,7 +146,7 @@ export const createReport = async (reportData: ReportData) => {
  */
 export const getMyReports = async () => {
   try {
-    const response = await axiosInstance.get(apiRoute(`reportMyReports`));
+    const response = await axiosInstance.get(apiPath(`reportMyReports`));
     return response.data.data;
   } catch (error) {
     // The axiosConfig interceptor already logged the `[API] ...` message,

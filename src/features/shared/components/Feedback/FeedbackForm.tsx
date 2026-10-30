@@ -9,7 +9,7 @@ import { useAuth } from '@/utils/auth';
 import type { User } from '@/types/user';
 import axios, { AxiosError } from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 export interface FeedbackFormProps {
   isOpen: boolean;

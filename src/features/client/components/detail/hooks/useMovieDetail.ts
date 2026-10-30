@@ -34,7 +34,7 @@ import {
 } from '@/config/movieFallbackConfig';
 import { pickImageSrc, POSTER_FIELDS, THUMB_FIELDS } from '@/utils/imageSource';
 import { resolveImageUrl } from '@/utils/movieNormalizer';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 const API_BASE = MOVIE_CONFIG.apiBaseUrl;
 

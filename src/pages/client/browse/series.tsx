@@ -10,7 +10,7 @@ import { FaPlayCircle, FaStar, FaFilm, FaChevronDown, FaSync } from 'react-icons
 import { pickMovieImage, normalizeImageUrl } from '@/utils/imageSource';
 import { getApiBaseUrl } from '@/config/apiBase';
 import styles from '@/styles/Movies.module.css';
-import { apiUrl } from '@/config/apiRoutes';
+import { apiUrl } from '@/config/apiPaths';
 
 const CATEGORIES = [
   'Hành Động','Tình Cảm','Hài Hước','Cổ Trang','Tâm Lý','Hình Sự',
