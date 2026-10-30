@@ -1,16 +1,30 @@
 /**
- * @file dashboardSnapshot.ts
- * @description Trình quản lý Snapshot & ISR cho Dashboard & Movies.
- * Hỗ trợ Next.js ISR (Incremental Static Regeneration), local static snapshot fallback,
- * và resolve dữ liệu offline/cold-start. Bật/tắt qua NEXT_PUBLIC_ENABLE_HOMEPAGE_SNAPSHOT.
+ * dashboardSnapshot.ts
+ *
+ * Snapshot and ISR management for the Dashboard and Movies pages.
+ *
+ * It supports Next.js ISR (Incremental Static Regeneration), a local static
+ * snapshot as a fallback, and the resolution of offline or cold-start data.
+ * The whole mechanism is turned on and off with
+ * NEXT_PUBLIC_ENABLE_HOMEPAGE_SNAPSHOT.
  */
 
-/** Kiểm tra xem cơ chế snapshot / ISR có được bật không */
+import { getApiBaseUrl } from '@/config/apiBase';
+
+/**
+ * Checks whether the snapshot and ISR mechanism is enabled.
+ *
+ * @returns true when the feature is turned on, false otherwise.
+ */
 export function isHomepageSnapshotEnabled(): boolean {
   const envVal = process.env.NEXT_PUBLIC_ENABLE_HOMEPAGE_SNAPSHOT ?? process.env.ENABLE_HOMEPAGE_SNAPSHOT;
   return envVal === 'true';
 }
 
+/**
+ * The shape of the snapshot file. It mirrors the sections rendered on the
+ * home page so the file can be used without any conversion.
+ */
 const DEFAULT_SNAPSHOT_STRUCTURE = {
   version: '1.0',
   generatedAt: null,
@@ -24,9 +38,18 @@ const DEFAULT_SNAPSHOT_STRUCTURE = {
   moviesDetail: {} as Record<string, unknown>
 };
 
+/**
+ * In-memory cache of the snapshot, so the file is read from disk only once
+ * per server process.
+ */
 let cachedSnapshot: typeof DEFAULT_SNAPSHOT_STRUCTURE | null = null;
 
-/** Tải snapshot từ đĩa (server-side) */
+/**
+ * Loads the snapshot from disk. Server side only.
+ *
+ * @returns The snapshot, or null when the feature is off or the file cannot
+ *          be read.
+ */
 function loadSnapshotFromDisk(): typeof DEFAULT_SNAPSHOT_STRUCTURE | null {
   if (cachedSnapshot) return cachedSnapshot;
   if (!isHomepageSnapshotEnabled()) return null;
@@ -43,20 +66,31 @@ function loadSnapshotFromDisk(): typeof DEFAULT_SNAPSHOT_STRUCTURE | null {
         return cachedSnapshot;
       }
     } catch {
-      // Fallback sạch
+      // Clean fallback: the snapshot stays unavailable and the API is used.
     }
   }
 
   return null;
 }
 
-/** Trả về snapshot pre-built cục bộ */
+/**
+ * Returns the pre-built local snapshot.
+ *
+ * @returns The snapshot, or null when the feature is turned off.
+ */
 export function getLocalSnapshot(): typeof DEFAULT_SNAPSHOT_STRUCTURE | null {
   if (!isHomepageSnapshotEnabled()) return null;
   return loadSnapshotFromDisk() || DEFAULT_SNAPSHOT_STRUCTURE;
 }
 
-/** Tải snapshot qua HTTP (chạy được cả client và edge) */
+/**
+ * Loads the snapshot over HTTP. Works on the client and on the edge runtime.
+ *
+ * A cache-busting query parameter is added so the browser does not serve an
+ * old snapshot for more than a minute.
+ *
+ * @returns The snapshot, or null when it cannot be loaded.
+ */
 export async function getClientSnapshot(): Promise<typeof DEFAULT_SNAPSHOT_STRUCTURE | null> {
   if (!isHomepageSnapshotEnabled()) return null;
 
@@ -72,11 +106,12 @@ export async function getClientSnapshot(): Promise<typeof DEFAULT_SNAPSHOT_STRUC
       return await res.json() as typeof DEFAULT_SNAPSHOT_STRUCTURE;
     }
   } catch {
-    // Silent fallback
+    // Silent fallback: the caller keeps using the live API.
   }
   return null;
 }
 
+/** The dashboard data returned to the page after the snapshot is resolved. */
 type DashboardSnapshot = {
   featuredMovies: unknown[];
   topMovies: unknown[];
@@ -88,20 +123,35 @@ type DashboardSnapshot = {
   generatedAt: string;
 };
 
-/** Fetcher ISR phía server, gọi trong getStaticProps. */
+/**
+ * Fetches the dashboard data for ISR. Called inside getStaticProps.
+ *
+ * The live API is preferred. When it fails, the local snapshot file is used
+ * instead, so the page still renders with data.
+ *
+ * @returns The dashboard data, or null when neither source has data.
+ */
 export async function getDashboardDataForISR(): Promise<DashboardSnapshot | null> {
   if (!isHomepageSnapshotEnabled()) {
     return null;
   }
 
   const fallback = loadSnapshotFromDisk() || DEFAULT_SNAPSHOT_STRUCTURE;
-  const API_BASE = (process.env.NEXT_PUBLIC_CORE_API_URL || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+  const API_BASE = getApiBaseUrl();
 
   if (API_BASE) {
     try {
+      // The request is aborted after 6 seconds so a slow backend cannot
+      // block the build.
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
 
+      /**
+       * Fetches one endpoint and unwraps the list from the response.
+       *
+       * @param ep - The endpoint path, relative to the API base.
+       * @returns The list of movies, or an empty array on any failure.
+       */
       const fetchEndpoint = async (ep: string): Promise<unknown[]> => {
         try {
           const res = await fetch(`${API_BASE}${ep}`, {
@@ -110,6 +160,8 @@ export async function getDashboardDataForISR(): Promise<DashboardSnapshot | null
           });
           if (!res.ok) return [];
           const json = await res.json() as Record<string, unknown>;
+          // The backend has used several envelope shapes over time, so every
+          // known one is tried before giving up.
           return ((json.responseData as Record<string, unknown>)?.data as unknown[]) ||
             (json.responseData as unknown[]) ||
             ((json.data as Record<string, unknown>)?.movies as unknown[]) ||
@@ -156,7 +208,7 @@ export async function getDashboardDataForISR(): Promise<DashboardSnapshot | null
         };
       }
     } catch {
-      // Quietly fall back
+      // Quietly fall back to the snapshot file below.
     }
   }
 

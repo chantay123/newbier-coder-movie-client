@@ -398,7 +398,7 @@ export const buildMovieTrailerSearchEmbed = (movie: TrailerLike | null | undefin
 
 /**
  * Builds a `https://www.youtube.com/results?search_query=...` URL for
- * the "Tìm trên YouTube" external fallback link.
+ * the "Search on YouTube" external fallback link.
  */
 export const buildMovieTrailerSearchLink = (movie: TrailerLike | null | undefined): string => {
   if (!movie || typeof movie !== 'object') return 'https://www.youtube.com/';

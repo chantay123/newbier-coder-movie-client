@@ -1,21 +1,89 @@
 /**
- * @file imageSource.ts
- * @description Defensive helpers để chọn URL ảnh an toàn cho <img src>.
- * Tập trung logic "chỉ chấp nhận http(s) / data:image" tại đây, tránh
- * rải helper lặp lại ở mỗi component.
+ * imageSource.ts
+ *
+ * Defensive helpers that pick a safe image URL for an `<img src>`.
+ *
+ * The "only accept http(s) / data:image" rule lives here, so the same helper
+ * is not duplicated in every component.
  */
 
-const HTTP_OR_DATA_RE = /^(https?:\/\/|data:image\/)/i;
+import { getApiOrigin } from '@/config/apiBase';
+
+const HTTP_OR_DATA_RE = /^(https?:\/\/|data:image\/|blob:)/i;
+const PROTOCOL_RELATIVE_RE = /^\/\//;
+const ROOT_RELATIVE_RE = /^\/[^/]/;
 
 /**
- * Trả về URL ảnh hợp lệ đầu tiên trong danh sách candidate fields.
- * Chỉ chấp nhận http(s) hoặc data:image. Mọi giá trị khác (rỗng,
- * undefined, đường dẫn tương đối thiếu host, chuỗi không có scheme)
- * đều bị loại.
+ * Turns a relative image path into an absolute URL based on the backend
+ * origin.
  *
- * @param movie Loose-shape movie object (backend raw payload)
- * @param fields Danh sách key ưu tiên, theo thứ tự
- * @param fallback URL trả về khi không tìm được candidate nào hợp lệ
+ * WHY THIS EXISTS (the "images do not show" bug)
+ * Backend v1 returns uploaded images as **root relative paths**:
+ * ```json
+ * { "posterUrl": "/uploads/movies/abc.jpg" }
+ * ```
+ * `pickImageSrc` used to accept only `http(s)://` or `data:image/`, so every
+ * `/uploads/...` URL was rejected and the card fell back to the placeholder,
+ * even though the backend really had an image. This helper adds the missing
+ * resolve step instead of throwing the value away.
+ *
+ * @param raw - The image path or URL taken from the API.
+ * @returns The absolute image URL, or an empty string when the value cannot
+ *          be used.
+ */
+const toAbsoluteImageUrl = (raw: string): string => {
+  const v = raw.trim();
+  if (!v) return '';
+
+  // Already an absolute URL or a data/blob URL, so it is kept as is.
+  if (HTTP_OR_DATA_RE.test(v)) return v;
+
+  // Protocol relative: //cdn.example.com/a.jpg
+  if (PROTOCOL_RELATIVE_RE.test(v)) {
+    const proto = (typeof window !== 'undefined' && window.location?.protocol) || 'https:';
+    return `${proto}${v}`;
+  }
+
+  // Root relative path: /uploads/a.jpg -> {backend origin}/uploads/a.jpg
+  if (ROOT_RELATIVE_RE.test(v)) {
+    const origin = resolveImageOrigin();
+    if (origin) return `${origin}${v}`;
+    // Without a configured origin the value is returned unchanged, so the
+    // browser resolves it against the current domain. That is usually correct
+    // when the image lives in /public.
+    return v;
+  }
+
+  // Garbage values: "undefined", "null", "N/A"...
+  if (/^(undefined|null|n\/a|nan)$/i.test(v)) return '';
+
+  // Neither a scheme nor a slash, so the value cannot be guessed and is
+  // dropped.
+  return '';
+};
+
+/**
+ * The backend origin, used to build the URL of relative images.
+ *
+ * The work is delegated to `getApiOrigin()` in `config/apiBase.ts`, the single
+ * place that reads the environment, so no module resolves `NEXT_PUBLIC_*` in
+ * its own way.
+ *
+ * @returns The backend origin, or an empty string.
+ */
+const resolveImageOrigin = (): string => getApiOrigin();
+
+/**
+ * Returns the first valid image URL found in a list of candidate fields.
+ *
+ * Accepted values: absolute URLs (http/https/data/blob), protocol relative
+ * URLs, and **root relative paths** (`/uploads/...`). The last case is joined
+ * with the backend origin through {@link toAbsoluteImageUrl}.
+ *
+ * @param movie - The loosely typed movie object (the raw backend payload).
+ * @param fields - The candidate keys, in priority order.
+ * @param fallback - The URL returned when no candidate is valid.
+ * @returns The resolved image URL, or the fallback.
  */
 export const pickImageSrc = (
   movie: Record<string, unknown> | null | undefined,
@@ -26,14 +94,13 @@ export const pickImageSrc = (
   for (const key of fields) {
     const raw = movie[key];
     if (typeof raw !== 'string') continue;
-    const v = raw.trim();
-    if (!v) continue;
-    if (HTTP_OR_DATA_RE.test(v)) return v;
+    const resolved = toAbsoluteImageUrl(raw);
+    if (resolved) return resolved;
   }
   return fallback;
 };
 
-/** Backdrop candidates — ưu tiên backdrop → poster → thumb. */
+/** Backdrop candidates, in priority order: backdrop -> poster -> thumb. */
 export const BACKDROP_FIELDS: readonly string[] = [
   'backdrop_url',
   'backdropUrl',
@@ -46,29 +113,43 @@ export const BACKDROP_FIELDS: readonly string[] = [
   'posterPath'
 ];
 
-/** Poster candidates — ưu tiên poster → thumb. */
+/** Poster candidates, in priority order: poster -> thumb -> other common keys. */
 export const POSTER_FIELDS: readonly string[] = [
   'poster_url',
   'posterUrl',
+  'poster',
   'thumb_url',
   'thumbUrl',
+  'thumb',
   'imagePoster',
+  'image_poster',
   'poster_path',
-  'posterPath'
+  'posterPath',
+  'image',
+  'imageUrl',
+  'image_url',
+  'thumbnail'
 ];
 
-/** Thumbnail (nhỏ) candidates — ưu tiên thumb → poster. */
+/** Thumbnail (small) candidates, in priority order: thumb -> poster. */
 export const THUMB_FIELDS: readonly string[] = [
   'thumb_url',
   'thumbUrl',
+  'thumb',
   'poster_url',
   'posterUrl',
+  'poster',
   'imagePoster',
+  'image_poster',
   'poster_path',
-  'posterPath'
+  'posterPath',
+  'image',
+  'imageUrl',
+  'image_url',
+  'thumbnail'
 ];
 
-/** Default fallback URLs cho các rail. */
+/** Default fallback URLs for the rails. */
 export const FALLBACK_BACKDROP = '/img/placeholder-backdrop.svg';
 export const FALLBACK_POSTER = '/img/placeholder-poster.svg';
 
@@ -91,9 +172,10 @@ export const FALLBACK_POSTER = '/img/placeholder-poster.svg';
  * Rather than duplicating the fallback chain in every page, this helper
  * centralizes "read a poster off a loosely-typed movie object".
  *
- * @param movie Raw or normalized movie object (either casing works)
- * @param kind 'poster' prefers poster→thumb, 'thumb' prefers thumb→poster
- * @param fallback URL used when no valid candidate exists
+ * @param movie - The raw or normalized movie object (either casing works).
+ * @param kind - 'poster' prefers poster then thumb, 'thumb' prefers thumb then poster.
+ * @param fallback - The URL used when no valid candidate exists.
+ * @returns The resolved image URL, or the fallback.
  */
 export const pickMovieImage = (
   movie: Record<string, unknown> | null | undefined,
@@ -109,8 +191,11 @@ export const pickMovieImage = (
  * Same as {@link pickMovieImage} but for a plain string already stored on a
  * field: it guards against the classic `undefined` / `null` /
  * `"undefined"` / `""` values that template literals produce when a
- * backend field is missing. Returns `''` when nothing usable is found so
- * the caller can chain its own fallback.
+ * backend field is missing.
+ *
+ * @param raw - The raw value to clean.
+ * @returns The cleaned URL, or an empty string when nothing usable is found,
+ *          so the caller can chain its own fallback.
  */
 export const normalizeImageUrl = (raw: unknown): string => {
   if (typeof raw !== 'string') return '';

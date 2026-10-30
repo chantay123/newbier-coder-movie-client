@@ -1,7 +1,9 @@
 /**
- * @file auth.tsx
- * @description Auth context: exposes user, login/register/logout, account-lock
- * detection via periodic poll and WebSocket, and HOCs for guarding routes.
+ * auth.tsx
+ *
+ * The authentication context. It exposes the current user, the login,
+ * register and logout actions, the account-lock detection through a periodic
+ * poll and the WebSocket, plus the HOCs that protect the routes.
  */
 import React, {
   createContext,
@@ -15,8 +17,9 @@ import React, {
 import { useRouter } from 'next/router';
 import { useSession, signOut, type SessionProviderProps } from 'next-auth/react';
 import authService from '@/API/services/authService';
+import { getApiOrigin, resolveWebSocketUrl } from '@/config/apiBase';
 
-/** Obfuscation helpers — giấu user info trong DevTools */
+/** Obfuscation helpers, used to hide the user info in DevTools. */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
 
 const obfEncode = (plain: string): string => {
@@ -124,10 +127,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logoutInFlightRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
 
-  // Track NextAuth session
+  // Tracks the NextAuth session.
   const { data: session, status: sessionStatus } = useSession();
 
-  // React Strict Mode safe mount tracking
+  // Mount tracking that is safe with React Strict Mode.
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -135,8 +138,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  // Listen to sessionStorage changes (cross-tab login/logout).
-  // User info giờ nằm trong sessionStorage, không phải localStorage.
+  // Listens to the storage changes, so a login or logout in another tab is
+  // reflected here. The user info lives in sessionStorage, not localStorage.
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleStorageChange = () => {
@@ -159,8 +162,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Resolve initial user từ session hoặc sessionStorage (không dùng localStorage cho user info).
-  // Chạy 1 lần duy nhất khi provider mount.
+  // Resolves the initial user from the session or from sessionStorage. The
+  // user info is never read from localStorage. This runs once, when the
+  // provider mounts.
   useEffect(() => {
     let cancelled = false;
 
@@ -181,7 +185,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               ...(session.user as AuthUser),
               backendToken
             };
-            // ✅ Lưu user vào sessionStorage (tự xóa khi đóng tab)
+            // The user is stored in sessionStorage, so it is removed when the
+            // tab is closed.
             sessionStorage.setItem('user', obfEncode(JSON.stringify(userWithToken)));
             setUser(userWithToken);
             setLoading(false);
@@ -189,7 +194,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
 
-        // Đọc token
+        // Reads the access token.
         const remembered = localStorage.getItem('remember_me') === '1';
         const accessToken = (() => {
           if (remembered) {
@@ -201,7 +206,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return fromSession || localStorage.getItem('token') || localStorage.getItem('auth_token');
         })();
 
-        // ✅ User payload: đọc từ sessionStorage trước, fallback localStorage (remember-me)
+        // The user payload is read from sessionStorage first, with
+        // localStorage as the fallback for the remember-me case.
         const storedUser = (() => {
           if (window.sessionStorage) {
             const ssUser = window.sessionStorage.getItem('user');
@@ -329,29 +335,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     let ws: WebSocket | null = null;
     let attempts = 0;
 
-    const buildWsUrl = (): string | null => {
-      const explicit = process.env.NEXT_PUBLIC_WS_URL;
-      if (explicit) {
-        if (/^wss?:\/\//i.test(explicit)) return explicit;
-        const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        return `${protocol}://${explicit.replace(/^https?:\/\//, '').replace(/\/+$/, '')}/ws`;
-      }
-      const core = process.env.NEXT_PUBLIC_CORE_API_URL;
-      const legacy = process.env.NEXT_PUBLIC_API_URL;
-      const base = (core || legacy || '').replace(/\/+$/, '');
-      if (!base) return null;
-      const host = base.replace(/^https?:\/\//, '');
-      if (!host) return null;
-      if (typeof window !== 'undefined' && host === window.location.host) return null;
-      const protocol = base.startsWith('https://') ? 'wss'
-        : base.startsWith('http://') ? 'ws'
-        : (window.location.protocol === 'https:' ? 'wss' : 'ws');
-      return `${protocol}://${host}/ws`;
-    };
-
-    const wsUrl = buildWsUrl();
+    /**
+     * Resolves the WebSocket URL through `resolveWebSocketUrl()`, the single
+     * source of truth.
+     *
+     * This function used to read the two environment variables on its own and
+     * append `/ws` by hand. That logic was duplicated in `admin/users` and
+     * `WebSocketContext`, so three places built the URL in three different
+     * ways. Now there is only one.
+     */
+    const wsUrl = resolveWebSocketUrl();
     if (!wsUrl) {
-
       return undefined;
     }
 
@@ -539,9 +533,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         abortControllerRef.current = null;
       }
 
-      // authService.logout already wipes localStorage + sessionStorage and
-      // clears the remember-me flag. Centralized so all logout paths behave
-      // identically.
+      // authService.logout already wipes localStorage and sessionStorage and
+      // clears the remember-me flag. The call is centralized here so every
+      // logout path behaves identically.
       try {
         await authService.logout();
       } catch (logoutCleanupError) {
@@ -618,13 +612,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateAvatarInUI = (updated: AuthUser): string | null => {
     if (updated && updated.avatar) {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      // The relative avatar path is joined with the backend origin, not with
+      // the `/api/v1` base. The fallback used to be the hardcoded
+      // `http://localhost:5000`, so production always showed a broken image.
+      const origin = getApiOrigin();
       let avatarUrl = String(updated.avatar);
-      if (avatarUrl.startsWith('/')) {
-        avatarUrl = `${baseUrl}${avatarUrl}`;
+      if (avatarUrl.startsWith('/') && origin) {
+        avatarUrl = `${origin}${avatarUrl}`;
       }
       avatarUrl = `${avatarUrl}?t=${new Date().getTime()}`;
-      // ✅ Cập nhật sessionStorage thay vì localStorage
+      // The user is updated in sessionStorage instead of localStorage.
       try {
         const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
         const currentUser = ssUser ? (() => { try { const d = obfDecode(ssUser); return d ? JSON.parse(d) : {}; } catch { return {}; } })() : {};

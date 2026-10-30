@@ -44,7 +44,8 @@ const initPolling = (): void => {
   window.addEventListener('appOnline', () => setSharedOnline(true));
   window.addEventListener('appOffline', () => setSharedOnline(false));
 
-  // Kiểm tra lần đầu + interval 30s - chỉ một lần cho cả app
+  // The first check plus a 30 second interval. It runs only once for the
+  // whole app, not once per component.
   void checkRealConnectivity();
   pollIntervalId = setInterval(() => {
     void checkRealConnectivity();
