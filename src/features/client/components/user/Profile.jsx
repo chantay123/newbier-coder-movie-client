@@ -12,7 +12,6 @@ import {
   FaBars, FaSync, FaPlay, FaSignOutAlt, FaTrash, FaThumbsUp, FaThumbsDown, FaComment,
   FaCheckCircle, FaCalendarCheck, FaArrowLeft
 } from 'react-icons/fa';
-import Image from 'next/image';
 import Link from 'next/link';
 import styles from '@/styles/Profile.module.css';
 import authService from '@/API/services/authService';
@@ -23,6 +22,7 @@ import subscriptionService from '@/API/services/subscriptionService';
 import HistoryContent from '@/pages/client/user/history';
 import WatchLater from '@/pages/client/user/watch-later';
 import Favorites from '@/pages/client/user/favorites';
+import { getApiOrigin } from '@/config/apiBase';
 
 const DEFAULT_AVATAR = '/img/avatar.png';
 
@@ -280,10 +280,7 @@ export default function ProfilePage() {
         // Process avatar URL properly based on its format
         if (avatarUrl && avatarUrl.startsWith('/')) {
           // For relative paths (local uploads), prepend the base URL
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-          const baseWithoutApi = baseUrl.endsWith('/api')
-            ? baseUrl.substring(0, baseUrl.length - 4)
-            : baseUrl;
+          const baseWithoutApi = getApiOrigin();
 
           avatarUrl = `${baseWithoutApi}${avatarUrl}`;
         }
@@ -609,16 +606,21 @@ export default function ProfilePage() {
     }
   };
 
-  const handleRemoveFavorite = async (movieId) => {
+  const handleRemoveFavorite = async (movieId, movieSlug) => {
     try {
-      // Call API to remove from favorites
-      await authService.removeFavorite(movieId);
+      // Call the real API through favoritesService. The backend toggles the
+      // favorite by slug (`DELETE /movies/:slug/favorite`); there is no
+      // `authService.removeFavorite`.
+      const result = await favoritesService.removeFromFavorites(movieId, movieSlug);
 
-      // Update state to remove item from UI
-      setFavoritesData(prev => prev.filter(movie => movie.id !== movieId));
-      toast.success("Phim đã được xóa khỏi danh sách yêu thích!");
+      if (result.success) {
+        // Update state to remove item from UI
+        setFavoritesData(prev => prev.filter(movie => movie.id !== movieId));
+        toast.success("Phim đã được xóa khỏi danh sách yêu thích!");
+      } else {
+        toast.error(result.message || "Không thể xóa phim khỏi danh sách yêu thích. Vui lòng thử lại sau!");
+      }
     } catch (error) {
-
       toast.error("Không thể xóa phim khỏi danh sách yêu thích. Vui lòng thử lại sau!");
     }
   };

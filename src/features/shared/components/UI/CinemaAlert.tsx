@@ -7,7 +7,8 @@ import {
   FaHeart
 } from 'react-icons/fa';
 
-// Tên CustomEvent để hỗ trợ gọi alert từ bất kỳ đâu không cần hook/props
+// The name of the custom event. It allows any part of the application to
+// show an alert without a hook or props.
 const CINEMA_ALERT_EVENT = 'cinema_alert_event';
 
 export type CinemaAlertType = 'cinema' | 'warning' | 'success' | 'error' | 'info' | 'heart';
@@ -24,10 +25,15 @@ export interface CinemaAlertEvent extends CustomEvent {
 }
 
 /**
- * Hàm gọi alert dùng chung toàn ứng dụng.
- * Ví dụ:
- *   showCinemaAlert('Bạn đã thích bộ phim này trước đó!', 'warning');
- *   showCinemaAlert('Đã thêm vào danh sách yêu thích!', 'cinema');
+ * Shows an alert, and it is shared by the whole application.
+ *
+ * @param message - The text shown inside the alert.
+ * @param type - The style of the alert.
+ * @param duration - The time in milliseconds the alert stays visible.
+ *
+ * @example
+ *   showCinemaAlert('You already liked this movie!', 'warning');
+ *   showCinemaAlert('Added to your favorites!', 'cinema');
  */
 export function showCinemaAlert(
   message: string,
@@ -54,8 +60,11 @@ const CinemaAlertContext = createContext<CinemaAlertContextValue>({
 export const useCinemaAlert = (): CinemaAlertContextValue => useContext(CinemaAlertContext);
 
 /**
- * Component hiển thị alert nổi theo chuẩn Dark Cinema.
- * Tự động gắn listener cho showCinemaAlert() và tự hủy sau khi hết thời gian.
+ * The component that shows the floating alert, following the Dark Cinema
+ * style.
+ *
+ * It listens to `showCinemaAlert()` on its own and closes itself when the
+ * time is up.
  */
 const CinemaAlert: React.FC = () => {
   const [alertData, setAlertData] = useState<CinemaAlertDetail | null>(null);
@@ -77,7 +86,7 @@ const CinemaAlert: React.FC = () => {
       const detail = (event as CinemaAlertEvent).detail;
       if (!detail || !detail.message) return;
 
-      // Hủy timer cũ nếu đang chạy
+      // The old timer is cleared when it is still running.
       if (timerRef.current) clearTimeout(timerRef.current);
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
 
@@ -100,7 +109,7 @@ const CinemaAlert: React.FC = () => {
 
   if (!alertData) return null;
 
-  // Lựa chọn icon phù hợp theo type
+  // The icon is chosen based on the type of the alert.
   const renderIcon = (): React.ReactNode => {
     switch (alertData.type) {
       case 'warning':

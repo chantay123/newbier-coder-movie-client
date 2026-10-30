@@ -1,18 +1,20 @@
 /**
- * @file useHomeData.ts
- * @description Centralized data management hook for the Homepage.
- * Tích hợp HOME_SECTIONS để render không nhấp nháy, cập nhật state sạch,
- * fallback bền bỉ.
+ * The central data management hook of the home page.
  *
- * 🆕 Tích hợp Zustand (useMovieStore):
- * - Cache homepage movies theo section ('hero', 'top10', 'bigSlide', 'latest')
- * - Đọc từ cache trước → chỉ fetch khi cache miss hoặc hết hạn
- * - Tránh gọi lại API khi user quay lại trang chủ
+ * It uses `HOME_SECTIONS` to render without flickering, to keep the state
+ * clean and to provide a solid fallback.
+ *
+ * The Zustand store (`useMovieStore`) is used to:
+ * - Cache the home page movies by section ('hero', 'top10', 'bigSlide',
+ *   'latest').
+ * - Read the cache first, so the API is only called on a cache miss or
+ *   when the cache expired.
+ * - Avoid calling the API again when the user comes back to the home page.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// Zustand store cho movie caching
+// The Zustand store used for the movie caching.
 import { useMovieStore } from '@/stores/useMovieStore';
 import {
   normalizeHeroMovie,
@@ -35,10 +37,10 @@ import {
   mockAnimationMovies
 } from '@/mock/mockMovies';
 
-/** Phim thô từ backend - loose shape, mọi field đều optional */
+/** A raw movie coming from the backend. The shape is loose and every field is optional. */
 export type RawMovie = Record<string, unknown>;
 
-/** Movie sau khi đã normalize về schema chuẩn */
+/** A movie that was already normalized to the standard schema. */
 export interface NormalizedMovie extends RawMovie {
   _id: string;
   name: string;
@@ -47,12 +49,12 @@ export interface NormalizedMovie extends RawMovie {
   backdrop_url: string;
 }
 
-/** Movie với rank cho Top 10 */
+/** A movie with a rank, used by the Top 10 list. */
 export interface RankedMovie extends NormalizedMovie {
   rank: number;
 }
 
-/** Initial snapshot từ ISR/SSR */
+/** The initial snapshot coming from the ISR or the SSR. */
 export interface HomeDataSnapshot {
   featuredMovies?: RawMovie[];
   topMovies?: RawMovie[];
@@ -62,7 +64,7 @@ export interface HomeDataSnapshot {
   [key: string]: unknown;
 }
 
-/** Hook return type */
+/** The return type of the hook. */
 export interface UseHomeDataReturn {
   featuredMovies: NormalizedMovie[];
   topMovies: NormalizedMovie[];
@@ -84,23 +86,28 @@ export interface UseHomeDataReturn {
   fetchMostViewed: () => Promise<void>;
 }
 
-// Module-level guard so the diagnostic only fires once per page load,
-// even if the home page re-mounts or re-fetches.
+// The module level guard makes the diagnostic run only once per page
+// load, even when the home page is mounted again or the data is fetched
+// again.
 let didLogHomeDiagnostic = false;
 
 /**
- * Chuẩn hoá movie data từ nhiều format backend về schema chuẩn.
- * Mọi image field đều qua `resolveImageUrl` để relative path từ API
- * (e.g. `/uploads/poster.jpg`) được gắn origin thay vì host hiện tại.
+ * Normalizes the movie data coming from the different backend formats to
+ * the standard schema.
  *
- * @param movie Raw movie object from API
- * @param index Item index cho diversified fallback backdrops
- * @returns Normalized movie object
+ * Every image field goes through `resolveImageUrl`, so a relative path
+ * from the API (for example `/uploads/poster.jpg`) is joined with the
+ * origin instead of pointing to the current host.
+ *
+ * @param movie - The raw movie object coming from the API.
+ * @param index - The index of the item, used for the diversified fallback
+ *                backdrops.
+ * @returns The normalized movie, or `null` when it has no real image.
  */
 const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): NormalizedMovie | null => {
   if (!movie) return null;
 
-  // Lấy candidate field đầu tiên resolve được
+  // The first candidate field that can be resolved is used.
   const resolveFirstUsable = (candidates: unknown[]): string => {
     for (const c of candidates) {
       const r = resolveImageUrl(c as string | null | undefined);
@@ -119,18 +126,22 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
   const posterResolved = resolveFirstUsable(posterCandidates);
   const thumbResolved = resolveFirstUsable(thumbCandidates);
 
-  // CHỈ HIỂN THỊ PHIM CÓ ẢNH THẬT: nếu cả poster lẫn thumb đều rỗng
-  // từ API, trả null để caller filterMovies có thể bỏ qua. Trước đây
-  // code fallback về LOCAL_DEFAULT_POSTER, gây ra "dải xám" (placeholder
-  // SVG) trên trang chủ. Yêu cầu mới: phim không có ảnh → ẩn hoàn toàn.
+  // ONLY MOVIES WITH A REAL IMAGE ARE SHOWN: when both the poster and the
+  // thumbnail are empty in the API answer, `null` is returned, so the
+  // caller can skip the movie. The code used to fall back to
+  // `LOCAL_DEFAULT_POSTER`, which produced a grey strip (the placeholder
+  // SVG) on the home page. The new rule is: a movie without an image is
+  // hidden completely.
   //
-  // Chấp nhận 3 dạng URL có thể hiển thị:
-  //   1. http(s)://…            — URL tuyệt đối từ CDN/backend
-  //   2. data:image/…           — base64 inline
-  //   3. /uploads/…, /img/…     — host-relative (khi `imageOrigin` env
-  //      rỗng, `resolveImageUrl` giữ nguyên relative path). Trường hợp
-  //      này vẫn load được trong trình duyệt nên KHÔNG được coi là
-  //      "không có ảnh" — nếu không, phim sẽ bị ẩn oan khi env thiếu.
+  // Three kinds of displayable URL are accepted:
+  //   1. http(s)://…            — an absolute URL from the CDN or the
+  //      backend.
+  //   2. data:image/…           — an inline base64 image.
+  //   3. /uploads/…, /img/…     — a host relative path. When the
+  //      `imageOrigin` environment variable is empty, `resolveImageUrl`
+  //      keeps the relative path as it is. The browser still loads it, so
+  //      it must NOT be treated as "no image", otherwise the movie would
+  //      be hidden by mistake when the environment variable is missing.
   const hasRealPoster = (v: string): boolean => {
     if (!v) return false;
     const s = v.trim();
@@ -149,12 +160,13 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
   const thumb = thumbResolved || posterResolved || poster || LOCAL_DEFAULT_POSTER;
   const backdrop = resolveMovieBackdrop(movie as never, index) || LOCAL_DEFAULT_BACKDROP;
 
-  // Controlled diagnostic (gated by NEXT_PUBLIC_DEBUG_MOVIES=true).
-  // Logs ONLY the FIRST movie's raw fields and the resolved URLs, once
-  // per page load.
+  // A controlled diagnostic, enabled by `NEXT_PUBLIC_DEBUG_MOVIES=true`.
+  // Only the raw fields and the resolved URLs of the FIRST movie are
+  // logged, once per page load.
   if (SYSTEM_CONFIG.debugMovies && index === 0 && !didLogHomeDiagnostic) {
     didLogHomeDiagnostic = true;
-    // DEBUG: uncomment below lines when you need to diagnose movie data
+    // The debug mode only: uncomment the line below when the movie data
+    // has to be diagnosed.
     // console.log('[HomeData] First movie raw:', JSON.stringify(movie, null, 2));
   }
 
@@ -172,12 +184,14 @@ const normalizeMovie = (movie: RawMovie | null | undefined, index = 0): Normaliz
 };
 
 /**
- * Áp dụng `normalizeMovie` cho mảng phim, **đồng thời loại bỏ phim thiếu
- * poster** (mà `normalizeMovie` giờ trả về `null`). Giữ nguyên thứ tự.
+ * Applies `normalizeMovie` to an array of movies and, at the same time,
+ * removes the movies that have no poster (because `normalizeMovie` now
+ * returns `null` for them). The original order is kept.
  *
- * Dùng ở mọi call-site setTopMovies / setMostViewedMovies / setLatestMovies
- * / setUpcomingMovies để áp dụng đồng bộ triết lý "không có ảnh thật
- * thì ẩn phim" mà không phải sửa từng call-site.
+ * It is used by every call site of `setTopMovies`, `setMostViewedMovies`,
+ * `setLatestMovies` and `setUpcomingMovies`, so the rule "a movie without
+ * a real image is hidden" is applied everywhere without fixing each call
+ * site one by one.
  */
 const normalizeAndCompact = <T>(
   movies: readonly T[],
@@ -193,9 +207,11 @@ const normalizeAndCompact = <T>(
 };
 
 /**
- * Tương tự `normalizeAndCompact` nhưng dùng `normalizeHeroMovie` cho
- * HeroBanner. Cùng triết lý bỏ phim không có ảnh thật (cả poster và
- * thumb đều là placeholder local).
+ * Works like `normalizeAndCompact`, but it uses `normalizeHeroMovie` for
+ * the `HeroBanner`.
+ *
+ * The same rule applies: the movies without a real image are removed,
+ * because both the poster and the thumbnail are local placeholders.
  */
 const compactHeroMovies = (movies: readonly unknown[]): NormalizedMovie[] => {
   const out: NormalizedMovie[] = [];
@@ -210,26 +226,37 @@ const compactHeroMovies = (movies: readonly unknown[]): NormalizedMovie[] => {
 };
 
 
+/**
+ * Loads the data of the home page.
+ *
+ * @param initialSnapshot - The snapshot built by the ISR or the SSR. It is
+ *                          only used when the snapshot feature is enabled.
+ * @returns The movies of every section, plus the loading states and the
+ *          handlers of the page.
+ */
 export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): UseHomeDataReturn => {
   const isSnapshotEnabled = process.env.NEXT_PUBLIC_ENABLE_HOMEPAGE_SNAPSHOT === 'true';
   const effectiveSnapshot: HomeDataSnapshot | null = isSnapshotEnabled ? initialSnapshot : null;
   const snap = effectiveSnapshot as HomeDataSnapshot | null;
 
-  // ---- Zustand cache selectors ----
-  // Dùng selector để tránh re-render toàn component khi cache không liên quan thay đổi
+  // ---- The Zustand cache selectors ----
+  // A selector is used for each action, so the whole component does not
+  // re-render when an unrelated part of the cache changes.
   const getHomeCache = useMovieStore((s) => s.getCachedHomeMovies);
   const setHomeCache = useMovieStore((s) => s.setCachedHomeMovies);
   const setHomeLoading = useMovieStore((s) => s.setLoadingHome);
 
-  // Pure real API data states initialized from ISR snapshot when available & enabled.
-  // Each initializer runs the trailer-aware filter so the homepage
-  // never boots up with a list that contains movies we cannot play a
-  // trailer for. The same `filterMoviesWithValidTrailer` helper used
-  // by the network fetchers is reused here to keep the rule in one
-  // place: a movie without a valid trailer simply must not appear in
-  // any rail that exposes a "Xem trailer" button.
+  // The states hold the real data of the API. They are initialized from
+  // the ISR snapshot when it is available and enabled.
+  // Every initializer runs the trailer aware filter, so the home page
+  // never starts with a list that contains movies without a playable
+  // trailer. The same `filterMoviesWithValidTrailer` helper used by the
+  // network fetchers is reused here, so the rule stays in one place: a
+  // movie without a valid trailer must not appear in any rail that shows
+  // a "watch trailer" button.
   //
-  // 🆕 Cache-first: kiểm tra Zustand store trước, fallback về snapshot
+  // The cache is checked first in the Zustand store, and the snapshot is
+  // the fallback.
   const [featuredMovies, setFeaturedMovies] = useState<NormalizedMovie[]>(() => {
     const cached = getHomeCache('hero');
     if (cached && cached.length > 0) {
@@ -286,13 +313,15 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   const [hasMore, setHasMore] = useState<boolean>(true);
 
   const isMountedRef = useRef<boolean>(true);
-  // Counter tracks how many of the initial 4 fetches are still in
-  // flight. `loading` flips off only when the counter reaches zero,
-  // so a single hung fetch can no longer trap the page in skeleton
-  // state forever. Also used as a hard safety net: a per-fetch
-  // timeout is enforced below so the counter can never stay > 0.
+  // The counter tracks how many of the 4 initial fetches are still in
+  // flight. `loading` only turns off when the counter reaches zero, so a
+  // single hanging fetch can no longer trap the page in the skeleton
+  // state forever. It is also used as a hard safety net: a timeout is
+  // enforced on every fetch below, so the counter can never stay above
+  // zero.
   const initialFetchesPendingRef = useRef<number>(0);
-  // Master timeout id so we can clear it once the page renders.
+  // The id of the master timeout, so it can be cleared once the page is
+  // rendered.
   const loadingSafetyNetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -307,10 +336,12 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, []);
 
   /**
-   * Decrements the in-flight counter and, when it reaches zero,
-   * unsticks the page by setting `loading=false`. This is the single
-   * point of truth for the initial-load loading state — every
-   * fetcher that participates in the initial paint must call it.
+   * Decrements the in-flight counter and, when it reaches zero, unsticks
+   * the page by setting `loading=false`.
+   *
+   * This is the single source of truth for the loading state of the
+   * initial load: every fetcher that takes part in the first paint has
+   * to call it.
    */
   const finishInitialFetch = useCallback((): void => {
     initialFetchesPendingRef.current = Math.max(0, initialFetchesPendingRef.current - 1);
@@ -327,10 +358,13 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, []);
 
   /**
-   * Fetches hero spotlight movies via HOME_SECTIONS bundle.
-   * Falls back to local mockMovies when the API returns empty (e.g. 401).
+   * Fetches the movies of the hero spotlight through the `HOME_SECTIONS`
+   * bundle.
    *
-   * 🆕 Cache: ghi kết quả vào Zustand store sau khi fetch thành công
+   * The local `mockMovies` are used as a fallback when the API returns
+   * an empty list (for example on a 401).
+   *
+   * The result is written to the Zustand store after a successful fetch.
    */
   const fetchHeroMovies = useCallback(async (): Promise<void> => {
     try {
@@ -343,16 +377,18 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       if (isMountedRef.current && finalList.length > 0) {
         const filtered = filterMoviesWithValidTrailer(finalList);
 
-        // Theo yêu cầu: chỉ hiển thị phim CÓ trailer. Không fallback về
-        // danh sách không-trailer. Nếu lọc ra 0 phim thì Hero render
-        // null (xử lý ở HeroBanner khi `!activeMovie`). Lấy tối đa 6 phim
-        // đầu tiên pass qua filter để giữ layout carousel gọn gàng.
+        // Only the movies WITH a trailer are shown. There is no fallback
+        // on a list without a trailer. When the filter removes every
+        // movie, the hero renders `null` (it is handled by the
+        // `HeroBanner` when `!activeMovie`). At most 6 movies are kept
+        // after the filter, so the carousel layout stays compact.
         const finalHeroList = filtered.slice(0, 6);
 
-        // Tránh setState khi danh sách rỗng để React không re-render vô ích.
+        // The state is not set when the list is empty, so React does not
+        // re-render for nothing.
         if (finalHeroList.length > 0) {
           setFeaturedMovies(compactHeroMovies(finalHeroList));
-          // 🆕 Ghi cache cho section 'hero'
+          // The cache of the 'hero' section is written.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setHomeCache('hero', finalHeroList as any);
         }
@@ -368,8 +404,10 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, [finishInitialFetch, getHomeCache, setHomeCache]);
 
   /**
-   * Fetches Top 10 movies via HOME_SECTIONS bundle.
-   * Falls back to local mockMovies when the API returns empty (e.g. 401).
+   * Fetches the Top 10 movies through the `HOME_SECTIONS` bundle.
+   *
+   * The local `mockMovies` are used as a fallback when the API returns
+   * an empty list (for example on a 401).
    */
   const fetchTop10Movies = useCallback(async (): Promise<void> => {
     try {
@@ -387,7 +425,7 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
           rank: idx + 1
         }));
         setMostViewedMovies(normalized);
-        // 🆕 Ghi cache
+        // The cache is written.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setHomeCache('mostViewed', normalized as any);
         setTopMovies(compact);
@@ -409,10 +447,12 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, [finishInitialFetch, setHomeCache]);
 
   /**
-   * Fetches the homepage movie list (page=1, limit=20) on first paint
-   * and subsequent pages for infinite scroll.
-   * Falls back to local mockMovies when the API returns empty (e.g. 401
-   * Missing Bearer token on the production deploy).
+   * Fetches the movie list of the home page (`page=1`, `limit=20`) on the
+   * first paint, and the next pages for the infinite scroll.
+   *
+   * The local `mockMovies` are used as a fallback when the API returns an
+   * empty list (for example a 401 "Missing Bearer token" on the
+   * production deployment).
    */
   const fetchLatestMovies = useCallback(async (pageNumber = 1, isLoadMore = false): Promise<void> => {
     try {
@@ -420,35 +460,37 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         setLoadingMore(true);
       }
 
-      // First page uses the dedicated `getHomeMovies()` which honors the
-      // exact spec `GET /api/v1/movies?page=1&limit=20`. Subsequent
-      // pages reuse `getMoviesPage` for pagination continuity.
+      // The first page uses the dedicated `getHomeMovies()`, which follows
+      // the exact spec `GET /api/v1/movies?page=1&limit=20`. The next
+      // pages reuse `getMoviesPage`, so the pagination stays continuous.
       let rawMovies = pageNumber === 1
         ? await movieService.getHomeMovies()
         : await movieService.getMoviesPage(pageNumber, 24);
 
-      // FALLBACK: backend returns empty/401 → use local mock movies.
-      // This keeps the homepage visible during backend auth maintenance.
+      // The fallback: the backend returns an empty list or a 401, so the
+      // local mock movies are used. This keeps the home page visible
+      // during a maintenance of the backend authentication.
       if ((!Array.isArray(rawMovies) || rawMovies.length === 0) && pageNumber === 1) {
         rawMovies = mockMovies as unknown as RawMovie[];
       }
 
       if (rawMovies.length > 0 && isMountedRef.current) {
-        // Drop movies that have no valid trailer BEFORE we feed them
-        // into the rails. The homepage renders play buttons for every
-        // movie in these lists, so a movie without a usable trailer
-        // must never appear here — it would either silently no-op
-        // when clicked or show a "Trailer chưa được cung cấp" panel
-        // for a movie the user thought they could watch.
+        // The movies without a valid trailer are removed BEFORE they reach
+        // the rails. The home page shows a play button on every movie of
+        // these lists, so a movie without a usable trailer must never
+        // appear here. It would either do nothing when it is clicked, or
+        // it would show a "the trailer is not available" panel for a
+        // movie the user thought they could watch.
         const filteredRaw = filterMoviesWithValidTrailer(rawMovies);
-        // normalizeAndCompact đồng thời bỏ phim không có ảnh thật
-        // (poster_url + thumb_url đều rỗng/trả về local placeholder).
+        // `normalizeAndCompact` also removes the movies without a real
+        // image, so the grey placeholder strip never shows on the home
+        // page.
         const normalized = normalizeAndCompact(filteredRaw);
 
         if (pageNumber === 1) {
           setTopMovies(normalized.slice(0, 12));
           setLatestMovies(normalized);
-          // 🆕 Ghi cache cho section 'latest'
+          // The cache of the 'latest' section is written.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setHomeCache('latest', normalized as any);
         } else {
@@ -456,13 +498,13 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         }
       }
     } catch {
-      // Retain existing state silently
+      // The current state is kept silently.
     } finally {
       if (isMountedRef.current) {
         setLoadingMore(false);
-        // First-page requests participate in the initial loading
-        // counter; load-more requests are tracked separately and
-        // never affect the initial skeleton state.
+        // The requests of the first page take part in the initial loading
+        // counter. The "load more" requests are tracked separately and
+        // never change the initial skeleton state.
         if (pageNumber === 1) {
           finishInitialFetch();
         } else {
@@ -473,7 +515,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, [finishInitialFetch]);
 
   /**
-   * Lazily loads upcoming movies on demand with a deliberate loading buffer.
+   * Loads the upcoming movies lazily, on demand, with a deliberate
+   * loading buffer.
    */
   const loadUpcoming = useCallback(async (): Promise<void> => {
     if (upcomingLoaded || upcomingLoading) return;
@@ -503,8 +546,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       }
 
       if (result?.success && (result.upcomingMovies?.length ?? 0) > 0 && isMountedRef.current) {
-        // Same trailer-aware filter as the other rails. Upcoming
-        // movies also expose a "Xem trailer" button on the card.
+        // The same trailer aware filter as the other rails. The upcoming
+        // movies also show a "watch trailer" button on their card.
         const filtered = filterMoviesWithValidTrailer(result.upcomingMovies || []);
         setUpcomingMovies(normalizeAndCompact(filtered));
       } else if (isMountedRef.current) {
@@ -529,8 +572,11 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, [upcomingLoaded, upcomingLoading]);
 
   /**
-   * Fetches Anime Spotlight movies via HOME_SECTIONS bundle.
-   * Falls back to local mockAnimationMovies when the API returns empty (e.g. 401).
+   * Fetches the movies of the Anime Spotlight through the `HOME_SECTIONS`
+   * bundle.
+   *
+   * The local `mockAnimationMovies` are used as a fallback when the API
+   * returns an empty list (for example on a 401).
    */
   const fetchBigSlideMovies = useCallback(async (): Promise<void> => {
     try {
@@ -543,11 +589,11 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
         finalList = mockAnimationMovies as unknown as RawMovie[];
       }
       if (isMountedRef.current && Array.isArray(finalList) && finalList.length > 0) {
-        // Anime spotlight also drives a "Xem trailer" button on its
-        // card. Filter to only items with a resolvable trailer.
+        // The Anime Spotlight also shows a "watch trailer" button on its
+        // card, so only the items with a resolvable trailer are kept.
         const filtered = filterMoviesWithValidTrailer(finalList);
         setAnimeSpotlightMovies(filtered);
-        // 🆕 Ghi cache cho section 'bigSlide'
+        // The cache of the 'bigSlide' section is written.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setHomeCache('bigSlide', filtered as any);
       }
@@ -561,15 +607,17 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
     }
   }, [finishInitialFetch, setHomeCache]);
 
-  // Initial fetch on mount: ONLY triggered if initialSnapshot is not provided or empty.
-  // We use a ref-based counter (`initialFetchesPendingRef`) plus a hard
-  // 6s safety-net timeout so the page can never get stuck on a
-  // Skeleton if any individual fetcher hangs. Even if the network
-  // never resolves, the safety net forces `loading=false` and the
-  // page renders whatever data we already have (mock fallback).
+  // The initial fetch, run when the component is mounted. It is only
+  // triggered when the initial snapshot is missing or empty.
+  // A counter stored in a ref (`initialFetchesPendingRef`) is used
+  // together with a hard safety timeout of 2 seconds, so the page can
+  // never stay on the skeleton when one fetcher hangs. Even if the network
+  // never answers, the safety net forces `loading=false` and the page
+  // renders the data it already has (the mock fallback).
   //
-  // 🆕 Cache-first: kiểm tra Zustand cache trước.
-  // Nếu tất cả sections đã có cache → skip fetch, loading = false ngay.
+  // The cache is checked first in the Zustand store. When every section
+  // already has its cache, the fetch is skipped and `loading` is `false`
+  // right away.
   useEffect(() => {
     if (initialSnapshot?.featuredMovies?.length) {
       // eslint-disable-next-line no-console
@@ -577,7 +625,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       return;
     }
 
-    // 🆕 Cache-first: đếm xem có bao nhiêu sections đã có cache
+    // The cache is checked first: the sections that already have a cache
+    // are counted.
     const cachedHero = getHomeCache('hero');
     const cachedTop10 = getHomeCache('top10');
     const cachedBigSlide = getHomeCache('bigSlide');
@@ -585,20 +634,21 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
 
     const hasAllCache = cachedHero && cachedTop10 && cachedBigSlide && cachedLatest;
     if (hasAllCache) {
-      return; // loading = false (đã init từ cache ở trên)
+      return; // `loading` is already false, because the state was
+              // initialized from the cache above.
     }
     // eslint-disable-next-line no-console
 
-    // We always run 4 fetches in parallel. The counter starts at 4
-    // and is decremented in each fetcher's `finally` via
-    // `finishInitialFetch()`. When the counter hits 0, `loading`
-    // flips off.
+    // The 4 fetches always run in parallel. The counter starts at 4 and
+    // is decremented in the `finally` of each fetcher by
+    // `finishInitialFetch()`. When the counter reaches 0, `loading` turns
+    // off.
     initialFetchesPendingRef.current = 4;
 
-    // Hard safety net: if the counter is still > 0 after 2s, force
-    // `loading=false` anyway. The fetcher's own finally will still
-    // run when it eventually resolves — it will just find the
-    // counter already at 0 and no-op.
+    // The hard safety net: if the counter is still above zero after 2
+    // seconds, `loading` is forced to false anyway. The `finally` of the
+    // fetcher still runs when it finally answers, and it only finds the
+    // counter already at zero, so it does nothing.
     if (loadingSafetyNetRef.current) clearTimeout(loadingSafetyNetRef.current);
     loadingSafetyNetRef.current = setTimeout(() => {
       if (!isMountedRef.current) return;
@@ -617,8 +667,10 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
   }, [initialSnapshot, fetchHeroMovies, fetchTop10Movies, fetchBigSlideMovies, fetchLatestMovies]);
 
   /**
-   * Loads the next batch of movies for infinite scrolling.
-   * Falls back to local mockMovies (cycling) when the API returns empty.
+   * Loads the next batch of movies for the infinite scroll.
+   *
+   * The local `mockMovies` are used as a fallback, in a loop, when the API
+   * returns an empty list.
    */
   const loadMore = useCallback(async (): Promise<void> => {
     if (loadingMore || !hasMore) return;
@@ -631,7 +683,8 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       if ((!Array.isArray(rawMovies) || rawMovies.length === 0) && mockMovies.length > 0) {
         // eslint-disable-next-line no-console
 
-        // Cycle through mockMovies so infinite scroll always has data
+        // The mock movies are cycled, so the infinite scroll always has
+        // data to show.
         const cycleIdx = ((nextPage - 2) * 24) % mockMovies.length;
         const cycled: RawMovie[] = [];
         for (let i = 0; i < 24; i++) {
@@ -641,13 +694,13 @@ export const useHomeData = (initialSnapshot: HomeDataSnapshot | null = null): Us
       }
 
       if (rawMovies && rawMovies.length > 0 && isMountedRef.current) {
-        // Same trailer-aware filter as page 1. Without this, infinite
-        // scroll can keep appending movies that the homepage rails
-        // will then expose play buttons for, leading to the
-        // "Trailer chưa được cung cấp" panel on movie detail.
+        // The same trailer aware filter as the first page. Without it, the
+        // infinite scroll keeps appending movies that the home page rails
+        // then show a play button for, which leads to the "the trailer is
+        // not available" panel on the movie detail page.
         const filteredRaw = filterMoviesWithValidTrailer(rawMovies);
-        // Bỏ phim không có ảnh thật để không xuất hiện dải xám
-        // placeholder ở trang chủ.
+        // The movies without a real image are removed, so the grey
+        // placeholder strip never shows on the home page.
         const normalized = normalizeAndCompact(filteredRaw);
         setLatestMovies((prev) => [...prev, ...normalized]);
         setPage(nextPage);

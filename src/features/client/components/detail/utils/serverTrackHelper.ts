@@ -1,8 +1,9 @@
 /**
- * @file serverTrackHelper.ts
- * @description Helper to parse, classify, and group server / audio stream tracks
- * (Vietsub, Thuyết Minh, Lồng Tiếng). Eliminates duplicate buttons and enables
- * hover-to-select multiple sources (Nguồn 1, Nguồn 2).
+ * The helper that parses, classifies and groups the server and audio
+ * stream tracks (Vietnamese subtitles, dubbing, original audio).
+ *
+ * It removes the duplicate buttons and enables the selection of several
+ * sources on hover (Source 1, Source 2).
  */
 
 export type TrackType = 'voice' | 'dub' | 'sub' | 'server';
@@ -16,14 +17,14 @@ export interface ParsedTrack {
   rawName: string;
 }
 
-/** Raw server entry từ API */
+/** A raw server entry coming from the API. */
 export interface ServerEntry {
   server_name?: string;
   server_data?: unknown[];
   [key: string]: unknown;
 }
 
-/** Source within a group (Nguồn 1, Nguồn 2...) */
+/** A source inside a group (Source 1, Source 2...). */
 export interface GroupSource {
   originalIndex: number;
   serverName: string;
@@ -32,7 +33,7 @@ export interface GroupSource {
   sourceNumber: number;
 }
 
-/** Group of sources sharing the same audio type */
+/** A group of sources that share the same audio type. */
 export interface TrackGroup {
   key: string;
   label: string;
@@ -40,6 +41,15 @@ export interface TrackGroup {
   sources: GroupSource[];
 }
 
+/**
+ * Parses the name of a server and detects its audio type.
+ *
+ * @param serverName - The raw name of the server, such as
+ *                     "Vietsub #1".
+ * @param index - The position of the server, used to build the fallback
+ *                name.
+ * @returns The parsed track with its type, title, badge and icon.
+ */
 export function parseServerTrack(serverName: string = '', index: number = 0): ParsedTrack {
   const raw = String(serverName || '').trim();
   const lower = raw.toLowerCase();
@@ -87,8 +97,14 @@ export function parseServerTrack(serverName: string = '', index: number = 0): Pa
 }
 
 /**
- * Groups an array of raw servers by audio version (Vietsub, Thuyết Minh, Lồng Tiếng).
- * Each group has 1 or more sources (Nguồn 1, Nguồn 2) to prevent duplicate buttons.
+ * Groups an array of raw servers by audio version (Vietnamese subtitles,
+ * dubbing, original audio).
+ *
+ * Every group holds one or more sources (Source 1, Source 2), which
+ * prevents duplicate buttons.
+ *
+ * @param servers - The raw servers of the movie.
+ * @returns The groups of sources, one per audio type.
  */
 export function groupServersByTrack(servers: ServerEntry[] = []): TrackGroup[] {
   if (!Array.isArray(servers) || servers.length === 0) return [];

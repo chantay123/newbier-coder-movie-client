@@ -5,8 +5,7 @@ import { MovieSection as MovieSectionRaw } from '@/features/shared/components/Mo
 const MovieSection = MovieSectionRaw as unknown as React.FC<Record<string, unknown>>;
 
 /**
- * @file TopRecommendedSection.tsx
- * @description Preset component for 'Phim Đề Xuất (HOT)' carousel rail.
+ * A preset component for the "Top recommended movies" carousel rail.
  */
 
 export interface TopRecommendedSectionProps {

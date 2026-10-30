@@ -35,8 +35,8 @@ function getCodeFromEmoji(flag?: string): string | null {
 }
 
 /**
- * Generates fallback initials from country name or code
- * e.g. "Việt Nam" -> "VN", "Hàn Quốc" -> "HQ" (hoặc "KR" nếu có code)
+ * Generates fallback initials from the country name or code.
+ * For example "Vietnam" becomes "VN" and "Korea" becomes "KR".
  */
 export function getCountryInitials(name: string, code?: string): string {
   if (code && /^[a-zA-Z]{2,3}$/.test(code.trim())) {
@@ -53,8 +53,9 @@ export function getCountryInitials(name: string, code?: string): string {
 }
 
 /**
- * Component hiển thị hình ảnh cờ quốc gia (Flag Image).
- * Nếu không có ảnh hoặc tải ảnh thất bại, sẽ fallback hiển thị chữ viết tắt của quốc gia (VD: "VN").
+ * Renders the flag image of a country.
+ * When the image is missing or fails to load, it falls back to the
+ * short text code of the country, such as "VN".
  */
 export default function CountryFlag({ name, code, flag, className }: CountryFlagProps) {
   const [imgError, setImgError] = useState(false);

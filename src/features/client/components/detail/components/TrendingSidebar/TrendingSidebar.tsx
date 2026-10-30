@@ -7,8 +7,7 @@ import { pickImageSrc, POSTER_FIELDS } from '@/utils/imageSource';
 import styles from './TrendingSidebar.module.css';
 
 /**
- * @file TrendingSidebar.tsx
- * @description Minimalist Cinema Recommended Movies Widget ("Phim Đề Xuất").
+ * A small sidebar that recommends a few other movies to the visitor.
  */
 
 export interface RecommendedMovie {

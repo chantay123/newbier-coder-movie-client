@@ -4,13 +4,13 @@ import styles from '@/styles/MovieCards.module.css';
 import type { MovieLite } from './MovieCardVertical';
 
 /**
- * @file MovieCardHorizontal.tsx
- * @description Avant-garde 16:9 Cinema Wide Panorama Card with giant typographic outline rank.
+ * An avant-garde 16:9 cinema widescreen card with a giant outlined rank number.
  */
 
 /**
- * Defensive: chọn URL backdrop khả dĩ từ nhiều field. Chỉ chấp nhận
- * http(s) hoặc data:image. Mọi giá trị khác trả về placeholder.
+ * Picks a usable backdrop URL from the many fields the API may return.
+ * Only `http(s)` and `data:image` sources are accepted, everything else
+ * falls back to the placeholder image.
  */
 const resolveBackdropSrc = (
   movie: Record<string, unknown> | null | undefined,

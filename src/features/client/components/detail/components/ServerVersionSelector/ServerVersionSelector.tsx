@@ -3,8 +3,8 @@ import { groupServersByTrack, type ServerEntry } from '@/features/client/compone
 import styles from './ServerVersionSelector.module.css';
 
 /**
- * @file ServerVersionSelector.tsx
- * @description Sleek audio version selector (Vietsub, Thuyết Minh, Lồng Tiếng).
+ * Lets the user pick the audio version (subtitled, dubbed, original)
+ * of a movie before playing it.
  */
 
 export interface ServerVersionSelectorProps {

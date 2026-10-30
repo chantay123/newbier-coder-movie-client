@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiRoutes';
 
 export interface ReportButtonProps {
   movieId?: string;
@@ -11,7 +13,7 @@ const ReportButton: React.FC<ReportButtonProps> = ({ movieId }) => {
 
   const handleSubmit = async (): Promise<void> => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/movies/report`, {
+      await fetch(apiUrl(`reportCreate`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

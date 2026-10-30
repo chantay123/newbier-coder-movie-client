@@ -6,10 +6,9 @@ import styles from './RadarTop10Modal.module.css';
 import type { RadarMovie, DeltaType } from './TrendingRadarSection';
 
 /**
- * @file RadarTop10Modal.tsx
- * @description Compact, Single-Screen Top 10 Leaderboard Modal.
- * - 2-column layout (5 + 5) perfectly fitting in a single screen without scrolling.
- * - Confirmation prompt on movie click asking "Bạn có muốn xem phim này không?".
+ * A compact Top 10 leaderboard modal that fits on a single screen.
+ * - Uses a 2-column layout (5 + 5) so no scrolling is needed.
+ * - Asks the user for confirmation before opening a movie.
  */
 
 export interface RadarTop10ModalProps {

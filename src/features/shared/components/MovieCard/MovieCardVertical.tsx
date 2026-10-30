@@ -3,18 +3,17 @@ import Link from 'next/link';
 import styles from '@/styles/MovieCards.module.css';
 
 /**
- * @file MovieCardVertical.tsx
- * @description Classic 2:3 Hollywood cinema vertical poster card with floating micro-badges,
- * smooth hover elevation, and responsive meta details.
+ * A classic 2:3 cinema poster card with floating micro-badges,
+ * a smooth hover elevation and responsive meta details.
  */
 
 /**
- * Defensive: chọn URL poster khả dĩ hiển thị được từ nhiều field mà
- * backend có thể trả về. Chỉ chấp nhận URL có scheme http(s) hoặc
- * data:image (base64). Mọi giá trị khác (rỗng, undefined, chuỗi
- * không có scheme, đường dẫn tương đối thiếu host, ...) đều trả về
- * placeholder. Đây là defense in depth cuối cùng trước khi <img>
- * tải, bảo vệ cả các entry-point khác ngoài Country rail.
+ * Picks a usable poster URL from the many fields the backend may return.
+ * Only URLs with an `http(s)` scheme or a `data:image` (base64) source
+ * are accepted. Every other value (empty, undefined, a string without
+ * a scheme, a relative path without a host, ...) falls back to the
+ * placeholder. This is the last line of defence before the `<img>`
+ * loads, so it also protects the entry points outside the country rail.
  */
 const resolvePosterSrc = (
   movie: Record<string, unknown> | null | undefined,

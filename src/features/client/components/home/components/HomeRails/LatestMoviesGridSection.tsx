@@ -5,8 +5,7 @@ import { MovieSection as MovieSectionRaw } from '@/features/shared/components/Mo
 const MovieSection = MovieSectionRaw as unknown as React.FC<Record<string, unknown>>;
 
 /**
- * @file LatestMoviesGridSection.tsx
- * @description Preset component for 'Phim Mới Cập Nhật' single-row cinema rail.
+ * A preset component for the "Recently updated movies" cinema rail.
  */
 
 export interface LatestMoviesGridSectionProps {

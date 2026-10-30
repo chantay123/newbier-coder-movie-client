@@ -1,12 +1,11 @@
 /**
- * @file mockComments.ts
- * @description Mock data chuẩn hoá và Schema Contract cho Community Comments.
- * Dùng làm đặc tả cho backend khi triển khai các endpoint
- * `/api/comments/top` và `/api/comments/live-buzz`.
+ * Normalized mock data and the schema contract for the community comments.
+ * It is used as the specification for the backend when the endpoints
+ * `/api/comments/top` and `/api/comments/live-buzz` are implemented.
  */
 
 /**
- * Tham chiếu phim trong comment.
+ * The movie referenced by a comment.
  */
 export interface MovieRef {
   _id: string;
@@ -19,7 +18,7 @@ export interface MovieRef {
 }
 
 /**
- * Tham chiếu người dùng đã comment.
+ * The user who wrote the comment.
  */
 export interface UserRef {
   _id: string;
@@ -29,7 +28,7 @@ export interface UserRef {
 }
 
 /**
- * Tham chiếu comment cha (khi là reply).
+ * The parent comment, set when the comment is a reply.
  */
 export interface ParentCommentRef {
   _id: string;
@@ -39,7 +38,7 @@ export interface ParentCommentRef {
 }
 
 /**
- * Schema comment chuẩn từ API.
+ * The standard comment schema returned by the API.
  */
 export interface CommentSchema {
   _id: string;
@@ -71,7 +70,7 @@ export interface LiveBuzzComment {
 }
 
 // ============================================================================
-// TOP COMMENTS DATA (Tuần, Tháng, Toàn thời gian)
+// TOP COMMENTS DATA (week, month, all time)
 // ============================================================================
 
 export const mockTopCommentsWeek: CommentSchema[] = [

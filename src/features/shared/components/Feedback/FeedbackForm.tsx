@@ -8,6 +8,8 @@ import { FaTimes, FaLightbulb } from 'react-icons/fa';
 import { useAuth } from '@/utils/auth';
 import type { User } from '@/types/user';
 import axios, { AxiosError } from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiRoutes';
 
 export interface FeedbackFormProps {
   isOpen: boolean;
@@ -94,8 +96,8 @@ const FeedbackForm = forwardRef<HTMLDivElement, FeedbackFormProps>(
           submitData.user = user._id;
         }
 
-        const baseUrl: string = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-        const response = await axios.post(`${baseUrl}/feedback`, submitData, {
+        const baseUrl: string = getApiBaseUrl();
+        const response = await axios.post(apiUrl(`feedbackList`), submitData, {
           headers: {
             'Content-Type': 'application/json',
             ...(isAuthenticated && {

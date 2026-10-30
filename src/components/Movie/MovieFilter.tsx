@@ -3,16 +3,20 @@ import { FaFilter, FaSearch, FaArrowRight, FaCaretDown, FaCaretUp, FaThLarge, Fa
 import styles from '@/styles/MovieFilter.module.css';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
+/**
+ * The filter values currently applied by the movie filter panel.
+ * Every field holds the display label that is sent to the backend.
+ */
 export interface MovieFilterState {
-  status: string;           // 'all' | 'Sắp chiếu' | 'Đang chiếu' | 'Trọn bộ'
-  format: string;           // 'all' | 'Chiếu Rạp'
-  country: string;          // 'all' | 'Âu Mỹ' | 'Hàn Quốc' ... (hoặc string[])
-  type: string;             // 'all' | 'Phim lẻ' | 'Phim bộ'
-  ageRating: string;        // 'all' | 'P (Mọi lứa tuổi)' ...
-  categories: string[];     // ['all'] hoặc ['Cung Đấu', 'Hành Động'...]
-  version: string;          // 'all' | 'Phụ đề' | 'Lồng tiếng' | 'Thuyết minh giọng Bắc' | 'Thuyết minh giọng Nam'
+  status: string;           // 'all' | 'Coming soon' | 'Now showing' | 'Complete'
+  format: string;           // 'all' | 'Cinema'
+  country: string;          // 'all' | 'Europe & America' | 'Korea' ... (or a string[])
+  type: string;             // 'all' | 'Single movie' | 'Series'
+  ageRating: string;        // 'all' | 'P (All ages)' ...
+  categories: string[];     // ['all'] or ['Action', 'Drama'...]
+  version: string;          // 'all' | 'Subtitled' | 'Dubbed' | 'Northern dub' | 'Southern dub'
   year: string;             // 'all' | '2026' | '2025' ...
-  sort: string;             // 'Mới nhất' | 'Mới cập nhật' | 'Điểm IMDb' | 'Lượt xem'
+  sort: string;             // 'Newest' | 'Recently updated' | 'IMDb score' | 'Views'
 }
 
 export interface MovieFilterProps {
@@ -23,19 +27,19 @@ export interface MovieFilterProps {
   onClose?: () => void;
   onReset?: () => void;
   themeColor?: 'amber' | 'red';
-  showTitleHeader?: boolean;   // Hiển thị thanh tiêu đề bên ngoài
-  titleText?: string;          // Mặc định: "Duyệt tìm"
+  showTitleHeader?: boolean;   // Show the title header outside of the panel
+  titleText?: string;          // Defaults to "Browse"
   className?: string;
-  defaultOpen?: boolean;       // Trạng thái mở mặc định
+  defaultOpen?: boolean;       // Whether the panel starts expanded
 }
 
-// 1. Tình trạng
+// 1. Release status
 export const STATUS_LIST = ['Tất cả', 'Sắp chiếu', 'Đang chiếu', 'Trọn bộ'];
 
-// 2. Định dạng
+// 2. Format
 export const FORMAT_LIST = ['Tất cả', 'Chiếu Rạp'];
 
-// 3. Quốc gia
+// 3. Country
 export const COUNTRY_LIST = [
   'Tất cả', 'Âu Mỹ', 'Ba Lan', 'Canada', 'Châu Á', 'Châu Âu', 'Colombia',
   'Đài Loan', 'Đức', 'Hàn Quốc', 'Hồng Kông', 'Indonesia', 'Ireland',
@@ -43,10 +47,10 @@ export const COUNTRY_LIST = [
   'Trung quốc', 'United States of America', 'Việt Nam'
 ];
 
-// 4. Loại phim
+// 4. Movie type
 export const TYPE_LIST = ['Tất cả', 'Phim lẻ', 'Phim bộ'];
 
-// 5. Xếp hạng
+// 5. Age rating
 export const AGE_RATING_LIST = [
   'Tất cả',
   'P (Mọi lứa tuổi)',
@@ -56,7 +60,7 @@ export const AGE_RATING_LIST = [
   'T18 (18 tuổi trở lên)'
 ];
 
-// 6. Thể loại
+// 6. Genre
 export const CATEGORY_LIST = [
   'Tất cả', 'Âm Nhạc', 'Ẩm Thực', 'Anime', 'Báo Thù', 'Bí ẩn', "Boy's Love", 'Boys Love',
   'Cảm Động', 'Chích Kịch', 'Chiến Tranh', 'Chiếu Rạp', 'Chính kịch', 'Chính Sự', 'Chính Trị',
@@ -75,7 +79,7 @@ export const CATEGORY_LIST = [
   'Webtoon', 'Xuyên Không', 'Y khoa'
 ];
 
-// 7. Phiên bản
+// 7. Version
 export const VERSION_LIST = [
   'Tất cả',
   'Phụ đề',
@@ -84,13 +88,13 @@ export const VERSION_LIST = [
   'Thuyết minh giọng Nam'
 ];
 
-// 8. Năm sản xuất
+// 8. Release year
 export const YEAR_LIST = [
   'Tất cả', '2026', '2025', '2024', '2023', '2022', '2021', '2020',
   '2019', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011'
 ];
 
-// 9. Sắp xếp
+// 9. Sorting
 export const SORT_LIST = ['Mới nhất', 'Mới cập nhật', 'Điểm IMDb', 'Lượt xem'];
 
 export const INITIAL_MOVIE_FILTER_STATE: MovieFilterState = {
@@ -120,7 +124,11 @@ function toDatabaseSlug(text: string): string {
 }
 
 /**
- * Chuyển đổi MovieFilterState sang tham số truy vấn API backend (/api/v1/movies)
+ * Converts the filter state into the query parameters expected by the
+ * backend movies endpoint (`/api/v1/movies`).
+ *
+ * @param filters - The filter values selected by the user.
+ * @returns The query parameters ready to be sent to the API.
  */
 export function filterStateToQueryParams(filters: MovieFilterState): Record<string, any> {
   const params: Record<string, any> = {};
@@ -201,7 +209,7 @@ const MovieFilter: React.FC<MovieFilterProps> = ({
 
   const activeState = value || internalState;
 
-  // Tính số lượng tiêu chí đang áp dụng (khác 'Tất cả')
+  // Counts how many criteria are currently applied (everything except "All")
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (activeState.status && activeState.status !== 'Tất cả') count++;
@@ -218,7 +226,7 @@ const MovieFilter: React.FC<MovieFilterProps> = ({
     return count;
   }, [activeState]);
 
-  // Danh sách tóm tắt các filter đang chọn để hiển thị khi thu gọn
+  // Short summary of the selected filters, shown while the panel is collapsed
   const activeChips = useMemo(() => {
     const list: string[] = [];
     if (activeState.status && activeState.status !== 'Tất cả') list.push(activeState.status);
