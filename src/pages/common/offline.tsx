@@ -1,6 +1,5 @@
 /**
- * @file pages/common/offline.tsx
- * @description Trang thông báo mất kết nối internet
+ * The page shown when the browser has no internet connection.
  */
 import React, { useEffect, useState, MouseEvent } from 'react';
 import { useNetworkStatus } from '@/utils/networkStatus';

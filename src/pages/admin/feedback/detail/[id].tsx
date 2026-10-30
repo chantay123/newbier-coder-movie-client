@@ -5,6 +5,8 @@ import { useRouter } from 'next/router';
 import AdminLayout from '@/layouts/AdminLayout';
 import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiRoutes';
 import {
   FaEnvelope, FaArrowLeft, FaClock, FaReply, FaTrash,
   FaCheckCircle, FaCalendarAlt, FaExclamationTriangle,
@@ -95,11 +97,11 @@ const FeedbackDetailPage = () => {
         setError(null);
 
         const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const baseUrl = getApiBaseUrl();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         try {
-          const res = await axios.get(`${baseUrl}/feedback/${id}`, { headers, timeout: 3500 });
+          const res = await axios.get(apiUrl(`feedbackById`, Array.isArray(id) ? id[0] : id), { headers, timeout: 3500 });
           if (res.data && res.data.success) {
             setFeedback(res.data.data);
             setResponseStatus(res.data.data.status);
@@ -148,11 +150,11 @@ const FeedbackDetailPage = () => {
       setError(null);
 
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseUrl = getApiBaseUrl();
 
       if (token) {
         try {
-          await axios.patch(`${baseUrl}/feedback/${id}`, {
+          await axios.patch(apiUrl(`feedbackById`, Array.isArray(id) ? id[0] : id), {
             adminResponse: response,
             status: responseStatus
           }, {
@@ -199,11 +201,11 @@ const FeedbackDetailPage = () => {
       setError(null);
 
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseUrl = getApiBaseUrl();
 
       if (token) {
         try {
-          await axios.delete(`${baseUrl}/feedback/${id}`, {
+          await axios.delete(apiUrl(`feedbackById`, Array.isArray(id) ? id[0] : id), {
             headers: { Authorization: `Bearer ${token}` },
             timeout: 4000
           });

@@ -121,15 +121,16 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
     if (isUpcomingUnlocked && !upcomingLoaded && !upcomingLoading) loadUpcoming();
   }, [isUpcomingUnlocked, upcomingLoaded, upcomingLoading, loadUpcoming]);
 
-  // 🆕 Preload: khi batch 1 unlock, bắt đầu fetch batch 2 data trước khi user scroll tới
+  // Preload: as soon as batch 1 is unlocked, start fetching the data of
+  // batch 2 before the user scrolls down to it.
   useEffect(() => {
     if (!unlockedBatches.has(1) && unlockedBatches.has(0)) {
-      // Batch 1 vừa unlock — dispatch data fetch sớm
+      // Batch 1 has just been unlocked, so dispatch the data fetch early
       const batch1Sections = sectionBatches[1] || [];
       batch1Sections.forEach((sectionId) => {
         const config = HOME_SECTIONS[sectionId];
         if (config?.rails) {
-          // Country sections có nhiều rails con
+          // The country sections hold several child rails
           config.rails.forEach((rail) => {
             if (rail.load) rail.load([]).catch(() => {/* silent */});
           });
@@ -202,7 +203,7 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
     // filtered through `filterMoviesWithValidTrailer` in
     // `useHomeData`, but a future card component wired here might
     // forget to filter its own list. Re-checking here means a
-    // "Trailer chưa được cung cấp" panel can never appear from
+    // "trailer not available" panel can never appear from
     // this entry point.
     if (!hasValidTrailer(movie as never)) return;
     setActiveTrailerMovie(movie);

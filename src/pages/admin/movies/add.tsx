@@ -21,6 +21,7 @@ import MovieWebSimulation from '@/features/admin/components/Movies/FormFields/Mo
 import QuickCreateTaxonomyModal, { QuickCreateType } from '@/features/admin/components/Movies/FormFields/QuickCreateTaxonomyModal';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
+import { apiRoute } from '@/config/apiRoutes';
 import {
   YEAR_STEPPER_CONFIG,
   FORM_VALIDATION_CONFIG,
@@ -104,7 +105,7 @@ const UnavailableMediaSvg = ({ label = 'Không khả dụng' }: { label?: string
 const AddMoviePage = () => {
   const router = useRouter();
 
-  // Wizard Step State (1: Cơ bản, 2: Phân loại, 3: Media, 4: Server, 5: Xuất bản)
+  // Wizard step state (1: Basic info, 2: Taxonomy, 3: Media, 4: Server, 5: Publish)
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Movie Form State
@@ -174,7 +175,8 @@ const AddMoviePage = () => {
   const [notify, setNotify] = useState('');
   const [showtimes, setShowtimes] = useState('Đã khởi chiếu trọn bộ tại rạp');
 
-  // Upcoming Movie & Auto-transition Schedule (Gộp phim sắp ra mắt, cho phép khuyết thiếu)
+  // Upcoming movie and the automatic transition schedule
+  // (the upcoming movie block allows missing fields)
   const [isUpcoming, setIsUpcoming] = useState(false);
   const [isUpcomingModalOpen, setIsUpcomingModalOpen] = useState(false);
   const [releaseDateTime, setReleaseDateTime] = useState('');
@@ -668,7 +670,7 @@ const AddMoviePage = () => {
       };
 
       try {
-        const res = await axios.post('/admin/movies', payload);
+        const res = await axios.post(apiRoute(`adminMoviesList`), payload);
         if (res.data && res.data.success) {
           showCinemaAlert('Thêm phim mới thành công vào hệ thống!', 'success');
           setTimeout(() => router.push('/admin/movies'), 1200);

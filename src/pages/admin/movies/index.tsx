@@ -58,6 +58,7 @@ import AdminPagination from '@/features/admin/components/Common/AdminPagination'
 import { ADMIN_MOVIES_I18N, ADMIN_COMMON_I18N } from '@/config/i18n/admin';
 import { MOCK_ADMIN_MOVIES, INITIAL_CATEGORIES } from '@/mock/admin';
 import axiosInstance from '@/API/config/axiosConfig';
+import { apiRoute } from '@/config/apiRoutes';
 
 import {
   getMoviesForAdmin,
@@ -89,21 +90,25 @@ interface Category {
 
 interface Movie {
   _id: string;
+  id?: string;
   name: string;
   origin_name: string;
   year: number;
   type: 'series' | 'single';
   status: 'active' | 'inactive';
   thumb_url: string;
-  category: Category[] | string[];
+  poster_url?: string;
+  category: Array<Category | string>;
   views: number;
   view?: number;
+  view_count?: number;
+  like_count?: number;
   quality: string;
   lang: string;
   content?: string;
   director?: string[] | string;
   actor?: string[] | string;
-  country?: { id: string; name: string }[] | string;
+  country?: Array<{ id: string; name: string } | string>;
   time?: string;
   showtimes?: string;
   episode_current?: string | number;
@@ -124,8 +129,8 @@ interface Movie {
       link_m3u8: string;
     }>;
   }[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   expiryDate?: string;
   rating: number;
   vote_count: number;
@@ -270,7 +275,10 @@ const MoviesAdmin = () => {
         }
 
         if (response && response.movies && Array.isArray(response.movies) && response.movies.length > 0) {
-          setMovies(response.movies);
+          // AdminMovie (the service layer) uses optional for a few fields
+          // that the UI declares as required, so the cast is explicit
+          // instead of loosening the UI type.
+          setMovies(response.movies as unknown as Movie[]);
           setIsOfflineMock(false);
           const pagination = response.pagination || {};
           setTotalMovies(pagination.totalItems || response.movies.length);
@@ -338,7 +346,7 @@ const MoviesAdmin = () => {
         );
 
         if (response && response.movies && Array.isArray(response.movies) && response.movies.length > 0) {
-          setMovies(response.movies);
+          setMovies(response.movies as unknown as Movie[]);
           setIsOfflineMock(false);
           const pagination = response.pagination || {};
           setTotalMovies(pagination.totalItems || response.movies.length);
@@ -446,7 +454,7 @@ const MoviesAdmin = () => {
   }, [currentPage, moviesPerPage, sortField, sortDirection, selectedCategory, filterStatus, filterYear, filterType, isSearching]);  useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axiosInstance.get('/admin/movies/categories');
+        const response = await axiosInstance.get(apiRoute(`adminMoviesCategories`));
         if (response.data && response.data.categories && response.data.categories.length > 0) {
           setCategories(response.data.categories);
           return;
@@ -838,14 +846,16 @@ const MoviesAdmin = () => {
                       <div className={cinemaTable.badgeList}>
                         {movie.category && movie.category.length > 0 ? (
                           movie.category.slice(0, 2).map((cat, idx) => (
-                            <span key={idx} className={cinemaTable.genreBadge}>{cat.name}</span>
+                            <span key={idx} className={cinemaTable.genreBadge}>{typeof cat === 'string' ? cat : cat.name}</span>
                           ))
                         ) : (
                           <span style={{ color: '#6b7280', fontSize: '0.75rem' }}>Đang cập nhật</span>
                         )}
                       </div>
                       <div style={{ color: '#9ca3af', fontSize: '0.74rem', marginTop: '4px' }}>
-                        {movie.country?.map((c) => c.name).join(', ') || 'N/A'}
+                        {Array.isArray(movie.country)
+                          ? movie.country.map((c) => (typeof c === 'string' ? c : c.name)).join(', ')
+                          : (movie.country || 'N/A')}
                       </div>
                     </td>
 

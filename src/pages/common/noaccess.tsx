@@ -1,6 +1,6 @@
 /**
- * @file pages/common/noaccess.tsx
- * @description Trang thông báo không có quyền truy cập (403)
+ * The page shown when the visitor does not have permission to open
+ * the requested resource (403).
  */
 import { useEffect, useState, MouseEvent } from 'react';
 import { useRouter } from 'next/router';

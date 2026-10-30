@@ -5,6 +5,8 @@ import { useRouter } from 'next/router';
 import AdminLayout from '@/layouts/AdminLayout';
 import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from 'axios';
+import { getApiBaseUrl, getApiOrigin } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiRoutes';
 import {
   FaEye, FaFilter, FaExclamationTriangle,
   FaClock, FaEnvelope, FaSearch, FaSort,
@@ -176,8 +178,7 @@ const FeedbackPage = () => {
     if (!user || !user.avatar) return null;
     if (user.avatar === '/img/avatar.png') return null;
     if (user.avatar.startsWith('http')) return user.avatar;
-    const baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    const cleanBaseUrl = baseApiUrl.replace(/\/api$/, '');
+    const cleanBaseUrl = getApiOrigin();
     const avatarPath = user.avatar.startsWith('/') ? user.avatar : `/${user.avatar}`;
     return `${cleanBaseUrl}${avatarPath}`;
   };
@@ -232,10 +233,10 @@ const FeedbackPage = () => {
         params.sortOrder = sortOrder;
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseUrl = getApiBaseUrl();
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      const response = await axios.get(`${baseUrl}/feedback`, {
+      const response = await axios.get(apiUrl(`feedbackList`), {
         params,
         headers,
         timeout: 4000
@@ -335,11 +336,11 @@ const FeedbackPage = () => {
     try {
       setUpdatingStatus(id);
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseUrl = getApiBaseUrl();
 
       if (token) {
         try {
-          await axios.patch(`${baseUrl}/feedback/${id}`,
+          await axios.patch(apiUrl(`feedbackById`, Array.isArray(id) ? id[0] : id),
             { status: newStatus },
             { headers: { Authorization: `Bearer ${token}` }, timeout: 4000 }
           );
@@ -368,11 +369,11 @@ const FeedbackPage = () => {
     try {
       setDeleteInProgress(true);
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseUrl = getApiBaseUrl();
 
       if (token) {
         try {
-          await axios.delete(`${baseUrl}/feedback/${feedbackToDelete}`, {
+          await axios.delete(apiUrl(`feedbackById`, feedbackToDelete), {
             headers: { Authorization: `Bearer ${token}` },
             timeout: 4000
           });

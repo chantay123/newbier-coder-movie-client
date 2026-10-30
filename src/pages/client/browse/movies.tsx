@@ -1,6 +1,6 @@
 /**
- * @file pages/browse/movies.tsx
- * @description Single movies (phim lẻ) listing page with category/country/year filters and sort.
+ * The listing page of the single movies, with category, country and
+ * year filters plus a sort option.
  */
 import React, { useState, useEffect, MouseEvent } from 'react';
 import Head from 'next/head';
@@ -10,7 +10,9 @@ import Skeleton from '@/features/shared/components/UI/Skeleton';
 import type { SkeletonProps } from '@/features/shared/components/UI/Skeleton';
 import { FaPlayCircle, FaStar, FaClock, FaChevronDown, FaSync } from 'react-icons/fa';
 import { pickMovieImage } from '@/utils/imageSource';
+import { getApiBaseUrl } from '@/config/apiBase';
 import styles from '@/styles/Movies.module.css';
+import { apiUrl } from '@/config/apiRoutes';
 
 const CATEGORIES = [
   'Hành Động','Tình Cảm','Hài Hước','Cổ Trang','Tâm Lý','Hình Sự',
@@ -94,9 +96,9 @@ export default function Movies() {
   const [totalMovies, setTotalMovies] = useState<number>(0);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  // Read initial filters from the URL so each "Xem tất cả" deep-link
-  // opens the right slice. Defaults below preserve the previous
-  // "phim lẻ" view for any direct visitor to /browse/movies without
+  // Read the initial filters from the URL so each "See all" deep link
+  // opens the right slice. The defaults below preserve the previous
+  // single-movie view for any direct visitor to /browse/movies without
   // query params.
   const [filters, setFilters] = useState<{ category: string; country: string; year: string; type: string }>({ category: '', country: '', year: '', type: 'single' });
   const [showCategoryDropdown, setShowCategoryDropdown] = useState<boolean>(false);
@@ -154,22 +156,22 @@ export default function Movies() {
       setLoading(true);
       if (refreshing || (pageNumber === 1 && !isLoadMore)) setMovies([]);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const baseUrl = getApiBaseUrl();
       const params = new URLSearchParams();
       params.append('q', '');
       params.append('page', String(pageNumber));
       params.append('size', '24');
-      // `type=all` means "no type filter" — the section "Xem tất cả"
-      // links send this to mean "all movies, both single and series".
-      // The backend's /search endpoint treats a missing/empty `type`
-      // as "no type constraint" so we just skip the param.
+      // `type=all` means "no type filter". The "See all" section links
+      // send this to mean "all movies, both single and series".
+      // The backend's /search endpoint treats a missing or empty `type`
+      // as "no type constraint", so we just skip the param.
       if (filters.type && filters.type !== 'all') params.append('type', filters.type);
       if (filters.category) params.append('category', filters.category);
       if (filters.country) params.append('country', filters.country);
       if (filters.year) params.append('year', filters.year);
       if (sortOption) params.append('sort', sortOption);
 
-      const response = await fetch(`${apiUrl}/movies/search?${params.toString()}`);
+      const response = await fetch(apiUrl(`moviesSearch`) + `?${params.toString()}`);
       const result = (await response.json()) as SearchResponse;
 
       if (result?.hits && Array.isArray(result.hits)) {
@@ -285,14 +287,14 @@ export default function Movies() {
 
   const clearAllFilters = (): void => {
     // Keep the deep-link `type` so the user stays on the right
-    // section (e.g. "Tất cả phim" or "Phim Lẻ") — only clear
-    // category/country/year.
+    // section (for example "All movies" or "Single movies") and only
+    // clear category, country and year.
     setFilters((prev) => ({ category: '', country: '', year: '', type: prev.type }));
     setTimeout(() => { setLoading(true); fetchMovies(1, false); }, 0);
   };
 
-  // Title shown to the user depends on which deep-link sent them
-  // here. Default ("Phim Lẻ") is preserved for direct visitors to
+  // The title shown to the user depends on which deep link sent them
+  // here. The default ("Single movies") is preserved for direct visitors to
   // /browse/movies without query params.
   const pageTitle = filters.type === 'all'
     ? 'Tất cả phim'

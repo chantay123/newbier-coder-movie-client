@@ -11,7 +11,7 @@ import { getRolesForAdmin } from '@/features/admin/services/userAdminService';
 import RoleForm from '@/features/admin/components/Users/RoleForm';
 import ConfirmModal from '@/features/admin/components/Common/ConfirmModal';
 import axiosInstance from '@/API/config/axiosConfig';
-import { API_URL } from '@/config/API';
+import { apiRoute } from '@/config/apiRoutes';
 
 // Extended RoleForAdmin interface to include permissions
 interface RoleForAdmin {
@@ -24,7 +24,8 @@ interface RoleForAdmin {
 // Function to delete role
 const deleteRoleByAdmin = async (id: string) => {
   try {
-    const response = await axiosInstance.delete(`${API_URL}/admin/roles/${id}`);
+    // The path is relative: `axiosInstance` already carries the base URL.
+    const response = await axiosInstance.delete(apiRoute(`adminRolesById`, id));
     return response.data;
   } catch (error) {
 

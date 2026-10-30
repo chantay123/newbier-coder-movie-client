@@ -79,20 +79,11 @@ const AdvertisementPage = () => {
     try {
       setLoading(true);
 
-      // Use a try-catch with a simpler approach to handle backend connectivity
-      try {
-        // Test API connectivity with a simple check
-        const connectionTest = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/health-check`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(3000) // 3 second timeout for the connectivity test
-        });
-
-        if (!connectionTest.ok) throw new Error('API server connection failed');
-      } catch (connectionError) {
-
-        // Continue with the request anyway, but we've logged the potential issue
-      }
+      // NOTE: This block used to call `http://localhost:5000/api/health-check`
+      // as a pre-flight check. Backend v1 has no such route, so the request
+      // always failed (and in production it even pointed at a dev machine).
+      // `adService` already handles network and 401 errors, so the probe
+      // was removed to avoid one useless request.
 
       const result = await adService.getAllAds(
         currentPage,

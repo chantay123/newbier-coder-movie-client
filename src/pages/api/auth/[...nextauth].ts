@@ -8,6 +8,7 @@ import type { NextAuthOptions, Account, Profile, Session } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import FacebookProvider from 'next-auth/providers/facebook';
 import axios from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
 
 interface BackendUser {
   _id?: string;
@@ -69,7 +70,7 @@ const authOptions: NextAuthOptions = {
       if (acc.provider === 'google') {
         try {
           const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/google-login`,
+            `${getApiBaseUrl()}/auth/google-login`,
             {
               email: prof.email,
               name: prof.name,
@@ -98,7 +99,7 @@ const authOptions: NextAuthOptions = {
       if (acc.provider === 'facebook') {
         try {
           const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/facebook-login`,
+            `${getApiBaseUrl()}/auth/facebook-login`,
             {
               email: prof.email,
               name: prof.name,

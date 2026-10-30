@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import Image from 'next/image';
+import { resolvePublicAssetUrl } from '@/config/apiBase';
 import styles from '@/styles/AdminDashboard.module.css';
 import {
   FaFilm,
@@ -641,12 +641,18 @@ const AdminDashboardPage: NextPageWithLayout = () => {
                     <div className={styles.recentItem} key={movie._id || index}>
                       <div className={styles.recentItemImage}>
                         {movie.poster ? (
-                          <Image
-                            src={movie.poster}
+                          // Use a plain <img> instead of next/image: the poster
+                          // can come from any host the backend returns (the CDN
+                          // of the crawled source), and those hosts are not in
+                          // `images.remotePatterns`, so next/image would throw
+                          // a "hostname not configured" error.
+                          <img
+                            src={resolvePublicAssetUrl(movie.poster)}
                             alt={movie.title}
                             width={40}
                             height={40}
                             style={{ objectFit: 'cover' }}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
                           />
                         ) : (
                           <FaFilm />

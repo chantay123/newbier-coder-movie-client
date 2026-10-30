@@ -20,6 +20,7 @@ import styles from '@/styles/admin-users.module.css';
 import { FaSync, FaExclamationTriangle } from 'react-icons/fa';
 import { ADMIN_USERS_I18N, ADMIN_COMMON_I18N } from '@/config/i18n/admin';
 import { MOCK_ADMIN_USERS, MOCK_USER_STATS } from '@/mock/admin';
+import { resolveWebSocketUrl } from '@/config/apiBase';
 
 // Basic type definitions for this component
 interface UserForAdmin {
@@ -241,17 +242,6 @@ const AdminUsersPage = () => {
   //   3) Pause reconnects while the tab is hidden — there's no point
   //      hammering a backend the user can't see.
   useEffect(() => {
-    const resolveWsUrl = (): string | null => {
-      const envUrl = process.env.NEXT_PUBLIC_WS_URL;
-      if (envUrl && /^wss?:\/\//i.test(envUrl)) return envUrl;
-      // Derive from NEXT_PUBLIC_API_URL when possible.
-      const apiBase = process.env.NEXT_PUBLIC_API_URL;
-      if (apiBase && /^https?:\/\//i.test(apiBase)) {
-        return apiBase.replace(/^http/i, 'ws');
-      }
-      return null;
-    };
-
     const MAX_RECONNECT_ATTEMPTS = 5;
     const baseBackoffMs = 5000;
 
@@ -270,7 +260,10 @@ const AdminUsersPage = () => {
       }
       clearReconnect();
 
-      const wsUrl = resolveWsUrl();
+      // The WebSocket URL is resolved by the single source
+      // `resolveWebSocketUrl()` (NEXT_PUBLIC_WS_URL, then derived from the
+      // API base). It returns `null` when the backend has no WS configured.
+      const wsUrl = resolveWebSocketUrl();
       if (!wsUrl) {
         // No WebSocket endpoint is configured. Real-time updates will
         // be disabled for this session; the page still works because

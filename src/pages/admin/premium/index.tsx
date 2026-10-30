@@ -7,12 +7,14 @@ import { FaCheck, FaTimes, FaEye, FaStar, FaUser, FaFilm, FaClock, FaSync, FaCro
 import styles from '@/styles/AdminDashboard.module.css';
 import { useTheme } from 'next-themes';
 import axios from '@/API/config/axiosConfig';
+import { getApiBaseUrl, resolvePublicAssetUrl } from '@/config/apiBase';
 import { useRouter } from 'next/router';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
 import AdminLayout from '@/layouts/AdminLayout';
 import Head from 'next/head';
+import { apiUrl } from '@/config/apiRoutes';
 
 // Set Vietnamese locale for dayjs
 dayjs.locale('vi');
@@ -80,12 +82,12 @@ const SubscriptionItem: React.FC<{
       <div className="card-header">
         <div className="d-flex align-items-center">
           <img
-            src={subscription.user.avatar || 'http://localhost:3000/img/user-avatar.png'}
+            src={resolvePublicAssetUrl(subscription.user.avatar) || '/img/user-avatar.png'}
             alt={subscription.user.name}
             className="rounded-circle mr-2"
             style={{ width: '40px', height: '40px', objectFit: 'cover' }}
             onError={(e) => {
-              (e.target as HTMLImageElement).src = 'http://localhost:3000/img/user-avatar.png';
+              (e.target as HTMLImageElement).src = '/img/user-avatar.png';
             }}
           />
           <div>
@@ -311,7 +313,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
           });
 
           // Try to send test request with token
-          const testResponse = await fetch('http://localhost:5000/api/subscription/admin/pending-subscriptions', {
+          const testResponse = await fetch(apiUrl(`subscriptionAdminPendingSubscriptions`), {
             headers: {
               'Authorization': `Bearer ${testToken}`
             }
@@ -347,11 +349,10 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
 
       // Map tab to the correct endpoint
       if (tab === 'pending') {
-        endpoint = '/api/subscription/admin/pending-subscriptions';
+        endpoint = apiUrl(`subscriptionAdminPendingSubscriptions`);
       } else {
         // For approved and rejected, we'll use the main subscription endpoint with status filter
-        endpoint = '/api/subscription/admin/subscriptions';
-
+        endpoint = apiUrl(`subscriptionAdminSubscriptions`);
         // Add filter for the right status
         if (tab === 'approved') {
           statusFilter = '?status=active,approved';
@@ -367,7 +368,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000${endpoint}${statusFilter}`, {
+      const response = await fetch(`${endpoint}${statusFilter}`, {
         headers: {
           'Authorization': `Bearer ${testToken}`
         }
@@ -542,7 +543,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://localhost:5000/api/subscription/admin/approve/${subscriptionId}`, {
+      const response = await fetch(apiUrl(`subscriptionAdminApprove`, subscriptionId), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${testToken}`,
@@ -624,7 +625,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://localhost:5000/api/subscription/admin/reject/${subscriptionId}`, {
+      const response = await fetch(apiUrl(`subscriptionAdminReject`, subscriptionId), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${testToken}`,
@@ -704,7 +705,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`http://localhost:5000/api/subscription/admin/cancel/${subscriptionId}`, {
+      const response = await fetch(apiUrl(`subscriptionAdminCancel`, subscriptionId), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${testToken}`,
@@ -763,7 +764,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
 
       const toastId = toast.loading('Đang tải thông tin người dùng...');
 
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      const response = await fetch(apiUrl(`adminUsersById`, userId), {
         headers: {
           'Authorization': `Bearer ${token}`
         }

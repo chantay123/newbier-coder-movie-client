@@ -1,6 +1,5 @@
 /**
- * @file years/index.tsx
- * @description Standalone Admin page for managing Movie Release Years (Năm Phát Hành).
+ * A standalone admin page for managing the movie release years.
  */
 'use client';
 

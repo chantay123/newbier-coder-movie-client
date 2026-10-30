@@ -237,7 +237,7 @@ const PerformerDetail: React.FC = () => {
       <div
         className={styles.performerBanner}
         style={{
-          backgroundImage: `url(${performer.profile_path ? `${imageBaseUrl}/original${performer.profile_path}` : profilePlaceholder})`,
+          backgroundImage: `url(${performer.profile_path ? `${TMDB_CONFIG.imageBaseUrl}/original${performer.profile_path}` : profilePlaceholder})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center top',
           backgroundRepeat: 'no-repeat',

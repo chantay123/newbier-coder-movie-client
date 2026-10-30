@@ -8,7 +8,9 @@ import Skeleton from '@/features/shared/components/UI/Skeleton';
 import type { SkeletonProps } from '@/features/shared/components/UI/Skeleton';
 import { FaPlayCircle, FaStar, FaFilm, FaChevronDown, FaSync } from 'react-icons/fa';
 import { pickMovieImage, normalizeImageUrl } from '@/utils/imageSource';
+import { getApiBaseUrl } from '@/config/apiBase';
 import styles from '@/styles/Movies.module.css';
+import { apiUrl } from '@/config/apiRoutes';
 
 const CATEGORIES = [
   'Hành Động','Tình Cảm','Hài Hước','Cổ Trang','Tâm Lý','Hình Sự',
@@ -135,8 +137,8 @@ export default function Series() {
         if (filters[k]) queryParams += `&${k}=${filters[k]}`;
       });
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const response = await fetch(`${apiUrl}/movies?${queryParams}`);
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(apiUrl(`moviesList`) + `?${queryParams}`);
       const result = (await response.json()) as { data?: { movies?: SeriesMovie[]; pagination?: Pagination } };
 
       if (result.data?.movies) {
