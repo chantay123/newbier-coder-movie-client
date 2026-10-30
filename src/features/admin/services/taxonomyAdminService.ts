@@ -21,6 +21,7 @@
  * Mutations stay in-memory until backend deploys admin write routes.
  */
 import axiosInstance from '@/API/config/axiosConfig';
+import { apiRoute, type ApiRouteKey } from '@/config/apiRoutes';
 import {
   INITIAL_CATEGORIES,
   INITIAL_COUNTRIES,
@@ -90,15 +91,20 @@ function extractItems(raw: unknown): TaxonomyItem[] {
   return [];
 }
 
-/** Maps TaxonomyType → the API path segment */
-function typeToPath(type: TaxonomyType): string {
+/**
+ * Maps a TaxonomyType to the KEY of its endpoint.
+ *
+ * The key is semantic, but the VALUE is an opaque token: the real path
+ * never reaches the client bundle.
+ */
+function typeToRouteKey(type: TaxonomyType): ApiRouteKey {
   switch (type) {
-    case 'formats':   return 'formats';
-    case 'countries': return 'countries';
-    case 'years':    return 'years';
+    case 'formats':   return 'taxonomyFormats';
+    case 'countries': return 'taxonomyCountries';
+    case 'years':     return 'taxonomyYears';
     case 'genres':
-    case 'categories': return 'genres';   // categories maps to genres on backend
-    default:          return type;
+    case 'categories': return 'taxonomyGenres';   // categories maps to genres on backend
+    default:          return 'taxonomyGenres';
   }
 }
 
@@ -131,8 +137,8 @@ export class TaxonomyAdminService implements ITaxonomyAdminService {
    */
   async getAll(type: TaxonomyType): Promise<TaxonomyItem[]> {
     try {
-      const path = typeToPath(type);
-      const response = await axiosInstance.get(`/${path}`);
+      const path = apiRoute(typeToRouteKey(type));
+      const response = await axiosInstance.get(path);
       const items = extractItems(response.data);
       if (items.length > 0) {
         this.stores[type] = items; // keep store in sync
@@ -190,7 +196,7 @@ export class TaxonomyAdminService implements ITaxonomyAdminService {
 
   async create(type: TaxonomyType, rawInput: TaxonomyItemInput): Promise<TaxonomyItem> {
     const validated = taxonomyItemInputSchema.parse(rawInput);
-    const prefix = typeToPath(type).slice(0, 3);
+    const prefix = typeToRouteKey(type).slice(0, 3);
     const newItem: TaxonomyItem = {
       id: `${prefix}-${Date.now()}`,
       name: validated.name,

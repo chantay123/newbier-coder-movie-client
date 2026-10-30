@@ -1,12 +1,13 @@
 /**
- * @file movieAdminService.ts
- * @description Admin movie management: list, search, create, toggle visibility, delete.
- * 
- * API MODE: Gọi trực tiếp backend tại https://core-movie-service.onrender.com/api/v1
- * Fallback: Mock data nếu API không khả dụng
+ * The admin service for the movies: list, search, create, toggle the
+ * visibility and delete.
+ *
+ * API MODE: the backend is called directly.
+ * Fallback: the mock data is used when the API is not available.
  */
 import axiosInstance from '@/API/config/axiosConfig';
 import { MOCK_ADMIN_MOVIES, MockMovieItem } from '@/mock/admin/mockMovies';
+import { apiRoute } from '@/config/apiRoutes';
 
 export interface AdminMovie {
   _id: string;
@@ -50,10 +51,10 @@ export interface ElasticsearchStatus {
   documentCount?: number;
 }
 
-/** In-memory mock store (clone để callers không mutate source array) */
+/** The in-memory mock store. It is cloned so the callers never mutate the source array. */
 const mockStore: MockMovieItem[] = MOCK_ADMIN_MOVIES.map((m) => ({ ...m }));
 
-/** Helper: tìm kiếm in-memory */
+/** The helper that searches the in-memory list. */
 const applySearch = (list: MockMovieItem[], search: string): MockMovieItem[] => {
   if (!search) return list;
   const q = search.toLowerCase();
@@ -65,7 +66,7 @@ const applySearch = (list: MockMovieItem[], search: string): MockMovieItem[] => 
   );
 };
 
-/** Helper: lọc in-memory */
+/** The helper that filters the in-memory list. */
 const applyFilters = (
   list: MockMovieItem[],
   filters: {
@@ -88,7 +89,7 @@ const applyFilters = (
   });
 };
 
-/** Helper: sắp xếp in-memory */
+/** The helper that sorts the in-memory list. */
 const sortList = (
   list: MockMovieItem[],
   field: string,
@@ -99,8 +100,8 @@ const sortList = (
     const av = (a as unknown as Record<string, unknown>)[field];
     const bv = (b as unknown as Record<string, unknown>)[field];
     if (av === bv) return 0;
-    if (av === undefined) return 1;
-    if (bv === undefined) return -1;
+    if (av === undefined || av === null) return 1;
+    if (bv === undefined || bv === null) return -1;
     const cmp = av > bv ? 1 : -1;
     return direction === 'asc' ? cmp : -cmp;
   });
@@ -131,10 +132,10 @@ const toAdminMovie = (m: MockMovieItem): AdminMovie => ({
   isHidden: m.status === 'inactive'
 });
 
-/** Mock delay để simulate network */
+/** The mock delay, used to simulate the network. */
 const mockDelay = (ms = 300): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-/** Build pagination object */
+/** Builds the pagination object. */
 const buildPagination = (totalItems: number, page: number, limit: number): AdminPagination => ({
   totalItems,
   totalPages: Math.max(1, Math.ceil(totalItems / limit)),
@@ -185,8 +186,9 @@ export const getMoviesForAdmin = async (
   isHidden?: boolean
 ): Promise<AdminMovieListResponse> => {
   try {
-    // Gọi API với endpoint /movies (backend không có /admin/movies)
-    const response = await axiosInstance.get('/movies', {
+    // The API is called on the endpoint `/movies`, because the backend has
+    // no `/admin/movies` route.
+    const response = await axiosInstance.get(apiRoute(`moviesList`), {
       params: {
         page,
         limit,
@@ -201,7 +203,7 @@ export const getMoviesForAdmin = async (
       }
     });
 
-    // Normalize response format từ backend
+    // The response format of the backend is normalized.
     if (response.data) {
       const moviesData = response.data.movies || response.data.data?.movies || [];
       return {
@@ -258,8 +260,8 @@ export const searchMoviesWithElasticsearch = async (
   }
 
   try {
-    // Thử tìm kiếm qua API
-    const response = await axiosInstance.get('/movies/search', {
+    // The search is tried through the API first.
+    const response = await axiosInstance.get(apiRoute(`moviesSearch`), {
       params: {
         page,
         limit,
@@ -315,7 +317,7 @@ export const searchMoviesWithElasticsearch = async (
 
 export const checkElasticsearchStatus = async (): Promise<ElasticsearchStatus> => {
   try {
-    const response = await axiosInstance.get('/search/status', { timeout: 5000 });
+    const response = await axiosInstance.get(apiRoute(`searchStatus`), { timeout: 5000 });
     if (response.data) {
       return {
         status: response.data.status === 'active' ? 'active' : 'inactive',
@@ -334,9 +336,9 @@ export const checkElasticsearchStatus = async (): Promise<ElasticsearchStatus> =
 
 export const deleteMovieByAdmin = async (movieId: string): Promise<void> => {
   try {
-    await axiosInstance.delete(`/movies/${movieId}`);
+    await axiosInstance.delete(apiRoute(`moviesDetail`, movieId));
   } catch (error) {
-    // Mock delete nếu API fail
+    // The delete falls back to the mock when the API fails.
     console.warn('[AdminMovies] Delete API unavailable, mock delete:', movieId);
     const idx = mockStore.findIndex((m) => m._id === movieId);
     if (idx >= 0) mockStore.splice(idx, 1);
@@ -345,13 +347,14 @@ export const deleteMovieByAdmin = async (movieId: string): Promise<void> => {
 
 export const toggleMovieVisibility = async (movieId: string): Promise<{ movie: AdminMovie; isHidden: boolean }> => {
   try {
-    const response = await axiosInstance.patch(`/movies/${movieId}/visibility`);
+    const response = await axiosInstance.patch(apiRoute(`moviesVisibility`, movieId));
     return {
       movie: response.data.movie || { _id: movieId, name: '', origin_name: '', slug: '' },
       isHidden: response.data.isHidden ?? true
     };
   } catch (error) {
-    // Mock toggle nếu API fail
+    // The toggle of the visibility falls back to the mock when the API
+    // fails.
     console.warn('[AdminMovies] Toggle visibility API unavailable, mock toggle:', movieId);
     const idx = mockStore.findIndex((m) => m._id === movieId);
     if (idx < 0) throw new Error(`Movie ${movieId} not found`);
@@ -370,13 +373,13 @@ export const createMovieByAdmin = async (
   movieData: Record<string, unknown>
 ): Promise<{ movie: AdminMovie; success: boolean }> => {
   try {
-    const response = await axiosInstance.post('/movies', movieData);
+    const response = await axiosInstance.post(apiRoute(`moviesList`), movieData);
     return {
       movie: response.data.movie,
       success: true
     };
   } catch (error) {
-    // Mock create nếu API fail
+    // The create falls back to the mock when the API fails.
     console.warn('[AdminMovies] Create API unavailable, mock create:', movieData);
     await mockDelay(300);
     const now = new Date().toISOString();

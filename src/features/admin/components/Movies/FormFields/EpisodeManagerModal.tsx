@@ -209,7 +209,8 @@ export default function EpisodeManagerModal({
     return activeServer ? activeServer.episodes.filter(e => e.status === 'DISABLED').length : 0;
   }, [activeServer]);
 
-  // Range Chunks Generator (e.g. Tập 1 - 50, Tập 51 - 100...) for large series
+  // Builds the range chunks (for example Episode 1 - 50, Episode 51 - 100)
+  // so long series do not overflow the episode picker.
   const episodeRanges = useMemo(() => {
     if (!activeServer || activeServer.episodes.length <= 30) return [];
     const total = activeServer.episodes.length;

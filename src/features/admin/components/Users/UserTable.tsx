@@ -6,6 +6,7 @@ import LoginHistoryModal from '@/features/admin/components/Users/LoginHistoryMod
 import CinemaDropdown from '@/features/admin/components/Common/CinemaDropdown';
 import { ADMIN_USERS_I18N } from '@/config/i18n/admin';
 import cinemaTable from '@/styles/CinemaTable.module.css';
+import { getApiOrigin } from '@/config/apiBase';
 
 interface User {
   _id: string;
@@ -206,7 +207,7 @@ const UserTable: React.FC<UserTableProps> = ({ users = [], onEdit, onDelete, onB
     if (compareA > compareB) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const baseUrl = getApiOrigin();
   const getAvatarUrl = (user: User) => {
     if (!user || !user.avatar) return null;
     if (typeof user.avatar === 'string') {

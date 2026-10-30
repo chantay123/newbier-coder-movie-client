@@ -4,6 +4,7 @@
  */
 import axiosInstance from '@/config/axiosAdminConfig';
 import type { AxiosResponse } from 'axios';
+import { apiRoute } from '@/config/apiRoutes';
 
 export interface UpcomingMovie {
   _id?: string;
@@ -34,20 +35,20 @@ export const getUpcomingMovies = async (
   search = '',
   filters: Record<string, unknown> = {}
 ): Promise<AxiosResponse> => {
-  return axiosInstance.get('/admin/upcoming-movies', { params: { page, limit, search, ...filters } });
+  return axiosInstance.get(apiRoute(`upcomingAdminList`), { params: { page, limit, search, ...filters } });
 };
 
 export const getUpcomingMovieById = async (id: string): Promise<AxiosResponse> =>
-  axiosInstance.get(`/admin/upcoming-movies/${id}`);
+  axiosInstance.get(apiRoute(`upcomingAdminById`, id));
 
 export const createUpcomingMovie = async (movieData: Partial<UpcomingMovie>): Promise<AxiosResponse> =>
-  axiosInstance.post('/admin/upcoming-movies', movieData);
+  axiosInstance.post(apiRoute(`upcomingAdminList`), movieData);
 
 export const updateUpcomingMovie = async (id: string, movieData: Partial<UpcomingMovie>): Promise<AxiosResponse> =>
-  axiosInstance.put(`/admin/upcoming-movies/${id}`, movieData);
+  axiosInstance.put(apiRoute(`upcomingAdminById`, id), movieData);
 
 export const deleteUpcomingMovie = async (id: string): Promise<AxiosResponse> =>
-  axiosInstance.delete(`/admin/upcoming-movies/${id}`);
+  axiosInstance.delete(apiRoute(`upcomingAdminById`, id));
 
 export const releaseUpcomingMovie = async (id: string): Promise<AxiosResponse> =>
-  axiosInstance.put(`/admin/upcoming-movies/${id}/release`);
+  axiosInstance.put(apiRoute(`upcomingAdminRelease`, id));

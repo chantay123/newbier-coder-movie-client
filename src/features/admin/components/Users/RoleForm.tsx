@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaSave, FaTimes, FaPlus, FaTrash } from 'react-icons/fa';
 import axiosInstance from '@/API/config/axiosConfig';
-import { API_URL } from '@/config/API';
+import { apiRoute } from '@/config/apiRoutes';
 
 interface RoleForAdmin {
   _id: string;
@@ -12,7 +12,8 @@ interface RoleForAdmin {
 
 const createRoleByAdmin = async (roleData: { name: string; description: string; permissions: string[] }) => {
   try {
-    const response = await axiosInstance.post(`${API_URL}/admin/roles`, roleData);
+    // The path is relative: `axiosInstance` already carries the base URL.
+    const response = await axiosInstance.post(apiRoute(`adminRolesList`), roleData);
     return response.data;
   } catch (error) {
 
@@ -22,7 +23,7 @@ const createRoleByAdmin = async (roleData: { name: string; description: string; 
 
 const updateRoleByAdmin = async (id: string, roleData: { name: string; description: string; permissions: string[] }) => {
   try {
-    const response = await axiosInstance.put(`${API_URL}/admin/roles/${id}`, roleData);
+    const response = await axiosInstance.put(apiRoute(`adminRolesById`, id), roleData);
     return response.data;
   } catch (error) {
 
