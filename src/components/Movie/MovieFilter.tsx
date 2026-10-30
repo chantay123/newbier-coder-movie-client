@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { FaFilter, FaSearch, FaArrowRight, FaCaretDown, FaCaretUp, FaThLarge, FaSlidersH } from 'react-icons/fa';
 import styles from '@/styles/MovieFilter.module.css';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
+import { useClientYears } from '@/features/client/years/hooks/useClientYears';
 
 /**
  * The filter values currently applied by the movie filter panel.
@@ -206,6 +207,17 @@ const MovieFilter: React.FC<MovieFilterProps> = ({
 
   const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const [customYear, setCustomYear] = useState<string>('');
+  const { activeYears } = useClientYears();
+
+  const availableYears = useMemo(() => {
+    if (activeYears && activeYears.length > 0) {
+      const names = activeYears
+        .filter((y) => y.isActive !== false)
+        .map((y) => y.name);
+      return ['Tất cả', ...names];
+    }
+    return YEAR_LIST;
+  }, [activeYears]);
 
   const activeState = value || internalState;
 
@@ -571,7 +583,7 @@ const MovieFilter: React.FC<MovieFilterProps> = ({
               <div className={styles.filterRow}>
                 <div className={styles.rowLabel}>Năm sản xuất:</div>
                 <div className={styles.rowOptions}>
-                  {YEAR_LIST.map(yr => {
+                  {availableYears.map(yr => {
                     const isActive = activeState.year === yr && !customYear;
                     return (
                       <button

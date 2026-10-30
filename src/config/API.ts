@@ -111,6 +111,16 @@ export const endpoints = {
       uploadThumbnail: (id: string) => route('adminMoviesThumbnail', id),
       toggleVisibility: (id: string) => route('adminMoviesVisibility', id)
     },
+    years: {
+      getAll: (page = 1, limit = 20, search?: string) =>
+        buildUrl(`${API_URL}/years`, { page, limit, ...(search ? { search } : {}) }),
+      getPublicAll: () => `${API_URL}/years`,
+      getById: (id: string) => `${API_URL}/admin/years/${id}`,
+      create: () => `${API_URL}/admin/years`,
+      update: (id: string) => `${API_URL}/admin/years/${id}`,
+      delete: (id: string) => `${API_URL}/admin/years/${id}`,
+      toggleStatus: (id: string) => `${API_URL}/admin/years/${id}/status`
+    },
     users: {
       getAll: (page = 1, limit = 10) => buildUrl(route('adminUsersList'), { page, limit }),
       getById: (id: string) => route('adminUsersById', id),

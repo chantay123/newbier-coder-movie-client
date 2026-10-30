@@ -8,7 +8,8 @@ import { getApiBaseUrl } from './apiBase';
  * This file used to read `NEXT_PUBLIC_API_URL` on its own (ignoring
  * `NEXT_PUBLIC_CORE_API_URL`) with a `http://localhost:5000/api` fallback, so
  * the admin called the wrong host or the wrong version whenever only
- * `CORE_API_URL` was configured. It now shares the `getApiBaseUrl()` resolver.
+ * `CORE_API_URL` was configured. It now shares the `getApiBaseUrl()` resolver,
+ * so the admin and the rest of the app always talk to the same backend.
  */
 const baseURL = getApiBaseUrl();
 
@@ -50,14 +51,25 @@ axiosInstance.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  if (config.method === 'patch' || config.method === 'PATCH') {
-    config.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
-    config.headers['Access-Control-Allow-Origin'] = '*';
+  // Ensure x-request-trace distributed tracing header is always populated
+  if (!config.headers['x-request-trace']) {
+    const traceId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    config.headers['x-request-trace'] = traceId;
+  }
+
+  // Ensure Accept & Content-Type
+  if (!config.headers['Accept']) {
+    config.headers['Accept'] = 'application/json';
+  }
+  if (!config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json';
   }
 
   return config;
 }, (error) => {
-
   return Promise.reject(error);
 });
 
@@ -81,8 +93,7 @@ axiosInstance.interceptors.response.use(
     }
 
     if (error.response && error.response.status === 403) {
-      // eslint-disable-next-line no-console
-
+      // Forbidden
     }
 
     return Promise.reject(error);
