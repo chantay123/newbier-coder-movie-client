@@ -22,8 +22,30 @@ export const ADMIN_YEAR_CONSTANTS = Object.freeze({
     CREATE_ERROR: 'Không thể tạo năm phát hành mới. Vui lòng kiểm tra lại.',
     UPDATE_SUCCESS: (yearName: string) => `Cập nhật năm "${yearName}" thành công!`,
     UPDATE_ERROR: 'Không thể cập nhật năm phát hành.',
-    DELETE_SUCCESS: (yearName: string) => `Đã xóa năm phát hành "${yearName}".`,
+    DELETE_SUCCESS: (yearName: string) => `Đã xóa năm phát hành "${yearName}" thành công.`,
     DELETE_ERROR: 'Không thể xóa năm phát hành.',
+    DELETE_ALREADY_REMOVED: (yearName: string) =>
+      `Năm phát hành "${yearName}" không còn tồn tại hoặc đã được xóa trước đó bởi quản trị viên khác. Danh sách đã được cập nhật.`,
+    DELETE_CONSTRAINT_ERROR: (yearName: string, reason: string) =>
+      `Không thể xóa năm "${yearName}": ${reason}`,
+    DELETE_TIMEOUT: (yearName?: string) =>
+      `Yêu cầu xóa ${yearName ? `năm "${yearName}" ` : ''}bị quá thời gian chờ (timeout), chưa rõ trạng thái trên máy chủ. Đang tự động làm mới danh sách...`,
+    DELETE_SESSION_EXPIRED:
+      'Phiên làm việc đã hết hạn hoặc không hợp lệ. Bạn không thể thực hiện thao tác xóa. Vui lòng đăng nhập lại.',
+    DELETE_FORBIDDEN:
+      'Bạn không có quyền quản trị để thực hiện xóa năm phát hành này.',
+    DELETE_CONFIRM_TITLE: 'Xác Nhận Xóa Năm Phát Hành',
+    DELETE_CONFIRM_MESSAGE: (yearName: string) =>
+      `Bạn có chắc chắn muốn xóa năm phát hành "${yearName}"? Hành động này sẽ gỡ bỏ niên giám này khỏi hệ thống.`,
+    DELETE_BULK_CONFIRM_TITLE: 'Xác Nhận Xóa Hàng Loạt Năm Phát Hành',
+    DELETE_BULK_CONFIRM_MESSAGE: (count: number) =>
+      `Bạn có chắc chắn muốn xóa ${count} năm phát hành đã chọn? Thao tác này sẽ gỡ bỏ các năm này khỏi hệ thống.`,
+    DELETE_BULK_SUCCESS: (count: number) =>
+      `Đã xóa thành công ${count} năm phát hành đã chọn.`,
+    DELETE_BULK_PARTIAL: (successCount: number, totalCount: number, details: string) =>
+      `Đã xóa thành công ${successCount}/${totalCount} năm phát hành. Thất bại ${totalCount - successCount} năm: ${details}`,
+    DELETE_BULK_FAILED: (details: string) =>
+      `Xóa hàng loạt thất bại: ${details}`,
     TOGGLE_STATUS_SUCCESS: (yearName: string, isActive: boolean) =>
       `Đã ${isActive ? 'kích hoạt' : 'tạm ẩn'} năm "${yearName}".`,
     TOGGLE_STATUS_ERROR: 'Không thể thay đổi trạng thái năm phát hành.',
