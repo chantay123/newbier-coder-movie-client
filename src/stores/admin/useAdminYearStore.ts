@@ -11,6 +11,7 @@ import {
   CreateYearInput,
   UpdateYearInput,
   YearFilterParams,
+  BulkDeleteResult,
 } from '@/features/admin/years/types/year.types';
 import {
   IYearAdminService,
@@ -38,6 +39,9 @@ export interface AdminYearState {
   isLoading: boolean;
   isSubmitting: boolean;
   togglingId: string | null;
+  deletingId: string | null;
+  isBulkDeleting: boolean;
+  selectedIds: string[];
   error: string | null;
 
   // Modal State
@@ -67,12 +71,22 @@ export interface AdminYearActions {
     service?: IYearAdminService,
     signal?: AbortSignal
   ) => Promise<boolean>;
+  deleteMultipleYears: (
+    ids: string[],
+    service?: IYearAdminService,
+    signal?: AbortSignal
+  ) => Promise<BulkDeleteResult>;
   toggleStatus: (
     id: string,
     targetState?: boolean,
     service?: IYearAdminService,
     signal?: AbortSignal
   ) => Promise<YearEntity | null>;
+
+  // Selection
+  selectItem: (id: string) => void;
+  selectAll: (ids: string[]) => void;
+  clearSelection: () => void;
 
   // Filters & Pagination
   setSearchTerm: (term: string) => void;
@@ -104,6 +118,9 @@ const initialState: AdminYearState = {
   isLoading: false,
   isSubmitting: false,
   togglingId: null,
+  deletingId: null,
+  isBulkDeleting: false,
+  selectedIds: [],
   error: null,
   isCreateModalOpen: false,
   isEditModalOpen: false,
@@ -273,7 +290,13 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
   },
 
   /**
-   * Deletes a release year.
+   * Deletes a release year by ID with full banking/enterprise resilience.
+   * - Item deleted by another admin (404): Treats as UI success, removes from list, shows friendly info toast.
+   * - Constraint violation (400, 409, 422): Shows specific server reason, keeps item in list, allows retry.
+   * - Session expired / Unauthorized (401): Notifies session expiration, prompts re-login, keeps item.
+   * - Forbidden (403): Notifies lack of permissions, keeps item.
+   * - Timeout (ECONNABORTED, 504): Notifies unknown server status, triggers automatic reload to synchronize.
+   * - Double-click protection: Locks item via `deletingId`.
    */
   deleteYear: async (
     id: string,
@@ -283,21 +306,200 @@ export const useAdminYearStore = create<AdminYearState & AdminYearActions>()((se
     const target = get().years.find((y) => y.id === id);
     const targetName = target?.name || id;
 
+    // Double-click / concurrent action guard
+    if (get().deletingId === id || get().isBulkDeleting) {
+      return false;
+    }
+
+    set({ deletingId: id });
+
     try {
-      await service.delete(id, signal);
+      const result = await service.delete(id, signal);
 
-      set((state) => ({
-        years: state.years.filter((y) => y.id !== id),
-        total: Math.max(0, state.total - 1),
-      }));
+      // Remove from state and update counts
+      set((state) => {
+        const nextYears = state.years.filter((y) => y.id !== id);
+        const activeCount = nextYears.filter((y) => y.isActive).length;
+        const inactiveCount = nextYears.length - activeCount;
+        return {
+          years: nextYears,
+          total: Math.max(0, state.total - 1),
+          activeCount,
+          inactiveCount,
+          selectedIds: state.selectedIds.filter((itemId) => itemId !== id),
+          deletingId: null,
+        };
+      });
 
-      toastNotification.success(ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_SUCCESS(targetName));
+      if (result.alreadyDeleted) {
+        // Handled as UI success with a polite notification
+        toastNotification.info(
+          result.message || ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ALREADY_REMOVED(targetName)
+        );
+      } else {
+        toastNotification.success(ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_SUCCESS(targetName));
+      }
+
       return true;
     } catch (err) {
       const parsed = parseApiError(err, ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR);
-      toastNotification.error(parsed.message);
+
+      set({ deletingId: null });
+
+      // 1. Timeout handling: server state is indeterminate, trigger automatic reload
+      if (parsed.code === 'TIMEOUT') {
+        toastNotification.warning(ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_TIMEOUT(targetName));
+        get().fetchYears(service);
+        return false;
+      }
+
+      // 2. Session expired / 401
+      if (parsed.statusCode === 401 || parsed.code === 'UNAUTHORIZED') {
+        toastNotification.error(ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_SESSION_EXPIRED);
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            window.location.href = `/auth/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+          }, 1500);
+        }
+        return false;
+      }
+
+      // 3. Forbidden / 403
+      if (parsed.statusCode === 403 || parsed.code === 'FORBIDDEN') {
+        toastNotification.error(ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_FORBIDDEN);
+        return false;
+      }
+
+      // 4. Constraint violation or specific server error
+      if (
+        parsed.statusCode === 400 ||
+        parsed.statusCode === 409 ||
+        parsed.statusCode === 422 ||
+        (parsed.message && parsed.message !== ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR)
+      ) {
+        toastNotification.error(
+          ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_CONSTRAINT_ERROR(targetName, parsed.message)
+        );
+        return false;
+      }
+
+      // 5. Default generic error
+      toastNotification.error(parsed.message || ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR);
       return false;
     }
+  },
+
+  /**
+   * Deletes multiple release years in batch.
+   * Reports exact count of succeeded and failed items, detailing specific failure reasons.
+   */
+  deleteMultipleYears: async (
+    ids: string[],
+    service = defaultYearAdminService,
+    signal?: AbortSignal
+  ): Promise<BulkDeleteResult> => {
+    if (ids.length === 0) {
+      return { total: 0, successCount: 0, failureCount: 0, results: [] };
+    }
+
+    if (get().isBulkDeleting) {
+      throw new Error('Đang thực hiện thao tác xóa hàng loạt khác.');
+    }
+
+    set({ isBulkDeleting: true });
+
+    try {
+      const result = await service.deleteMultiple(ids, signal);
+
+      const succeededIds = result.results
+        .filter((r) => r.success)
+        .map((r) => r.id);
+
+      if (succeededIds.length > 0) {
+        set((state) => {
+          const nextYears = state.years.filter((y) => !succeededIds.includes(y.id));
+          const activeCount = nextYears.filter((y) => y.isActive).length;
+          const inactiveCount = nextYears.length - activeCount;
+          return {
+            years: nextYears,
+            total: Math.max(0, state.total - succeededIds.length),
+            activeCount,
+            inactiveCount,
+            selectedIds: state.selectedIds.filter((id) => !succeededIds.includes(id)),
+          };
+        });
+      }
+
+      // Format user-facing notifications based on batch outcome
+      if (result.failureCount === 0) {
+        toastNotification.success(
+          ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_BULK_SUCCESS(result.successCount)
+        );
+      } else if (result.successCount > 0) {
+        const failDetails = result.results
+          .filter((r) => !r.success)
+          .map((r) => `• ${r.name}: ${r.errorReason || 'Không thể xóa'}`)
+          .join('\n');
+
+        toastNotification.error(
+          ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_BULK_PARTIAL(
+            result.successCount,
+            result.total,
+            failDetails
+          ),
+          { autoClose: 8000 }
+        );
+      } else {
+        const failDetails = result.results
+          .map((r) => `• ${r.name}: ${r.errorReason || 'Không thể xóa'}`)
+          .join('\n');
+
+        toastNotification.error(
+          ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_BULK_FAILED(failDetails),
+          { autoClose: 8000 }
+        );
+      }
+
+      // If any item experienced timeout, trigger reload to reconcile
+      const hasTimeout = result.results.some((r) =>
+        r.errorReason?.toLowerCase().includes('timeout')
+      );
+      if (hasTimeout) {
+        toastNotification.warning(ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_TIMEOUT());
+        get().fetchYears(service);
+      }
+
+      set({ isBulkDeleting: false });
+      return result;
+    } catch (err) {
+      set({ isBulkDeleting: false });
+      const parsed = parseApiError(err, ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR);
+      toastNotification.error(parsed.message);
+      throw parsed;
+    }
+  },
+
+  selectItem: (id: string) => {
+    set((state) => ({
+      selectedIds: state.selectedIds.includes(id)
+        ? state.selectedIds.filter((itemId) => itemId !== id)
+        : [...state.selectedIds, id],
+    }));
+  },
+
+  selectAll: (ids: string[]) => {
+    set((state) => {
+      const allSelected = ids.length > 0 && ids.every((id) => state.selectedIds.includes(id));
+      return {
+        selectedIds: allSelected
+          ? state.selectedIds.filter((id) => !ids.includes(id))
+          : Array.from(new Set([...state.selectedIds, ...ids])),
+      };
+    });
+  },
+
+  clearSelection: () => {
+    set({ selectedIds: [] });
   },
 
   /**

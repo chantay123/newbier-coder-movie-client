@@ -334,4 +334,132 @@ describe('Admin Year Feature Unit Tests', () => {
       expect(yr2018).toBeUndefined();
     });
   });
+
+  describe('Year Deletion & Enterprise Concurrency Rules', () => {
+    it('should delete a year normally and update store', async () => {
+      useAdminYearStore.setState({
+        years: [
+          { id: 'yr-101', name: '2021', slug: '2021', description: '', isActive: true, movieCount: 0 },
+          { id: 'yr-102', name: '2022', slug: '2022', description: '', isActive: false, movieCount: 0 },
+        ],
+        total: 2,
+        activeCount: 1,
+        inactiveCount: 1,
+        selectedIds: ['yr-101'],
+      });
+
+      const mockService = {
+        delete: jest.fn().mockResolvedValue({
+          id: 'yr-101',
+          name: '2021',
+          success: true,
+        }),
+      } as any;
+
+      const success = await useAdminYearStore.getState().deleteYear('yr-101', mockService);
+      expect(success).toBe(true);
+
+      const state = useAdminYearStore.getState();
+      expect(state.years.find((y) => y.id === 'yr-101')).toBeUndefined();
+      expect(state.total).toBe(1);
+      expect(state.activeCount).toBe(0);
+      expect(state.inactiveCount).toBe(1);
+      expect(state.selectedIds.includes('yr-101')).toBe(false);
+    });
+
+    it('should handle item deleted by another admin (404) as UI success, remove from list and notify gently', async () => {
+      useAdminYearStore.setState({
+        years: [
+          { id: 'yr-ghost', name: '2019', slug: '2019', description: '', isActive: true, movieCount: 0 },
+        ],
+        total: 1,
+        activeCount: 1,
+        inactiveCount: 0,
+      });
+
+      const mockService = {
+        delete: jest.fn().mockResolvedValue({
+          id: 'yr-ghost',
+          name: '2019',
+          success: true,
+          alreadyDeleted: true,
+          message: 'Item already deleted by another admin',
+        }),
+      } as any;
+
+      const success = await useAdminYearStore.getState().deleteYear('yr-ghost', mockService);
+      expect(success).toBe(true);
+
+      const state = useAdminYearStore.getState();
+      expect(state.years.find((y) => y.id === 'yr-ghost')).toBeUndefined();
+      expect(state.total).toBe(0);
+      expect(state.activeCount).toBe(0);
+    });
+
+    it('should retain item in list when server returns constraint violation error', async () => {
+      useAdminYearStore.setState({
+        years: [
+          { id: 'yr-linked', name: '2020', slug: '2020', description: '', isActive: true, movieCount: 15 },
+        ],
+        total: 1,
+        activeCount: 1,
+        inactiveCount: 0,
+      });
+
+      const mockService = {
+        delete: jest.fn().mockRejectedValue({
+          isAxiosError: true,
+          response: {
+            status: 400,
+            data: { message: 'Năm phát hành đang có 15 phim liên kết, không thể xóa' },
+          },
+        }),
+      } as any;
+
+      const success = await useAdminYearStore.getState().deleteYear('yr-linked', mockService);
+      expect(success).toBe(false);
+
+      const state = useAdminYearStore.getState();
+      // Item MUST remain in list for user retry
+      expect(state.years.find((y) => y.id === 'yr-linked')).toBeDefined();
+      expect(state.total).toBe(1);
+      expect(state.deletingId).toBeNull();
+    });
+
+    it('should handle bulk delete partial failure: remove succeeded items, retain failed ones, and detail reasons', async () => {
+      useAdminYearStore.setState({
+        years: [
+          { id: 'yr-succeed', name: '2015', slug: '2015', description: '', isActive: true, movieCount: 0 },
+          { id: 'yr-fail', name: '2016', slug: '2016', description: '', isActive: true, movieCount: 8 },
+        ],
+        total: 2,
+        activeCount: 2,
+        inactiveCount: 0,
+        selectedIds: ['yr-succeed', 'yr-fail'],
+      });
+
+      const mockService = {
+        deleteMultiple: jest.fn().mockResolvedValue({
+          total: 2,
+          successCount: 1,
+          failureCount: 1,
+          results: [
+            { id: 'yr-succeed', name: '2015', success: true },
+            { id: 'yr-fail', name: '2016', success: false, errorReason: 'Năm đang có 8 phim' },
+          ],
+        }),
+      } as any;
+
+      const result = await useAdminYearStore.getState().deleteMultipleYears(['yr-succeed', 'yr-fail'], mockService);
+      expect(result.successCount).toBe(1);
+      expect(result.failureCount).toBe(1);
+
+      const state = useAdminYearStore.getState();
+      expect(state.years.find((y) => y.id === 'yr-succeed')).toBeUndefined();
+      expect(state.years.find((y) => y.id === 'yr-fail')).toBeDefined();
+      expect(state.total).toBe(1);
+      expect(state.selectedIds).toEqual(['yr-fail']);
+      expect(state.isBulkDeleting).toBe(false);
+    });
+  });
 });

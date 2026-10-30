@@ -53,52 +53,64 @@ export function parseApiError(error: unknown, fallbackMessage = 'Đã có lỗi 
     const responseData = error.response?.data as Record<string, unknown> | undefined;
 
     // Extract message from typical backend envelope formats
+    const responseStatusObj = responseData?.responseStatus as Record<string, unknown> | undefined;
     const serverMessage =
+      (typeof responseStatusObj?.responseMessage === 'string' && responseStatusObj.responseMessage) ||
       (typeof responseData?.message === 'string' && responseData.message) ||
       (typeof responseData?.error === 'string' && responseData.error) ||
       (Array.isArray(responseData?.errors) && typeof responseData.errors[0] === 'string' && responseData.errors[0]) ||
       null;
 
+    const isTimeout =
+      error.code === 'ECONNABORTED' ||
+      (typeof error.message === 'string' && error.message.toLowerCase().includes('timeout')) ||
+      statusCode === 504;
+
     let friendlyMessage = serverMessage || fallbackMessage;
     let code = 'HTTP_ERROR';
 
-    switch (statusCode) {
-      case 400:
-        code = 'BAD_REQUEST';
-        friendlyMessage = serverMessage || 'Dữ liệu gửi lên không hợp lệ.';
-        break;
-      case 401:
-        code = 'UNAUTHORIZED';
-        friendlyMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-        break;
-      case 403:
-        code = 'FORBIDDEN';
-        friendlyMessage = 'Bạn không có quyền quản trị để thực hiện thao tác này.';
-        break;
-      case 404:
-        code = 'NOT_FOUND';
-        friendlyMessage = serverMessage || 'Không tìm thấy dữ liệu yêu cầu.';
-        break;
-      case 409:
-        code = 'CONFLICT';
-        friendlyMessage = serverMessage || 'Dữ liệu đã tồn tại trong hệ thống.';
-        break;
-      case 422:
-        code = 'UNPROCESSABLE_ENTITY';
-        friendlyMessage = serverMessage || 'Dữ liệu không đáp ứng quy chuẩn của hệ thống.';
-        break;
-      case 429:
-        code = 'TOO_MANY_REQUESTS';
-        friendlyMessage = 'Thao tác quá nhanh. Vui lòng đợi trong giây lát.';
-        break;
-      case 500:
-      case 502:
-      case 503:
-        code = 'SERVER_ERROR';
-        friendlyMessage = 'Máy chủ đang bận hoặc gặp sự cố. Vui lòng thử lại sau.';
-        break;
-      default:
-        break;
+    if (isTimeout) {
+      code = 'TIMEOUT';
+      friendlyMessage = 'Yêu cầu quá thời gian chờ (timeout). Vui lòng thử lại hoặc làm mới danh sách.';
+    } else {
+      switch (statusCode) {
+        case 400:
+          code = 'BAD_REQUEST';
+          friendlyMessage = serverMessage || 'Dữ liệu gửi lên không hợp lệ.';
+          break;
+        case 401:
+          code = 'UNAUTHORIZED';
+          friendlyMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+          break;
+        case 403:
+          code = 'FORBIDDEN';
+          friendlyMessage = 'Bạn không có quyền quản trị để thực hiện thao tác này.';
+          break;
+        case 404:
+          code = 'NOT_FOUND';
+          friendlyMessage = serverMessage || 'Không tìm thấy dữ liệu yêu cầu.';
+          break;
+        case 409:
+          code = 'CONFLICT';
+          friendlyMessage = serverMessage || 'Dữ liệu đã tồn tại trong hệ thống.';
+          break;
+        case 422:
+          code = 'UNPROCESSABLE_ENTITY';
+          friendlyMessage = serverMessage || 'Dữ liệu không đáp ứng quy chuẩn của hệ thống.';
+          break;
+        case 429:
+          code = 'TOO_MANY_REQUESTS';
+          friendlyMessage = 'Thao tác quá nhanh. Vui lòng đợi trong giây lát.';
+          break;
+        case 500:
+        case 502:
+        case 503:
+          code = 'SERVER_ERROR';
+          friendlyMessage = 'Máy chủ đang bận hoặc gặp sự cố. Vui lòng thử lại sau.';
+          break;
+        default:
+          break;
+      }
     }
 
     return new AppError(friendlyMessage, statusCode, code, responseData);

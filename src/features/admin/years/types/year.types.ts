@@ -116,3 +116,35 @@ export interface RawYearApiResponse {
   data?: unknown;
   items?: unknown[];
 }
+
+/**
+ * Result of a single release year deletion attempt
+ */
+export interface DeleteYearResult {
+  id: string;
+  name: string;
+  success: boolean;
+  alreadyDeleted?: boolean;
+  message?: string;
+}
+
+/**
+ * Result item for batch/bulk deletion operations
+ */
+export interface BulkDeleteResultItem {
+  id: string;
+  name: string;
+  success: boolean;
+  alreadyDeleted?: boolean;
+  errorReason?: string;
+}
+
+/**
+ * Aggregated summary of a bulk delete operation
+ */
+export interface BulkDeleteResult {
+  total: number;
+  successCount: number;
+  failureCount: number;
+  results: BulkDeleteResultItem[];
+}
