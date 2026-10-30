@@ -1,9 +1,11 @@
 /**
- * @file WebSocketContext.tsx
- * @description Single WebSocket connection shared by the app, exposing the latest
- * message and a `send` helper. Falls back to no-op during SSR.
+ * A single WebSocket connection shared by the whole application.
+ *
+ * The provider exposes the latest message and a `send` helper. On the
+ * server side rendering, the socket is simply not created.
  */
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { resolveWebSocketUrl } from '@/config/apiBase';
 
 interface WebSocketContextValue {
   socket: WebSocket | null;
@@ -28,6 +30,13 @@ export interface WebSocketMessage {
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 
+/**
+ * Reads the WebSocket context.
+ *
+ * @returns The socket, the connection state, the last message and the
+ *          `send` helper.
+ * @throws An error when the hook is used outside of `WebSocketProvider`.
+ */
 export const useWebSocket = (): WebSocketContextValue => {
   const ctx = useContext(WebSocketContext);
   if (!ctx) {
@@ -47,7 +56,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const ws = new WebSocket('ws://localhost:5000');
+
+    // The URL comes from the configuration (`NEXT_PUBLIC_WS_URL`, or it is
+    // deduced from the API base).
+    // The address `ws://localhost:5000` used to be hardcoded, so the
+    // production build always opened a socket to the development machine
+    // and flooded the console with connection errors.
+    const wsUrl = resolveWebSocketUrl();
+    if (!wsUrl) return undefined;
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = (): void => {
       setIsConnected(true);

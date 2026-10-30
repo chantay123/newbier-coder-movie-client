@@ -1,14 +1,14 @@
 /**
- * @file AdContext.tsx
- * @description Cung cấp ad-block settings cho toàn bộ app, dựa trên
- * subscription benefits của user hiện tại.
+ * Provides the ad settings of the whole application.
+ *
+ * The settings come from the subscription benefits of the current user.
  */
 
 import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import subscriptionService from '@/API/services/subscriptionService';
 
-/** Default ad settings */
+/** The default ad settings. */
 export interface AdSettings {
   hideHomepageAds: boolean;
   hideVideoAds: boolean;
@@ -18,7 +18,7 @@ export interface AdSettings {
   lastUpdated?: string;
 }
 
-/** Default values for context */
+/** The default values of the context. */
 const defaultAdSettings: AdSettings = {
   hideHomepageAds: false,
   hideVideoAds: false,
@@ -29,14 +29,18 @@ const defaultAdSettings: AdSettings = {
 
 const AdContext = createContext<AdSettings>(defaultAdSettings);
 
-/** Hook consumer-side */
+/**
+ * Reads the ad settings.
+ *
+ * @returns The ad settings of the current user.
+ */
 export const useAdContext = (): AdSettings => useContext(AdContext);
 
 interface AdContextProviderProps {
   children: ReactNode;
 }
 
-/** Provider bao bọc app */
+/** The provider that wraps the application. */
 export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }) => {
   const router = useRouter();
 
@@ -58,6 +62,8 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
 
   useEffect(() => {
     const checkAuth = (): void => {
+      // The token is read from `localStorage` when the user ticked
+      // "Remember me", and from `sessionStorage` for a session-only login.
       const token = (() => {
         if (typeof window === 'undefined') return null;
         const remembered = localStorage.getItem('remember_me') === '1';
@@ -90,6 +96,8 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
     checkAuth();
 
     const handleStorageChange = (e: StorageEvent): void => {
+      // The auth state is checked again when a token is added or removed
+      // in another tab of the browser.
       if (e.key === 'auth_token' || e.key === 'token' || e.key === 'authToken' || e.key === 'remember_me') {
         checkAuth();
       }
@@ -163,7 +171,8 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
           authError: true
         };
 
-        // Unwrap nested structures defensively
+        // The nested structures are unwrapped defensively, because the
+        // backend sometimes nests the payload one level deeper.
         const benefitsAny = benefits as {
           responseData?: Partial<typeof benefits>;
           data?: Partial<typeof benefits>;
@@ -174,11 +183,11 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
           isFetchingRef.current = false;
           return;
         }
-        // The service reports a 401/403 via `authError`. We still allow
-        // a few retries in case the token is being refreshed.
+        // The service reports a 401 or a 403 through `authError`. A few
+        // retries are still allowed, because the token may be refreshing.
         if (normalized.authError) {
-          // Don't spam the console when the user isn't logged in —
-          // that's the expected steady state.
+          // The console is not flooded when the user is not signed in,
+          // because that is the expected steady state.
           if (isAuthenticated && retryCount === 0) {
 
           }
@@ -187,11 +196,14 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
             benefitsTimeoutRef.current = setTimeout(fetchSubscriptionBenefits, 2000);
             return;
           } else if (isAuthenticated) {
-            // Only log when we actually expected to be authenticated.
+            // The message is only logged when the user was expected to be
+            // signed in.
 
           }
         }
 
+        // The premium package `15k` always hides the advertisements, even
+        // when the backend does not send the explicit flags.
         const isPremium15k = normalized.isPremium15k === true
           || normalized.packageType === '682f7d849c310399aa715c9d';
 
@@ -212,9 +224,10 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
 
         retryCount = 0;
       } catch (error) {
-        // Distinguish permanent failures (no point retrying) from
-        // transient ones. Axios sets error.response only when the server
-        // replied; absence means Network Error / CORS / timeout.
+        // The permanent failures are told apart from the temporary ones.
+        // Axios only sets `error.response` when the server answered, so a
+        // missing value means a network error, a CORS problem or a
+        // timeout.
         const err = error as { response?: { status?: number }; message?: string };
         const status = err?.response?.status;
         const isPermanent = status === 404 || status === 400;
@@ -231,15 +244,17 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
             setAdSettings((prev) => ({ ...prev, isLoading: false }));
           }
         } else if (retryCount < MAX_RETRIES) {
+          // The delay grows with each retry, so the backend is not hit
+          // too fast.
           retryCount++;
           const delay = 1000 * Math.pow(2, retryCount);
           if (isComponentMounted) {
             benefitsTimeoutRef.current = setTimeout(fetchSubscriptionBenefits, delay);
           }
         } else {
-          // We've burned through retries on transient errors. Stop
-          // scheduling more until the next interval tick (15 min) to
-          // avoid an infinite retry loop.
+          // Every retry has been used on temporary errors. No new attempt
+          // is scheduled until the next interval tick (15 minutes), so
+          // there is no infinite retry loop.
           if (isComponentMounted) {
             setAdSettings((prev) => ({ ...prev, isLoading: false }));
           }
@@ -251,7 +266,8 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
 
     fetchSubscriptionBenefits();
 
-    // Only schedule a periodic refresh if the endpoint appears reachable.
+    // A periodic refresh is only scheduled when the endpoint seems to be
+    // reachable.
     const refreshInterval = setInterval(() => {
       if (!isEndpointDisabled) fetchSubscriptionBenefits();
     }, 15 * 60 * 1000);
@@ -265,6 +281,8 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
     };
   }, [isAuthenticated, authResolved]);
 
+  // The "no access" page never shows the advertisements, whatever the
+  // subscription of the user is.
   const finalAdSettings: AdSettings = {
     ...adSettings,
     hideHomepageAds: isNoAccessPage ? true : adSettings.hideHomepageAds,

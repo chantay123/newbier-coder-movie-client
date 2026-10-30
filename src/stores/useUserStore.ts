@@ -1,14 +1,17 @@
 /**
- * @file useUserStore.ts
- * @description Zustand store cho user authentication và profile — cache trong localStorage:
- * 1. Lưu auth token và user info
- * 2. Cache user profile để không fetch lại khi chuyển trang
- * 3. Chia sẻ state giữa Navbar, Profile, MovieCard (favorite status)
+ * Zustand store for the user authentication and the profile.
+ *
+ * The store keeps the data in `localStorage` so that:
+ * 1. The auth token and the user info are kept between visits.
+ * 2. The user profile is cached, so it is not fetched again on every page
+ *    change.
+ * 3. The state is shared between the Navbar, the Profile page and the
+ *    MovieCard (favorite status).
  *
  * Cache strategy:
- * - Auth token: localStorage (persist vĩnh viễn)
- * - User profile: localStorage + TTL 10 phút
- * - Favorite movies: localStorage + TTL 5 phút
+ * - Auth token: `localStorage`, persisted forever.
+ * - User profile: `localStorage` with a TTL of 10 minutes.
+ * - Favorite movies: `localStorage` with a TTL of 5 minutes.
  */
 
 import { create } from 'zustand';
@@ -18,7 +21,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 // TYPES
 // ============================================================
 
-/** User profile data */
+/** The data of the user profile. */
 export interface UserProfile {
   _id: string;
   id?: string;
@@ -33,7 +36,7 @@ export interface UserProfile {
   [key: string]: unknown;
 }
 
-/** Favorite movie item */
+/** A favorite movie. */
 export interface FavoriteItem {
   _id: string;
   slug: string;
@@ -46,12 +49,12 @@ export interface FavoriteItem {
   [key: string]: unknown;
 }
 
-/** Trạng thái favorite của 1 phim */
+/** The favorite state of one movie. */
 export interface FavoriteStatusData {
   isFavorite: boolean;
 }
 
-/** Cache entry */
+/** A cache entry. */
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -63,19 +66,20 @@ interface CacheEntry<T> {
 
 interface UserStoreState {
   // ---- Auth ----
-  /** Token để gửi API (null = chưa login) */
+  /** The token sent with the API requests (`null` means not signed in). */
   token: string | null;
 
-  /** User đã login chưa */
+  /** `true` when the user is signed in. */
   isAuthenticated: boolean;
 
   // ---- Profile ----
-  /** User profile cache */
+  /** The cached user profile. */
   profileCache: CacheEntry<UserProfile> | null;
 
   // ---- Favorites ----
-  /** Favorite movies cache theo slug: movieSlug -> { isFavorite, timestamp } */
-  favoritesCache: Record<string, CacheEntry<FavoriteStatusData>>; // movieSlug -> cache
+  /** The cached favorite state of each movie, by slug. */
+  favoritesCache: Record<string, CacheEntry<FavoriteStatusData>>;
+  /** The cached list of favorite movies. */
   favoritesList: CacheEntry<FavoriteItem[]> | null;
 
   // ---- Loading states ----
@@ -118,15 +122,22 @@ interface UserStoreActions {
 // CONSTANTS
 // ============================================================
 
-/** TTL: 10 phút cho user profile */
+/** The TTL of the user profile: 10 minutes. */
 const PROFILE_TTL_MS = 10 * 60 * 1000;
 
-/** TTL: 5 phút cho favorite status */
+/** The TTL of the favorite status: 5 minutes. */
 const FAVORITE_STATUS_TTL_MS = 5 * 60 * 1000;
 
-/** TTL: 2 phút cho favorites list */
+/** The TTL of the favorites list: 2 minutes. */
 const FAVORITES_LIST_TTL_MS = 2 * 60 * 1000;
 
+/**
+ * Tells whether a cache entry is too old to be used.
+ *
+ * @param timestamp - The moment the entry was written.
+ * @param ttlMs - The lifetime of the entry in milliseconds.
+ * @returns `true` when the entry is expired.
+ */
 const isExpired = (timestamp: number, ttlMs: number): boolean => {
   return Date.now() - timestamp > ttlMs;
 };
@@ -166,7 +177,7 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
           favoritesCache: {},
           favoritesList: null
         });
-        // Xóa token khỏi localStorage (persist sẽ tự làm)
+        // The token is cleared from `localStorage` by the persist middleware.
       },
 
       // ============================================================
@@ -196,8 +207,11 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
       // ============================================================
 
       /**
-       * Lấy favorite status của 1 phim.
-       * @returns true/false nếu có cache, null nếu chưa cache
+       * Reads the favorite state of one movie.
+       *
+       * @param movieSlug - The slug of the movie.
+       * @returns `true` or `false` when the state is cached, `null` when it
+       *          is not cached yet.
        */
       getFavoriteStatus: (movieSlug: string): boolean | null => {
         const entry = get().favoritesCache[movieSlug];
@@ -259,18 +273,18 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
         const now = Date.now();
 
         set((state) => {
-          // Filter profile
+          // The profile is kept only when it is still valid.
           const profileCache = state.profileCache && !isExpired(state.profileCache.timestamp, PROFILE_TTL_MS)
             ? state.profileCache : null;
 
-          // Filter favorites cache
+          // The favorite states that are still valid.
           const favoritesCache = Object.fromEntries(
             Object.entries(state.favoritesCache).filter(
               ([, entry]) => !isExpired(entry.timestamp, FAVORITE_STATUS_TTL_MS)
             )
           );
 
-          // Filter favorites list
+          // The favorites list is kept only when it is still valid.
           const favoritesList = state.favoritesList && !isExpired(state.favoritesList.timestamp, FAVORITES_LIST_TTL_MS)
             ? state.favoritesList : null;
 
@@ -278,6 +292,7 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
         });
       },
 
+      /** Removes every entry from the cache. */
       clearAllCache: (): void => {
         set({
           profileCache: null,
@@ -291,9 +306,11 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
       name: 'user-store',
       storage: createJSONStorage(() => localStorage),
 
-      // Persist: token + favoritesCache (favorite status cần persist
-      // vì nó ảnh hưởng UI ngay lập tức khi load lại trang)
-      // KHÔNG persist: profileCache, favoritesList (sẽ fetch lại)
+      // Persisted: the token and the favorite states. The favorite state
+      // has to be persisted because it changes the UI as soon as the page
+      // is loaded again.
+      // Not persisted: the profile cache and the favorites list, because
+      // they are fetched again from the backend.
       partialize: (state) => ({
         token: state.token,
         isAuthenticated: state.isAuthenticated,
@@ -309,7 +326,8 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
   )
 );
 
-// Selector helpers (dùng trong component để tránh re-render không cần thiết)
+// The selector helpers keep the components from re-rendering when they only
+// need one small part of the state.
 export const useIsAuthenticated = () => useUserStore((state) => state.isAuthenticated);
 export const useToken = () => useUserStore((state) => state.token);
 export const useUserProfile = () => useUserStore((state) => state.getCachedProfile());
