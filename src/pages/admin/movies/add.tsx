@@ -21,6 +21,8 @@ import MovieWebSimulation from '@/features/admin/components/Movies/FormFields/Mo
 import QuickCreateTaxonomyModal, { QuickCreateType } from '@/features/admin/components/Movies/FormFields/QuickCreateTaxonomyModal';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import {
   YEAR_STEPPER_CONFIG,
   FORM_VALIDATION_CONFIG,
@@ -196,6 +198,10 @@ const AddMoviePage = () => {
     } else if (quickCreateModal.type === 'country') {
       setAllCountries(prev => [...prev, newItem]);
       setSelectedCountries(prev => [...prev, newItem.id]);
+    } else if (quickCreateModal.type === 'actor') {
+      if (newItem.name && !actors.includes(newItem.name)) {
+        setActors(prev => [...prev, newItem.name]);
+      }
     }
   };
 
@@ -1198,6 +1204,8 @@ const AddMoviePage = () => {
                       onRemove={handleRemoveActor}
                       suggestions={POPULAR_ACTORS}
                       placeholder={MOVIE_FORM_I18N.step2.actorPlaceholder}
+                      onQuickCreate={() => setQuickCreateModal({ isOpen: true, type: 'actor' })}
+                      quickCreateTitle="Thêm diễn viên mới"
                     />
                   </div>
                 </div>
@@ -2282,7 +2290,8 @@ const AddMoviePage = () => {
 AddMoviePage.getLayout = (page: React.ReactNode) => {
   return (
     <AdminRoute>
-      <AdminLayout>{page}</AdminLayout>
+      <AdminLayout>
+        <ToastContainer position="top-right" autoClose={3500} theme="dark" />{page}</AdminLayout>
     </AdminRoute>
   );
 };

@@ -70,6 +70,19 @@ export const ADMIN_API_CONFIG_MAP = Object.freeze({
     /** PATCH /api/v1/admin/years/:id/status - Toggle active/inactive status */
     toggleStatus: (id: string) => `${ADMIN_BASE_API_URL}/admin/years/${encodeURIComponent(id)}/status`,
   },
+  actors: {
+    /** Primary GET /api/v1/admin/actors */
+    list: (params?: { page?: number; limit?: number; search?: string; gender?: string; isActive?: boolean }) =>
+      buildQueryUrl(`${ADMIN_BASE_API_URL}/admin/actors`, { ...params, _t: Date.now() }),
+    /** POST /api/v1/admin/actors - Create new actor */
+    create: () => `${ADMIN_BASE_API_URL}/admin/actors`,
+    /** GET /api/v1/admin/actors/:id - Get actor details */
+    detail: (id: string) => `${ADMIN_BASE_API_URL}/admin/actors/${encodeURIComponent(id)}`,
+    /** PUT /api/v1/admin/actors/:id - Update actor */
+    update: (id: string) => `${ADMIN_BASE_API_URL}/admin/actors/${encodeURIComponent(id)}`,
+    /** DELETE /api/v1/admin/actors/:id - Remove actor */
+    delete: (id: string) => `${ADMIN_BASE_API_URL}/admin/actors/${encodeURIComponent(id)}`,
+  },
 } as const);
 
 export type AdminApiConfigMap = typeof ADMIN_API_CONFIG_MAP;
