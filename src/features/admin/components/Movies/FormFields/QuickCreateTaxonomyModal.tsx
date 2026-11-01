@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaPlus, FaTags, FaGlobeAmericas, FaUserTie } from 'react-icons/fa';
 import styles from '@/styles/AdminTaxonomies.module.css';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
+import CreateActorModal from '@/features/admin/actors/components/CreateActorModal';
 
 export type QuickCreateType = 'category' | 'country' | 'actor' | 'director';
 
@@ -30,7 +31,7 @@ export default function QuickCreateTaxonomyModal({
   isOpen,
   onClose,
   type,
-  onCreated
+  onCreated,
 }: QuickCreateTaxonomyModalProps) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -46,6 +47,19 @@ export default function QuickCreateTaxonomyModal({
 
   if (!isOpen) return null;
 
+  // Use the full-featured, accessible CreateActorModal when type is 'actor'
+  if (type === 'actor') {
+    return (
+      <CreateActorModal
+        isOpen={isOpen}
+        onClose={onClose}
+        onSuccess={(created) => {
+          onCreated(created);
+        }}
+      />
+    );
+  }
+
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setName(val);
@@ -56,10 +70,14 @@ export default function QuickCreateTaxonomyModal({
 
   const getTitle = () => {
     switch (type) {
-      case 'category': return { label: 'Thể Loại Mới', icon: <FaTags style={{ color: '#e50914' }} /> };
-      case 'country': return { label: 'Quốc Gia Mới', icon: <FaGlobeAmericas style={{ color: '#38bdf8' }} /> };
-      case 'actor': return { label: 'Diễn Viên Mới', icon: <FaUserTie style={{ color: '#f59e0b' }} /> };
-      case 'director': return { label: 'Đạo Diễn Mới', icon: <FaUserTie style={{ color: '#a855f7' }} /> };
+      case 'category':
+        return { label: 'Thể Loại Mới', icon: <FaTags style={{ color: '#e50914' }} /> };
+      case 'country':
+        return { label: 'Quốc Gia Mới', icon: <FaGlobeAmericas style={{ color: '#38bdf8' }} /> };
+      case 'director':
+        return { label: 'Đạo Diễn Mới', icon: <FaUserTie style={{ color: '#a855f7' }} /> };
+      default:
+        return { label: 'Mục Mới', icon: <FaPlus style={{ color: '#e50914' }} /> };
     }
   };
 
@@ -73,7 +91,7 @@ export default function QuickCreateTaxonomyModal({
     const createdItem: any = {
       id,
       name: name.trim(),
-      slug: finalSlug
+      slug: finalSlug,
     };
 
     if (type === 'country') {
@@ -99,7 +117,7 @@ export default function QuickCreateTaxonomyModal({
             {icon}
             <span>+ Tạo Nhanh {label}</span>
           </h3>
-          <button className={styles.closeModalBtn} onClick={onClose} aria-label="Đóng">
+          <button type="button" className={styles.closeModalBtn} onClick={onClose}>
             <FaTimes />
           </button>
         </div>
@@ -107,81 +125,51 @@ export default function QuickCreateTaxonomyModal({
         <form onSubmit={handleSubmit}>
           <div className={styles.modalBody}>
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Tên hiển thị *</label>
+              <label className={styles.formLabel}>Tên {label.toLowerCase()}:</label>
               <input
                 type="text"
                 className={styles.formInput}
                 placeholder={`Nhập tên ${label.toLowerCase()}...`}
                 value={name}
                 onChange={handleNameChange}
-                required
                 autoFocus
               />
             </div>
 
             <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Mã định danh (Slug) *</label>
+              <label className={styles.formLabel}>Đường dẫn (Slug):</label>
               <input
                 type="text"
                 className={styles.formInput}
-                placeholder="slug-khong-dau"
+                placeholder="slug-tu-dong"
                 value={slug}
                 onChange={(e) => {
                   setSlug(e.target.value);
                   setIsSlugTouched(true);
                 }}
-                required
               />
-              <span className={styles.formHint}>Tự động tạo không dấu</span>
             </div>
 
-            {type === 'country' && (
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Mã Alpha-2 Code (Tùy chọn)</label>
-                <input
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="VD: US, JP, KR, VN"
-                  value={extraInfo}
-                  onChange={(e) => setExtraInfo(e.target.value.toUpperCase())}
-                  maxLength={4}
-                />
-              </div>
-            )}
-
-            {type === 'category' && (
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Mô tả tóm tắt (Tùy chọn)</label>
-                <input
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="Mô tả thể loại..."
-                  value={extraInfo}
-                  onChange={(e) => setExtraInfo(e.target.value)}
-                />
-              </div>
-            )}
-
-            {(type === 'actor' || type === 'director') && (
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Quốc tịch (Tùy chọn)</label>
-                <input
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="VD: Hàn Quốc, Mỹ, Việt Nam..."
-                  value={extraInfo}
-                  onChange={(e) => setExtraInfo(e.target.value)}
-                />
-              </div>
-            )}
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>
+                {type === 'country' ? 'Mã quốc gia (VD: US, VN):' : 'Thông tin thêm (Mô tả):'}
+              </label>
+              <input
+                type="text"
+                className={styles.formInput}
+                placeholder={type === 'country' ? 'VN, US, KR...' : 'Mô tả ngắn gọn...'}
+                value={extraInfo}
+                onChange={(e) => setExtraInfo(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className={styles.modalFooter}>
             <button type="button" className={styles.cancelBtn} onClick={onClose}>
               Hủy
             </button>
-            <button type="submit" className={styles.saveBtn}>
-              + Tạo & Chọn Ngay
+            <button type="submit" className={styles.saveBtn} disabled={!name.trim()}>
+              Tạo Ngay
             </button>
           </div>
         </form>

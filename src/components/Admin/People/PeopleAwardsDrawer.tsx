@@ -18,15 +18,30 @@ export interface PersonItem {
   id: string;
   name: string;
   originalName?: string;
+  birthName?: string;
   slug: string;
   avatarUrl?: string;
+  profileImage?: string;
+  coverImage?: string;
+  gender?: 'male' | 'female' | 'other';
   nationality?: string;
   birthYear?: number;
+  dateOfBirth?: string;
+  placeOfBirth?: string;
+  height?: number;
+  debutYear?: number;
+  knownFor?: string;
   bio?: string;
+  biography?: string;
+  socialMedia?: Record<string, string>;
   isVerified: boolean;
   isActive: boolean;
   awards: AwardItem[];
   movieCount?: number;
+  popularity?: number;
+  viewCount?: number;
+  source?: string;
+  externalId?: string;
 }
 
 interface PeopleAwardsDrawerProps {
