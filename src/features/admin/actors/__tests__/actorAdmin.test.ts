@@ -4,14 +4,19 @@
  * @description Enterprise unit tests for Actor Validation Schema, Avatar Generator, and ActorAdminService.
  */
 
-import { createActorSchema, CreateActorInput } from '@/features/admin/actors/types/actor.types';
+import {
+  createActorSchema,
+  updateActorSchema,
+  CreateActorInput,
+  UpdateActorInput,
+} from '@/features/admin/actors/types/actor.types';
 import { generateActorAvatar } from '@/features/admin/actors/utils/actorAvatarGenerator';
 import { generateActorSlug } from '@/features/admin/actors/hooks/useCreateActorForm';
 import { ActorAdminService } from '@/features/admin/actors/services/actorAdminService';
 import { AxiosInstance } from 'axios';
 
 describe('Admin Actor Feature Unit Tests', () => {
-  describe('Zod Validation: createActorSchema', () => {
+  describe('Zod Validation: createActorSchema & updateActorSchema', () => {
     it('should validate a complete valid actor payload', () => {
       const validPayload: CreateActorInput = {
         name: 'Dương Quốc Nam',
@@ -42,6 +47,20 @@ describe('Admin Actor Feature Unit Tests', () => {
         expect(result.data.name).toBe('Dương Quốc Nam');
         expect(result.data.gender).toBe('male');
         expect(result.data.height).toBe(173);
+      }
+    });
+
+    it('should allow partial payloads in updateActorSchema', () => {
+      const partialUpdate: UpdateActorInput = {
+        height: 178,
+        biography: 'Cập nhật tiểu sử mới...',
+      };
+
+      const result = updateActorSchema.safeParse(partialUpdate);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.height).toBe(178);
+        expect(result.data.biography).toBe('Cập nhật tiểu sử mới...');
       }
     });
 
@@ -120,7 +139,7 @@ describe('Admin Actor Feature Unit Tests', () => {
     });
   });
 
-  describe('ActorAdminService: POST /api/v1/admin/actors', () => {
+  describe('ActorAdminService: POST /api/v1/admin/actors (Create)', () => {
     it('should send POST request and return normalized ActorEntity', async () => {
       const mockPost = jest.fn().mockResolvedValue({
         data: {
@@ -138,6 +157,7 @@ describe('Admin Actor Feature Unit Tests', () => {
 
       const mockHttp = {
         post: mockPost,
+        put: jest.fn(),
         get: jest.fn(),
       } as unknown as AxiosInstance;
 
@@ -162,6 +182,52 @@ describe('Admin Actor Feature Unit Tests', () => {
       expect(result.id).toBe('6ae74b57be8cbd0247831969');
       expect(result.name).toBe('Duong Quoc Nam');
       expect(result.gender).toBe('male');
+    });
+  });
+
+  describe('ActorAdminService: PUT /api/v1/admin/actors/:id (Update)', () => {
+    it('should send PUT request and return updated ActorEntity', async () => {
+      const mockPut = jest.fn().mockResolvedValue({
+        data: {
+          responseData: {
+            _id: '6ae74b57be8cbd0247831969',
+            name: 'Duong Quoc Nam Updated',
+            slug: 'duong-nam-quoc-updated',
+            gender: 'male',
+            height: 175,
+            profileImage: 'https://example.com/tom-new.jpg',
+            isActive: true,
+            isVerified: true,
+          },
+        },
+      });
+
+      const mockHttp = {
+        post: jest.fn(),
+        put: mockPut,
+        get: jest.fn(),
+      } as unknown as AxiosInstance;
+
+      const service = new ActorAdminService(mockHttp);
+      const result = await service.update('6ae74b57be8cbd0247831969', {
+        name: 'Duong Quoc Nam Updated',
+        slug: 'duong-nam-quoc-updated',
+        height: 175,
+      });
+
+      expect(mockPut).toHaveBeenCalledWith(
+        expect.stringContaining('/admin/actors/6ae74b57be8cbd0247831969'),
+        expect.objectContaining({
+          name: 'Duong Quoc Nam Updated',
+          slug: 'duong-nam-quoc-updated',
+          height: 175,
+        }),
+        expect.any(Object)
+      );
+
+      expect(result.id).toBe('6ae74b57be8cbd0247831969');
+      expect(result.name).toBe('Duong Quoc Nam Updated');
+      expect(result.height).toBe(175);
     });
   });
 });

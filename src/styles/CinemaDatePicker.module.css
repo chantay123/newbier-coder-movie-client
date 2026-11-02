@@ -1,0 +1,286 @@
+/* src/styles/CinemaDatePicker.module.css */
+
+.datePickerWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.inputContainer {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: #0a0a0c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.inputContainer:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.inputFocused {
+  border-color: rgba(229, 9, 20, 0.7) !important;
+  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.15) !important;
+}
+
+.inputError {
+  border-color: #ef4444 !important;
+}
+
+.inputDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.calendarIcon {
+  margin-left: 10px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.inputContainer:hover .calendarIcon {
+  color: #e50914;
+}
+
+.dateInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 0.83rem;
+  padding: 0.55rem 0.65rem;
+  width: 100%;
+}
+
+.dateInput::placeholder {
+  color: #6b7280;
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  margin-right: 2px;
+}
+
+.clearBtn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.triggerBtn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.triggerBtn:hover {
+  color: #ffffff;
+}
+
+/* Calendar Popover */
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1100;
+  width: 300px;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 12px;
+  animation: popoverEnter 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+@keyframes popoverEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Header with Month / Year Dropdowns and Nav */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 4px;
+}
+
+.navBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #cbd5e1;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.navBtn:hover {
+  background: rgba(229, 9, 20, 0.2);
+  border-color: #e50914;
+  color: #ffffff;
+}
+
+.selectGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+
+.headerSelect {
+  background: #1a1a1f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 4px 6px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.headerSelect:hover,
+.headerSelect:focus {
+  border-color: rgba(229, 9, 20, 0.6);
+}
+
+/* Weekday Row */
+.weekdaysGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.weekday {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Days Matrix */
+.daysGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.dayCell {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #f1f5f9;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.dayCell:hover:not(.dayDisabled) {
+  background: rgba(229, 9, 20, 0.18);
+  border-color: rgba(229, 9, 20, 0.4);
+  color: #ffffff;
+}
+
+.dayOtherMonth {
+  color: #475569 !important;
+}
+
+.dayToday {
+  font-weight: 700;
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+}
+
+.daySelected {
+  background: #e50914 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.6) !important;
+}
+
+.dayDisabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.footerBtn {
+  background: none;
+  border: none;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.footerBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.footerTodayBtn {
+  color: #e50914 !important;
+  font-weight: 600;
+}
+
+.footerTodayBtn:hover {
+  background: rgba(229, 9, 20, 0.15) !important;
+}
+

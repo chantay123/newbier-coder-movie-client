@@ -2,10 +2,11 @@
  * @file CreateActorModal.tsx
  * @description Accessible, Cinema Dark styled modal dialog for adding a new actor.
  * Includes interactive gender selection, image upload with live preview,
- * automated DiceBear vector avatar generation, and comprehensive biographical fields.
+ * automated DiceBear vector avatar generation, calendar picker for DOB,
+ * year dropdown selection, searchable nationality combobox, and verified badge toggle.
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
   FaTimes,
   FaUserTie,
@@ -27,23 +28,39 @@ import {
   FaFacebook,
   FaTwitter,
   FaImdb,
-  FaGlobe,
+  FaChevronDown,
+  FaCheck,
+  FaCheckCircle,
 } from 'react-icons/fa';
 import styles from '@/styles/AdminTaxonomies.module.css';
+import peopleStyles from '@/styles/AdminPeople.module.css';
 import { useCreateActorForm } from '@/features/admin/actors/hooks/useCreateActorForm';
 import { ActorEntity } from '@/features/admin/actors/types/actor.types';
-import { ADMIN_ACTOR_CONSTANTS } from '@/constants/adminActorConstants';
+import {
+  ADMIN_ACTOR_CONSTANTS,
+  POPULAR_COUNTRIES,
+  ACTOR_YEAR_OPTIONS,
+} from '@/constants/adminActorConstants';
+import { getCountryList, CountryItem } from '@/services/countryService';
+import CinemaDatePicker from '@/features/admin/components/Common/CinemaDatePicker';
+import CinemaDropdown, {
+  CinemaDropdownOption,
+} from '@/features/admin/components/Common/CinemaDropdown';
 
 export interface CreateActorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (created: ActorEntity) => void;
+  onSuccess?: (actor: ActorEntity) => void;
+  initialData?: ActorEntity | null;
+  mode?: 'create' | 'update';
 }
 
 export default function CreateActorModal({
   isOpen,
   onClose,
   onSuccess,
+  initialData = null,
+  mode = initialData ? 'update' : 'create',
 }: CreateActorModalProps) {
   const {
     register,
@@ -62,10 +79,77 @@ export default function CreateActorModal({
     handleResetToAutoAvatar,
     setValue,
     watch,
-  } = useCreateActorForm({ isOpen, onClose, onSuccess });
+    isEditMode,
+  } = useCreateActorForm({ isOpen, onClose, onSuccess, initialData, mode });
+
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+  const [countryList, setCountryList] = useState<CountryItem[]>(
+    POPULAR_COUNTRIES.map((c) => ({
+      code: c.code,
+      nameVi: c.nameVi,
+      nameEn: c.nameEn,
+      flag: c.flag,
+    }))
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const countryComboboxRef = useRef<HTMLDivElement>(null);
+
+  // Load complete country list from RestCountries API (via countryService)
+  useEffect(() => {
+    let isMounted = true;
+    getCountryList().then((list) => {
+      if (isMounted && list && list.length > 0) {
+        setCountryList(list);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const watchedBio = watch('biography') || '';
+  const watchedDateOfBirth = watch('dateOfBirth') || '';
+  const watchedNationality = watch('nationality') || '';
+  const watchedIsVerified = watch('isVerified');
+
+  // Filter countries for searchable combobox
+  const filteredCountries = useMemo(() => {
+    if (!watchedNationality.trim()) return countryList;
+    const query = watchedNationality.toLowerCase().trim();
+    const matches = countryList.filter(
+      (c) =>
+        c.nameVi.toLowerCase().includes(query) ||
+        c.nameEn.toLowerCase().includes(query) ||
+        c.code.toLowerCase().includes(query)
+    );
+    return matches.length > 0 ? matches : countryList;
+  }, [watchedNationality, countryList]);
+
+  // Debut year options for CinemaDropdown
+  const currentYear = new Date().getFullYear();
+  const debutYearOptions: CinemaDropdownOption[] = useMemo(() => {
+    return [
+      { value: '', label: '-- Chọn năm ra mắt --' },
+      ...ACTOR_YEAR_OPTIONS.map((y) => ({
+        value: y,
+        label: `Năm ${y}`,
+        desc: y >= currentYear ? 'Phim mới / Sắp chiếu' : undefined,
+      })),
+    ];
+  }, [currentYear]);
+
+  // Click outside to close country dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countryComboboxRef.current && !countryComboboxRef.current.contains(e.target as Node)) {
+        setIsCountryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Focus on name input on mount
   useEffect(() => {
@@ -91,8 +175,6 @@ export default function CreateActorModal({
   }, [isOpen, isSubmitting, onClose]);
 
   if (!isOpen) return null;
-
-  const watchedBio = watch('biography') || '';
 
   return (
     <div
@@ -138,10 +220,12 @@ export default function CreateActorModal({
                 className={styles.modalTitle}
                 style={{ fontSize: '1.1rem', color: '#f8fafc', margin: 0 }}
               >
-                Thêm Mới Diễn Viên
+                {isEditMode ? 'Cập Nhật Thông Tin Diễn Viên' : 'Thêm Mới Diễn Viên'}
               </h2>
               <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.78rem', color: '#9ca3af' }}>
-                Nhập thông tin hồ sơ diễn viên, tải lên hoặc tự động sinh avatar vector
+                {isEditMode
+                  ? 'Chỉnh sửa và cập nhật hồ sơ chi tiết của diễn viên'
+                  : 'Nhập thông tin hồ sơ diễn viên, tải lên hoặc tự động sinh avatar vector'}
               </p>
             </div>
           </div>
@@ -208,24 +292,41 @@ export default function CreateActorModal({
                   )}
                 </div>
 
-                {/* Badge indicator */}
-                <span
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    background: isCustomUploaded ? '#16a34a' : '#e50914',
-                    color: '#ffffff',
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    padding: '0.15rem 0.4rem',
-                    borderRadius: '9999px',
-                    border: '2px solid #0a0a0c',
-                  }}
-                  title={isCustomUploaded ? 'Ảnh do quản trị viên tải lên' : 'Ảnh sinh tự động theo giới tính'}
-                >
-                  {isCustomUploaded ? 'Ảnh tải lên' : 'Tự động'}
-                </span>
+                {/* Badge indicator on avatar */}
+                {watchedIsVerified ? (
+                  <span
+                    className={peopleStyles.verifiedAvatarCircle}
+                    title="Hồ sơ đã được cấp Tích Xanh Xác Minh (Verified)"
+                    aria-label="Tích xanh xác minh"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className={peopleStyles.verifiedCheckIcon}
+                      aria-hidden="true"
+                    >
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      background: isCustomUploaded ? '#16a34a' : '#e50914',
+                      color: '#ffffff',
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      padding: '0.15rem 0.4rem',
+                      borderRadius: '9999px',
+                      border: '2px solid #0a0a0c',
+                    }}
+                    title={isCustomUploaded ? 'Ảnh do quản trị viên tải lên' : 'Ảnh sinh tự động theo giới tính'}
+                  >
+                    {isCustomUploaded ? 'Ảnh tải lên' : 'Tự động'}
+                  </span>
+                )}
               </div>
 
               {/* Avatar Controls */}
@@ -294,13 +395,13 @@ export default function CreateActorModal({
                       transition: 'all 0.15s ease',
                     }}
                     onClick={handleRegenerateAvatar}
-                    title="Sinh ngẫu nhiên avatar vector mới phong cách Adventurer"
+                    title="Đổi avatar vector ngẫu nhiên khác"
                   >
                     <FaMagic size={11} />
                     <span>Đổi Avatar Ngẫu Nhiên</span>
                   </button>
 
-                  {/* Revert if uploaded */}
+                  {/* Revert to auto if custom uploaded */}
                   {isCustomUploaded && (
                     <button
                       type="button"
@@ -308,7 +409,7 @@ export default function CreateActorModal({
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '0.4rem',
-                        padding: '0.4rem 0.75rem',
+                        padding: '0.4rem 0.8rem',
                         background: 'transparent',
                         border: '1px solid rgba(255, 255, 255, 0.12)',
                         borderRadius: '6px',
@@ -339,7 +440,7 @@ export default function CreateActorModal({
                   ref={nameInputRef}
                   type="text"
                   className={`${styles.formInput} ${errors.name ? styles.inputError : ''}`}
-                  placeholder="VD: Dương Quốc Nam, Tom Holland..."
+                  placeholder="VD: Song Joong Ki, Tom Holland..."
                   value={watch('name')}
                   onChange={handleNameChange}
                   aria-invalid={Boolean(errors.name)}
@@ -373,7 +474,7 @@ export default function CreateActorModal({
                 <input
                   type="text"
                   className={`${styles.formInput} ${errors.slug ? styles.inputError : ''}`}
-                  placeholder="VD: duong-quoc-nam"
+                  placeholder="VD: song-joong-ki"
                   {...register('slug', {
                     onChange: () => setIsSlugManuallyEdited(true),
                   })}
@@ -440,21 +541,27 @@ export default function CreateActorModal({
               </div>
             </div>
 
-            {/* Row: Ngày sinh & Chiều cao */}
+            {/* Row: Ngày sinh (Cinema Calendar) & Chiều cao & Năm Ra Mắt (Dropdown) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+              {/* Ngày sinh */}
               <div>
                 <label className={styles.formLabel}>
                   <span className={styles.labelTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <FaCalendarAlt size={11} /> Ngày Sinh
                   </span>
                 </label>
-                <input
-                  type="date"
-                  className={styles.formInput}
-                  {...register('dateOfBirth')}
+                <CinemaDatePicker
+                  value={watchedDateOfBirth}
+                  onChange={(newDate) => setValue('dateOfBirth', newDate, { shouldValidate: true })}
+                  placeholder="Chọn hoặc gõ (YYYY-MM-DD)..."
+                  disabled={isSubmitting}
                 />
+                <span style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '0.25rem', display: 'block' }}>
+                  Lịch cinema chọn nhanh năm/tháng hoặc gõ tay
+                </span>
               </div>
 
+              {/* Chiều cao */}
               <div>
                 <label className={styles.formLabel}>
                   <span className={styles.labelTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -465,9 +572,11 @@ export default function CreateActorModal({
                   type="number"
                   min="50"
                   max="260"
-                  className={`${styles.formInput} ${errors.height ? styles.inputError : ''}`}
+                  className={`${styles.formInput} ${peopleStyles.heightNumberInput} ${errors.height ? styles.inputError : ''}`}
                   placeholder="VD: 173"
                   {...register('height')}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  disabled={isSubmitting}
                 />
                 {errors.height && (
                   <div className={styles.errorMessage} style={{ fontSize: '0.72rem', marginTop: '0.25rem' }}>
@@ -476,24 +585,34 @@ export default function CreateActorModal({
                 )}
               </div>
 
+              {/* Năm Ra Mắt (Cinema Dropdown) */}
               <div>
                 <label className={styles.formLabel}>
                   <span className={styles.labelTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <FaStar size={11} /> Năm Ra Mắt
                   </span>
                 </label>
-                <input
-                  type="number"
-                  min="1900"
-                  max={new Date().getFullYear() + 2}
-                  className={`${styles.formInput} ${errors.debutYear ? styles.inputError : ''}`}
-                  placeholder="VD: 2012"
-                  {...register('debutYear')}
+                <CinemaDropdown
+                  options={debutYearOptions}
+                  value={watch('debutYear') ?? ''}
+                  onChange={(val) =>
+                    setValue('debutYear', val === '' ? undefined : Number(val), {
+                      shouldValidate: true,
+                    })
+                  }
+                  placeholder="-- Chọn năm ra mắt --"
+                  prefixIcon={<FaStar size={11} color="#f59e0b" />}
+                  size="form"
+                  fullWidth
+                  searchable
+                  searchPlaceholder="Tìm kiếm năm (VD: 2020)..."
+                  hasError={Boolean(errors.debutYear)}
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
 
-            {/* Row: Quốc tịch & Tác phẩm tiêu biểu */}
+            {/* Row: Quốc tịch (Searchable Dropdown) & Tác phẩm tiêu biểu */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
               <div>
                 <label className={styles.formLabel}>
@@ -501,12 +620,58 @@ export default function CreateActorModal({
                     <FaGlobeAmericas size={11} /> Quốc Tịch
                   </span>
                 </label>
-                <input
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="VD: Việt Nam, British, American..."
-                  {...register('nationality')}
-                />
+                <div className={peopleStyles.countryComboboxWrapper} ref={countryComboboxRef}>
+                  <input
+                    type="text"
+                    className={`${styles.formInput} ${peopleStyles.countryInput}`}
+                    placeholder="Gõ tìm hoặc chọn quốc gia..."
+                    value={watchedNationality}
+                    onChange={(e) => {
+                      setValue('nationality', e.target.value, { shouldValidate: true });
+                      setIsCountryDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsCountryDropdownOpen(true)}
+                    disabled={isSubmitting}
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    className={peopleStyles.countryToggleBtn}
+                    onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+                    disabled={isSubmitting}
+                    tabIndex={-1}
+                    title="Danh sách quốc gia"
+                  >
+                    <FaChevronDown
+                      size={10}
+                      style={{
+                        transform: isCountryDropdownOpen ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.2s',
+                      }}
+                    />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isCountryDropdownOpen && (
+                    <ul className={peopleStyles.countryDropdownMenu} role="listbox">
+                      {filteredCountries.map((c) => (
+                        <li
+                          key={c.code}
+                          className={`${peopleStyles.countryOption} ${watchedNationality === c.nameVi ? peopleStyles.countryOptionActive : ''}`}
+                          onClick={() => {
+                            setValue('nationality', c.nameVi, { shouldValidate: true });
+                            setIsCountryDropdownOpen(false);
+                          }}
+                          role="option"
+                          aria-selected={watchedNationality === c.nameVi}
+                        >
+                          <span>{c.flag} {c.nameVi} ({c.nameEn})</span>
+                          {watchedNationality === c.nameVi && <FaCheck size={11} color="#e50914" />}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -543,6 +708,40 @@ export default function CreateActorModal({
                   {errors.biography.message}
                 </div>
               )}
+            </div>
+
+            {/* Status & Verification Checkboxes */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                marginBottom: '1rem',
+              }}
+            >
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', color: '#e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  {...register('isVerified')}
+                  style={{ accentColor: '#0284c7', width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                  <FaCheckCircle color="#0284c7" size={13} /> Tích xanh xác minh (Verified)
+                </span>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.82rem', color: '#e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  {...register('isActive')}
+                  style={{ accentColor: '#e50914', width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 600 }}>Trạng thái hoạt động</span>
+              </label>
             </div>
 
             {/* Social Media Details */}
@@ -635,7 +834,7 @@ export default function CreateActorModal({
                   <span>Đang Lưu...</span>
                 </>
               ) : (
-                <span>Lưu Diễn Viên</span>
+                <span>{isEditMode ? 'Cập Nhật Diễn Viên' : 'Lưu Diễn Viên'}</span>
               )}
             </button>
           </div>
