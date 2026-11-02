@@ -1,6 +1,6 @@
 /**
  * @file useCreateActorForm.ts
- * @description Enterprise custom hook coordinating Actor creation form state, Zod validation,
+ * @description Enterprise custom hook coordinating Actor creation & update form state, Zod validation,
  * image uploading with client validation, and real-time DiceBear vector avatar generation.
  */
 
@@ -21,12 +21,16 @@ import { ADMIN_ACTOR_CONSTANTS, ActorGender } from '@/constants/adminActorConsta
 import { toastNotification } from '@/utils/notification/toastNotification';
 import { parseApiError } from '@/utils/errors/appError';
 
-export interface UseCreateActorFormOptions {
+export interface UseActorFormOptions {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: (newActor: ActorEntity) => void;
+  onSuccess?: (actor: ActorEntity) => void;
   service?: IActorAdminService;
+  initialData?: ActorEntity | Partial<CreateActorInput> | null;
+  mode?: 'create' | 'update';
 }
+
+export type UseCreateActorFormOptions = UseActorFormOptions;
 
 /**
  * Normalizes Vietnamese diacritics into URL-friendly slug
@@ -42,13 +46,16 @@ export function generateActorSlug(text: string): string {
     .replace(/\s+/g, '-');
 }
 
-export function useCreateActorForm({
+export function useActorForm({
   isOpen,
   onClose,
   onSuccess,
   service = defaultActorAdminService,
-}: UseCreateActorFormOptions) {
-  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+  initialData = null,
+  mode = initialData ? 'update' : 'create',
+}: UseActorFormOptions) {
+  const isEditMode = mode === 'update';
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(isEditMode);
   const [isCustomUploaded, setIsCustomUploaded] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,45 +109,89 @@ export function useCreateActorForm({
   const watchedGender = watch('gender') as ActorGender;
   const watchedProfileImage = watch('profileImage');
 
-  // Initialize or reset form state when modal opens/closes
+  // Initialize or reset form state when modal opens/closes or initialData changes
   useEffect(() => {
     if (isOpen) {
-      const defaultAvatar = generateActorAvatar('new-actor', 'male');
-      initialAvatarRef.current = defaultAvatar;
-      reset({
-        name: '',
-        slug: '',
-        birthName: '',
-        dateOfBirth: '',
-        placeOfBirth: '',
-        nationality: 'Việt Nam',
-        gender: 'male',
-        height: undefined,
-        profileImage: defaultAvatar,
-        coverImage: '',
-        biography: '',
-        knownFor: '',
-        debutYear: undefined,
-        socialMedia: {
-          facebook: '',
-          instagram: '',
-          twitter: '',
-          imdb: '',
-          website: '',
-        },
-        externalId:
-          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        source: 'manual',
-        isActive: true,
-        isVerified: true,
-      });
-      setAvatarPreview(defaultAvatar);
-      setIsCustomUploaded(false);
-      setIsSlugManuallyEdited(false);
+      if (initialData) {
+        const currentAvatar =
+          initialData.profileImage ||
+          (initialData as any).avatarUrl ||
+          generateActorAvatar(initialData.name || 'actor', (initialData.gender as ActorGender) || 'male');
+
+        reset({
+          name: initialData.name || '',
+          slug: initialData.slug || '',
+          birthName: initialData.birthName || (initialData as any).originalName || '',
+          dateOfBirth: initialData.dateOfBirth || '',
+          placeOfBirth: initialData.placeOfBirth || '',
+          nationality: initialData.nationality || 'Việt Nam',
+          gender: (initialData.gender as ActorGender) || 'male',
+          height: initialData.height ?? undefined,
+          profileImage: currentAvatar,
+          coverImage: initialData.coverImage || '',
+          biography: initialData.biography || (initialData as any).bio || '',
+          knownFor: initialData.knownFor || '',
+          debutYear: initialData.debutYear ?? undefined,
+          socialMedia: {
+            facebook: initialData.socialMedia?.facebook || '',
+            instagram: initialData.socialMedia?.instagram || '',
+            twitter: initialData.socialMedia?.twitter || '',
+            imdb: initialData.socialMedia?.imdb || '',
+            website: initialData.socialMedia?.website || '',
+          },
+          externalId: initialData.externalId || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          source: (initialData.source as any) || 'manual',
+          isActive: initialData.isActive !== undefined ? initialData.isActive : true,
+          isVerified: initialData.isVerified !== undefined ? initialData.isVerified : true,
+        });
+
+        setAvatarPreview(currentAvatar);
+        setIsCustomUploaded(
+          Boolean(
+            currentAvatar &&
+            !currentAvatar.startsWith('data:image/svg+xml') &&
+            !currentAvatar.includes('dicebear')
+          )
+        );
+        setIsSlugManuallyEdited(true);
+      } else {
+        const defaultAvatar = generateActorAvatar('new-actor', 'male');
+        initialAvatarRef.current = defaultAvatar;
+        reset({
+          name: '',
+          slug: '',
+          birthName: '',
+          dateOfBirth: '',
+          placeOfBirth: '',
+          nationality: 'Việt Nam',
+          gender: 'male',
+          height: undefined,
+          profileImage: defaultAvatar,
+          coverImage: '',
+          biography: '',
+          knownFor: '',
+          debutYear: undefined,
+          socialMedia: {
+            facebook: '',
+            instagram: '',
+            twitter: '',
+            imdb: '',
+            website: '',
+          },
+          externalId:
+            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          source: 'manual',
+          isActive: true,
+          isVerified: true,
+        });
+        setAvatarPreview(defaultAvatar);
+        setIsCustomUploaded(false);
+        setIsSlugManuallyEdited(false);
+      }
     }
-  }, [isOpen, reset]);
+  }, [isOpen, initialData, reset]);
 
   // Synchronize avatar automatically when name or gender changes (only if admin hasn't uploaded a custom photo)
   useEffect(() => {
@@ -158,21 +209,18 @@ export function useCreateActorForm({
     setValue('name', val, { shouldValidate: true });
 
     if (!isSlugManuallyEdited) {
-      const generated = generateActorSlug(val);
-      setValue('slug', generated, { shouldValidate: true });
+      const autoSlug = generateActorSlug(val);
+      setValue('slug', autoSlug, { shouldValidate: true });
     }
   };
 
-  // Re-generate a fresh random avatar with DiceBear
+  // Re-roll random DiceBear vector avatar silently without toast alert
   const handleRegenerateAvatar = useCallback(() => {
-    const randomSeed = `${watchedName || 'actor'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const randomSeed = `${watchedName || 'actor'}-${Math.random().toString(36).substring(2, 9)}`;
     const newAvatar = generateActorAvatar(randomSeed, watchedGender);
-
-    setIsCustomUploaded(false);
     setValue('profileImage', newAvatar, { shouldValidate: true });
     setAvatarPreview(newAvatar);
-
-    toastNotification.info(ADMIN_ACTOR_CONSTANTS.MESSAGES.IMAGE_AUTO_GENERATED(watchedGender));
+    setIsCustomUploaded(false);
   }, [watchedName, watchedGender, setValue]);
 
   // Handle client-side file upload with banking-grade security validation
@@ -193,8 +241,8 @@ export function useCreateActorForm({
 
       // 3. Read image as Data URL for instant preview & persistence
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const resultUrl = event.target?.result as string;
+      reader.onload = (e) => {
+        const resultUrl = e.target?.result as string;
         if (resultUrl) {
           setIsCustomUploaded(true);
           setValue('profileImage', resultUrl, { shouldValidate: true });
@@ -219,12 +267,11 @@ export function useCreateActorForm({
     setAvatarPreview(autoAvatar);
   }, [watchedName, watchedGender, setValue]);
 
-  // Form submission handler
+  // Form submission handler: handles both Create and Update
   const onSubmit = async (values: CreateActorInput) => {
     setIsSubmitting(true);
 
     try {
-      // Ensure profileImage has a fallback if somehow empty
       const payload: CreateActorInput = {
         ...values,
         profileImage:
@@ -234,18 +281,31 @@ export function useCreateActorForm({
         birthName: values.birthName || values.name,
       };
 
-      const createdActor = await service.create(payload);
+      let resultActor: ActorEntity;
 
-      toastNotification.success(
-        ADMIN_ACTOR_CONSTANTS.MESSAGES.CREATE_SUCCESS(createdActor.name)
-      );
+      if (isEditMode && (initialData as any)?.id) {
+        // UPDATE MODE
+        resultActor = await service.update((initialData as any).id, payload);
+        toastNotification.success(
+          ADMIN_ACTOR_CONSTANTS.MESSAGES.UPDATE_SUCCESS(resultActor.name)
+        );
+      } else {
+        // CREATE MODE
+        resultActor = await service.create(payload);
+        toastNotification.success(
+          ADMIN_ACTOR_CONSTANTS.MESSAGES.CREATE_SUCCESS(resultActor.name)
+        );
+      }
 
       if (onSuccess) {
-        onSuccess(createdActor);
+        onSuccess(resultActor);
       }
       onClose();
     } catch (err) {
-      const parsed = parseApiError(err, ADMIN_ACTOR_CONSTANTS.MESSAGES.CREATE_ERROR);
+      const errorMsg = isEditMode
+        ? ADMIN_ACTOR_CONSTANTS.MESSAGES.UPDATE_ERROR
+        : ADMIN_ACTOR_CONSTANTS.MESSAGES.CREATE_ERROR;
+      const parsed = parseApiError(err, errorMsg);
       toastNotification.error(parsed.message);
     } finally {
       setIsSubmitting(false);
@@ -259,6 +319,7 @@ export function useCreateActorForm({
     errors,
     isValid,
     isSubmitting,
+    isEditMode,
     avatarPreview,
     isCustomUploaded,
     watchedGender,
@@ -274,3 +335,5 @@ export function useCreateActorForm({
     watch,
   };
 }
+
+export const useCreateActorForm = useActorForm;

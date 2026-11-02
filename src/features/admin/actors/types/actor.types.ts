@@ -85,6 +85,9 @@ export const createActorSchema = z.object({
 
 export type CreateActorInput = z.infer<typeof createActorSchema>;
 
+export const updateActorSchema = createActorSchema.partial();
+export type UpdateActorInput = z.infer<typeof updateActorSchema>;
+
 /**
  * Domain entity representing an Actor in MongoDB
  */

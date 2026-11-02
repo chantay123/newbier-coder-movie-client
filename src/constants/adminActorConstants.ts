@@ -4,6 +4,46 @@
  * Follows 'as const' immutability standards to prevent magic strings and numbers.
  */
 
+export interface CountryOption {
+  code: string;
+  nameVi: string;
+  nameEn: string;
+  flag: string;
+}
+
+export const POPULAR_COUNTRIES: readonly CountryOption[] = Object.freeze([
+  { code: 'VN', nameVi: 'Việt Nam', nameEn: 'Vietnam', flag: '🇻🇳' },
+  { code: 'KR', nameVi: 'Hàn Quốc', nameEn: 'South Korea', flag: '🇰🇷' },
+  { code: 'US', nameVi: 'Hoa Kỳ (Mỹ)', nameEn: 'United States', flag: '🇺🇸' },
+  { code: 'CN', nameVi: 'Trung Quốc', nameEn: 'China', flag: '🇨🇳' },
+  { code: 'JP', nameVi: 'Nhật Bản', nameEn: 'Japan', flag: '🇯🇵' },
+  { code: 'GB', nameVi: 'Vương Quốc Anh', nameEn: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'TH', nameVi: 'Thái Lan', nameEn: 'Thailand', flag: '🇹🇭' },
+  { code: 'HK', nameVi: 'Hồng Kông', nameEn: 'Hong Kong', flag: '🇭🇰' },
+  { code: 'TW', nameVi: 'Đài Loan', nameEn: 'Taiwan', flag: '🇹🇼' },
+  { code: 'FR', nameVi: 'Pháp', nameEn: 'France', flag: '🇫🇷' },
+  { code: 'DE', nameVi: 'Đức', nameEn: 'Germany', flag: '🇩🇪' },
+  { code: 'CA', nameVi: 'Canada', nameEn: 'Canada', flag: '🇨🇦' },
+  { code: 'AU', nameVi: 'Úc (Australia)', nameEn: 'Australia', flag: '🇦🇺' },
+  { code: 'IN', nameVi: 'Ấn Độ', nameEn: 'India', flag: '🇮🇳' },
+  { code: 'ES', nameVi: 'Tây Ban Nha', nameEn: 'Spain', flag: '🇪🇸' },
+  { code: 'IT', nameVi: 'Ý (Italy)', nameEn: 'Italy', flag: '🇮🇹' },
+  { code: 'SG', nameVi: 'Singapore', nameEn: 'Singapore', flag: '🇸🇬' },
+  { code: 'PH', nameVi: 'Philippines', nameEn: 'Philippines', flag: '🇵🇭' },
+  { code: 'ID', nameVi: 'Indonesia', nameEn: 'Indonesia', flag: '🇮🇩' },
+  { code: 'MY', nameVi: 'Malaysia', nameEn: 'Malaysia', flag: '🇲🇾' },
+  { code: 'RU', nameVi: 'Nga', nameEn: 'Russia', flag: '🇷🇺' },
+  { code: 'MX', nameVi: 'Mexico', nameEn: 'Mexico', flag: '🇲🇽' },
+  { code: 'BR', nameVi: 'Brazil', nameEn: 'Brazil', flag: '🇧🇷' },
+]);
+
+export const ACTOR_YEAR_OPTIONS: readonly number[] = Object.freeze(
+  Array.from(
+    { length: new Date().getFullYear() + 2 - 1920 + 1 },
+    (_, i) => new Date().getFullYear() + 2 - i
+  )
+);
+
 export const ADMIN_ACTOR_CONSTANTS = Object.freeze({
   PAGINATION: {
     DEFAULT_PAGE: 1,
