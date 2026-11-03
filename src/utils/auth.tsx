@@ -16,8 +16,15 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/router';
 import { useSession, signOut, type SessionProviderProps } from 'next-auth/react';
-import authService from '@/API/services/authService';
+import authService, { getStoredAccessToken } from '@/API/services/authService';
 import { getApiOrigin, resolveWebSocketUrl } from '@/config/apiBase';
+import {
+  ensureSessionReady,
+  getMemoryAccessToken,
+  getMemoryUser,
+  setMemoryAccessToken,
+  setMemoryUser,
+} from '@/utils/accessTokenStore';
 
 /** Obfuscation helpers, used to hide the user info in DevTools. */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
@@ -48,6 +55,40 @@ const obfDecode = (encoded: string): string | null => {
   }
 };
 
+/**
+ * Rebuilds a minimal user object from a JWT.
+ *
+ * It is used when a valid token exists but the stored user payload is
+ * missing, so the app does not end up in the "token present but
+ * `isAuthenticated` is false" state.
+ *
+ * @param token - The access token.
+ * @returns The user, or null when the token cannot be decoded.
+ */
+const decodeJwtUser = (token: string): AuthUser | null => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const json = decodeURIComponent(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+      .split('')
+      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+      .join(''));
+    const payload = JSON.parse(json) as Record<string, unknown>;
+    const id = (payload.sub as string) || (payload.userId as string) || (payload.id as string);
+    if (!id) return null;
+    return {
+      _id: id,
+      id,
+      username: (payload.username as string) || (payload.email as string) || '',
+      fullname: (payload.fullname as string) || (payload.username as string) || '',
+      email: (payload.email as string) || '',
+      role: (payload.role as string) || 'USER'
+    };
+  } catch {
+    return null;
+  }
+};
+
 export interface AuthUser {
   _id?: string;
   fullname?: string;
@@ -56,8 +97,11 @@ export interface AuthUser {
   avatar?: string;
   role?: string;
   isAdmin?: boolean;
-  backendToken?: string;
   isActive?: boolean;
+  /**
+   * The backend token is NEVER part of this payload any more: it lives in
+   * the encrypted `HttpOnly` session cookie, on the server side.
+   */
   [key: string]: unknown;
 }
 
@@ -162,72 +206,96 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // Resolves the initial user from the session or from sessionStorage. The
-  // user info is never read from localStorage. This runs once, when the
-  // provider mounts.
+  /**
+   * Resolves the initial user from the session.
+   *
+   * The session lives in an encrypted `HttpOnly` cookie, on the server side.
+   * The client asks the server for the access token (and the user profile)
+   * with `/api/auth/session-state`; the refresh token never reaches the
+   * browser.
+   *
+   * The user payload is read from the memory first, then from the storage
+   * (where the token-free profile is kept).
+   */
   useEffect(() => {
     let cancelled = false;
 
-    const checkLoggedIn = () => {
+    const checkLoggedIn = async () => {
       if (typeof window === 'undefined') {
         setLoading(false);
         return;
       }
 
       try {
+        // The NextAuth session (Google / Facebook) still exists, but its
+        // backend token is NOT returned to the browser any more. The route
+        // `/api/auth/oauth-session` reads the token on the server and puts
+        // it into the encrypted `HttpOnly` session cookie.
         if (session?.user) {
-          type SessionWithToken = { backendToken?: string; user: AuthUser };
-          const backendToken = (session as SessionWithToken).backendToken;
-          if (backendToken) {
-            localStorage.setItem('auth_token', backendToken);
-            sessionStorage.setItem('backendToken', backendToken);
+          try {
+            await fetch('/api/auth/oauth-session', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { Accept: 'application/json' },
+            });
+          } catch {
+            /* the session restore below reports the problem */
+          }
+
+          // The session is restored from the `HttpOnly` cookie.
+          await ensureSessionReady();
+
+          if (cancelled) {
+            setLoading(false);
+            return;
+          }
+
+          const bridgedToken = getMemoryAccessToken();
+          const bridgedUser = getMemoryUser();
+
+          if (bridgedToken) {
             const userWithToken: AuthUser = {
               ...(session.user as AuthUser),
-              backendToken
+              ...((bridgedUser ?? {}) as AuthUser)
             };
-            // The user is stored in sessionStorage, so it is removed when the
-            // tab is closed.
-            sessionStorage.setItem('user', obfEncode(JSON.stringify(userWithToken)));
-            setUser(userWithToken);
+            // The user payload is stored without any token.
+            const encodedUser = obfEncode(JSON.stringify(userWithToken));
+            sessionStorage.setItem('user', encodedUser);
+            if (localStorage.getItem('remember_me') === '1') {
+              localStorage.setItem('user', encodedUser);
+            }
+            if (!cancelled) setUser(userWithToken);
             setLoading(false);
             return;
           }
         }
 
-        // Reads the access token.
-        const remembered = localStorage.getItem('remember_me') === '1';
-        const accessToken = (() => {
-          if (remembered) {
-            return localStorage.getItem('token') || localStorage.getItem('auth_token');
-          }
-          const fromSession = window.sessionStorage
-            ? window.sessionStorage.getItem('token') || window.sessionStorage.getItem('auth_token')
-            : null;
-          return fromSession || localStorage.getItem('token') || localStorage.getItem('auth_token');
-        })();
+        // The session is restored from the `HttpOnly` cookie. The route
+        // refreshes the access token when it is expired.
+        await ensureSessionReady();
 
-        // The user payload is read from sessionStorage first, with
-        // localStorage as the fallback for the remember-me case.
+        if (cancelled) {
+          setLoading(false);
+          return;
+        }
+
+        const accessToken = getMemoryAccessToken();
+        const memoryUser = getMemoryUser();
+
+        // The user payload is read from the memory first, with the storage
+        // as the fallback (the profile is kept there without any token).
         const storedUser = (() => {
-          if (window.sessionStorage) {
-            const ssUser = window.sessionStorage.getItem('user');
-            if (ssUser) {
-              try {
-                const decoded = obfDecode(ssUser) || ssUser;
-                return decoded;
-              } catch { return null; }
-            }
+          if (memoryUser) return JSON.stringify(memoryUser);
+          const remembered = localStorage.getItem('remember_me') === '1';
+          const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
+          const lsUser = remembered ? localStorage.getItem('user') : null;
+          const rawUser = ssUser || lsUser;
+          if (!rawUser) return null;
+          try {
+            return obfDecode(rawUser) || rawUser;
+          } catch {
+            return null;
           }
-          if (remembered) {
-            const lsUser = localStorage.getItem('user');
-            if (lsUser) {
-              try {
-                const decoded = obfDecode(lsUser) || lsUser;
-                return decoded;
-              } catch { return null; }
-            }
-          }
-          return null;
         })();
 
         if (accessToken && storedUser) {
@@ -236,6 +304,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } catch (err) {
             if (!cancelled) setUser(null);
           }
+        } else if (accessToken) {
+          // The token is valid but the user payload is missing (the storage
+          // was cleared, or the user was created by another flow). The
+          // payload is rebuilt from the JWT, so the app does not show a
+          // "signed out" state while a valid token is being used.
+          const fromToken = decodeJwtUser(accessToken);
+          if (!cancelled) setUser(fromToken);
         } else {
           const currentUser = authService.getCurrentUser() as AuthUser | null;
           if (currentUser && !cancelled) setUser(currentUser);
@@ -247,7 +322,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    checkLoggedIn();
+    void checkLoggedIn();
 
     return () => {
       cancelled = true;
@@ -381,14 +456,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       ws.onopen = () => {
         attempts = 0;
 
-        const token = localStorage.getItem('token') || localStorage.getItem('auth_token');
-        if (token && ws && ws.readyState === WebSocket.OPEN) {
-          try {
-            ws.send(JSON.stringify({ type: 'authenticate', token }));
-          } catch (sendErr) {
+        // The session is restored first, so the token of the memory is
+        // available even right after a reload.
+        void ensureSessionReady().then(() => {
+          const token = getStoredAccessToken();
+          if (token && ws && ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(JSON.stringify({ type: 'authenticate', token }));
+            } catch (sendErr) {
 
+            }
           }
-        }
+        });
       };
 
       ws.onmessage = (event) => {
@@ -533,14 +612,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         abortControllerRef.current = null;
       }
 
-      // authService.logout already wipes localStorage and sessionStorage and
-      // clears the remember-me flag. The call is centralized here so every
-      // logout path behaves identically.
-      try {
-        await authService.logout();
-      } catch (logoutCleanupError) {
-
-      }
+      // `authService.logout()` already wiped localStorage and sessionStorage
+      // (tokens, user, remember-me flag and the persisted user store), so it
+      // is called only once here. A second call would send the logout
+      // request to the backend twice.
 
       router.push(LOGIN_ROUTE);
     } catch (err) {
@@ -621,11 +696,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         avatarUrl = `${origin}${avatarUrl}`;
       }
       avatarUrl = `${avatarUrl}?t=${new Date().getTime()}`;
-      // The user is updated in sessionStorage instead of localStorage.
+      // The user is updated in the memory of the tab, in sessionStorage
+      // (and in localStorage when the "remember me" flag is set). The
+      // payload never contains a token.
       try {
+        const memoryUser = getMemoryUser() ?? {};
+        setMemoryUser({ ...memoryUser, avatar: avatarUrl });
         const ssUser = window.sessionStorage ? window.sessionStorage.getItem('user') : null;
         const currentUser = ssUser ? (() => { try { const d = obfDecode(ssUser); return d ? JSON.parse(d) : {}; } catch { return {}; } })() : {};
-        window.sessionStorage.setItem('user', obfEncode(JSON.stringify({ ...currentUser, avatar: avatarUrl })));
+        const encoded = obfEncode(JSON.stringify({ ...currentUser, avatar: avatarUrl }));
+        window.sessionStorage.setItem('user', encoded);
+        if (localStorage.getItem('remember_me') === '1') {
+          localStorage.setItem('user', encoded);
+        }
       } catch { /* ignore */ }
       return avatarUrl;
     }

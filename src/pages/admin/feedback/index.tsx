@@ -7,6 +7,7 @@ import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from 'axios';
 import { getApiBaseUrl, getApiOrigin } from '@/config/apiBase';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from '@/API/services/authService';
 import {
   FaEye, FaFilter, FaExclamationTriangle,
   FaClock, FaEnvelope, FaSearch, FaSort,
@@ -214,7 +215,7 @@ const FeedbackPage = () => {
   const fetchFeedback = async () => {
     try {
       setLoading(true);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
 
       const params: any = {
         page: currentPage,
@@ -335,7 +336,7 @@ const FeedbackPage = () => {
   const updateFeedbackStatus = async (id: string, newStatus: 'pending' | 'processed' | 'resolved') => {
     try {
       setUpdatingStatus(id);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
       const baseUrl = getApiBaseUrl();
 
       if (token) {
@@ -368,7 +369,7 @@ const FeedbackPage = () => {
 
     try {
       setDeleteInProgress(true);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
       const baseUrl = getApiBaseUrl();
 
       if (token) {

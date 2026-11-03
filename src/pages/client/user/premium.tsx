@@ -159,6 +159,19 @@ export default function PremiumPage() {
         const packagesData = (await subscriptionService.getAllPackages()) as PackageFeature[];
         setPackages(packagesData);
 
+        // The package chosen before the login is restored, so the user does
+        // not have to pick it again after being redirected.
+        try {
+          const pendingPackageId = window.sessionStorage.getItem('selectedPackage');
+          if (pendingPackageId) {
+            window.sessionStorage.removeItem('selectedPackage');
+            const match = packagesData.find(
+              (pkg) => getPackageIdAsString(pkg._id || pkg.id) === pendingPackageId
+            );
+            if (match) setSelectedPackage(match);
+          }
+        } catch { /* sessionStorage can be disabled */ }
+
         if (isAuthenticated) {
           try {
             const subscriptionData = (await subscriptionService.getCurrentSubscription()) as SubscriptionData;
@@ -193,7 +206,12 @@ export default function PremiumPage() {
 
   const handleSelectPackage = async (pkg: PackageFeature): Promise<void> => {
     if (!isAuthenticated) {
-      localStorage.setItem('selectedPackage', String(pkg._id));
+      // The chosen package is kept in the session storage: it is only
+      // needed to restore the selection after the login redirect, so it
+      // must not survive the tab.
+      try {
+        window.sessionStorage.setItem('selectedPackage', String(pkg._id));
+      } catch { /* sessionStorage can be disabled */ }
       router.push('/auth/login?redirect=/user/premium');
       return;
     }

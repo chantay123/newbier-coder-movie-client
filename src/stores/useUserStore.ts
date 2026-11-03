@@ -2,20 +2,27 @@
  * Zustand store for the user authentication and the profile.
  *
  * The store keeps the data in `localStorage` so that:
- * 1. The auth token and the user info are kept between visits.
+ * 1. The favorite states are kept between visits, so the heart icon is
+ *    correct as soon as a page is loaded again.
  * 2. The user profile is cached, so it is not fetched again on every page
  *    change.
  * 3. The state is shared between the Navbar, the Profile page and the
  *    MovieCard (favorite status).
  *
  * Cache strategy:
- * - Auth token: `localStorage`, persisted forever.
- * - User profile: `localStorage` with a TTL of 10 minutes.
- * - Favorite movies: `localStorage` with a TTL of 5 minutes.
+ * - Auth token: NOT persisted. The token has a single source of truth
+ *   (`authService` / `auth_token` / `token`), so keeping a second copy in
+ *   `localStorage` only created a stale state where the store said
+ *   "authenticated" while the session was over (or the other way round).
+ *   The token is restored from the real storage during the rehydration.
+ * - User profile: in memory only, with a TTL of 10 minutes.
+ * - Favorite movies: `localStorage` with a TTL of 5 minutes and a bounded
+ *   number of entries.
  */
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { getMemoryAccessToken } from '@/utils/accessTokenStore';
 
 // ============================================================
 // TYPES
@@ -132,6 +139,13 @@ const FAVORITE_STATUS_TTL_MS = 5 * 60 * 1000;
 const FAVORITES_LIST_TTL_MS = 2 * 60 * 1000;
 
 /**
+ * The maximum number of movies kept in the favorite-status cache. The cache
+ * is written on every favorite toggle, so without a limit it would keep one
+ * entry per movie the user ever opened.
+ */
+const MAX_FAVORITE_STATUS_ENTRIES = 200;
+
+/**
  * Tells whether a cache entry is too old to be used.
  *
  * @param timestamp - The moment the entry was written.
@@ -140,6 +154,20 @@ const FAVORITES_LIST_TTL_MS = 2 * 60 * 1000;
  */
 const isExpired = (timestamp: number, ttlMs: number): boolean => {
   return Date.now() - timestamp > ttlMs;
+};
+
+/**
+ * Reads the access token of the current tab.
+ *
+ * The token is kept in the MEMORY of the tab
+ * (`src/utils/accessTokenStore.ts`), NOT in the Web Storage: a token in the
+ * storage can be read by any script running on the page.
+ *
+ * @returns The token, or null when the user is not signed in.
+ */
+const readStoredAccessToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return getMemoryAccessToken();
 };
 
 // ============================================================
@@ -177,7 +205,8 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
           favoritesCache: {},
           favoritesList: null
         });
-        // The token is cleared from `localStorage` by the persist middleware.
+        // The token is cleared from `localStorage` by `authService.logout()`,
+        // which is the single source of truth for the session.
       },
 
       // ============================================================
@@ -227,12 +256,26 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
       },
 
       setFavoriteStatus: (movieSlug: string, isFavorite: boolean): void => {
-        set((state) => ({
-          favoritesCache: {
+        set((state) => {
+          const favoritesCache = {
             ...state.favoritesCache,
             [movieSlug]: { data: { isFavorite }, timestamp: Date.now() }
+          };
+
+          // The cache must not grow forever: the oldest entries are dropped
+          // as soon as there are too many of them.
+          const keys = Object.keys(favoritesCache);
+          if (keys.length > MAX_FAVORITE_STATUS_ENTRIES) {
+            keys
+              .sort((a, b) => favoritesCache[a].timestamp - favoritesCache[b].timestamp)
+              .slice(0, keys.length - MAX_FAVORITE_STATUS_ENTRIES)
+              .forEach((key) => {
+                delete favoritesCache[key];
+              });
           }
-        }));
+
+          return { favoritesCache };
+        });
       },
 
       getCachedFavoritesList: (): FavoriteItem[] | null => {
@@ -306,20 +349,56 @@ export const useUserStore = create<UserStoreState & UserStoreActions>()(
       name: 'user-store',
       storage: createJSONStorage(() => localStorage),
 
-      // Persisted: the token and the favorite states. The favorite state
-      // has to be persisted because it changes the UI as soon as the page
-      // is loaded again.
-      // Not persisted: the profile cache and the favorites list, because
-      // they are fetched again from the backend.
+      // Persisted: the favorite states only. They change the UI as soon as
+      // the page is loaded again.
+      // Not persisted:
+      // - the token and `isAuthenticated`: `authService` owns the session.
+      //   Keeping a second copy here produced the "the token exists but
+      //   `isAuthenticated` is false" (and the opposite) mismatches.
+      // - the profile cache and the favorites list: they are fetched again
+      //   from the backend.
       partialize: (state) => ({
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
         favoritesCache: state.favoritesCache
       }),
 
+      // The persisted format changed: the token and `isAuthenticated` are not
+      // stored anymore. The old values are dropped when the store is read.
+      // The `merge` hook is used (and not only `migrate`) because the data
+      // written by the previous version has no version number, so `migrate`
+      // would never run for it.
+      version: 2,
+      migrate: (persistedState: unknown): unknown => {
+        if (!persistedState || typeof persistedState !== 'object') return persistedState;
+        const state = { ...(persistedState as Record<string, unknown>) };
+        delete state.token;
+        delete state.isAuthenticated;
+        return state;
+      },
+      merge: (persistedState: unknown, currentState: UserStoreState & UserStoreActions) => {
+        const base = currentState as unknown as Record<string, unknown>;
+        if (!persistedState || typeof persistedState !== 'object') {
+          return currentState;
+        }
+        const persisted = { ...(persistedState as Record<string, unknown>) };
+        // The auth state is never restored from the storage.
+        delete persisted.token;
+        delete persisted.isAuthenticated;
+        return { ...base, ...persisted } as unknown as UserStoreState & UserStoreActions;
+      },
+
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.clearExpiredCache();
+        if (!state) return;
+
+        // The expired entries are dropped.
+        state.clearExpiredCache();
+
+        // The auth state is restored from the real storage, so the store can
+        // never disagree with the session.
+        try {
+          const token = readStoredAccessToken();
+          state.setToken(token);
+        } catch {
+          state.setToken(null);
         }
       }
     }

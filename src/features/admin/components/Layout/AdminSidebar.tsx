@@ -25,6 +25,7 @@ import loadingStyles from '@/styles/AdminLoading.module.css';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 interface MenuItem {
   path: string;
@@ -73,7 +74,7 @@ const AdminSidebar = () => {
   useEffect(() => {
     const fetchUnreadFeedbackCount = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
+        const token = getStoredAccessToken();
         if (!token) return;
 
         const baseUrl = getApiBaseUrl();
@@ -98,7 +99,7 @@ const AdminSidebar = () => {
   useEffect(() => {
     const fetchPendingPremiumCount = async () => {
       try {
-        const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
+        const token = getStoredAccessToken();
         if (!token) return;
 
         const baseUrl = getApiBaseUrl();

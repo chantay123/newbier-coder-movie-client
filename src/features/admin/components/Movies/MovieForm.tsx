@@ -4,6 +4,7 @@ import { Form, Button, Row, Col, Card, Tab, Nav, Image, Alert } from 'react-boot
 import { Movie } from './MovieTable';
 import BackToListButton from '@/features/admin/components/Common/BackToListButton';
 import BackToTopButton from '@/features/admin/components/Common/BackToTopButton';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 interface MovieFormProps {
   movie?: Partial<Movie>;
@@ -41,7 +42,7 @@ const MovieForm: React.FC<MovieFormProps> = ({ movie, onSubmit, onCancel }) => {
     }
 
     // Check for authentication token
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    const token = getStoredAccessToken();
     if (!token) {
       setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.');
 

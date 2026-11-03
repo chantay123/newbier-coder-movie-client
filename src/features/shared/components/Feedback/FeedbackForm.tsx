@@ -10,6 +10,7 @@ import type { User } from '@/types/user';
 import axios, { AxiosError } from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 export interface FeedbackFormProps {
   isOpen: boolean;
@@ -97,12 +98,13 @@ const FeedbackForm = forwardRef<HTMLDivElement, FeedbackFormProps>(
         }
 
         const baseUrl: string = getApiBaseUrl();
+        // The token is read through the shared helper, so a session-only
+        // login is supported as well.
+        const authToken = getStoredAccessToken();
         const response = await axios.post(apiUrl(`feedbackList`), submitData, {
           headers: {
             'Content-Type': 'application/json',
-            ...(isAuthenticated && {
-              Authorization: `Bearer ${localStorage.getItem('token')}`
-            })
+            ...(isAuthenticated && authToken ? { Authorization: `Bearer ${authToken}` } : {})
           }
         });
 

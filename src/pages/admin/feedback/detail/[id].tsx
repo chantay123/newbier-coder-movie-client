@@ -7,6 +7,7 @@ import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from '@/API/services/authService';
 import {
   FaEnvelope, FaArrowLeft, FaClock, FaReply, FaTrash,
   FaCheckCircle, FaCalendarAlt, FaExclamationTriangle,
@@ -96,7 +97,7 @@ const FeedbackDetailPage = () => {
         setLoading(true);
         setError(null);
 
-        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
         const baseUrl = getApiBaseUrl();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -149,7 +150,7 @@ const FeedbackDetailPage = () => {
       setSubmitting(true);
       setError(null);
 
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
       const baseUrl = getApiBaseUrl();
 
       if (token) {
@@ -200,7 +201,7 @@ const FeedbackDetailPage = () => {
       setDeleting(true);
       setError(null);
 
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
       const baseUrl = getApiBaseUrl();
 
       if (token) {

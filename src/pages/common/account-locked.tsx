@@ -7,6 +7,7 @@ import { useState, useEffect, MouseEvent } from 'react';
 import Head from 'next/head';
 import type { NextPage, GetStaticProps } from 'next';
 import type { ReactElement } from 'react';
+import authService from '@/API/services/authService';
 
 const setCookie = (name: string, value: string, days?: number): void => {
   if (typeof document === 'undefined') return;
@@ -40,10 +41,21 @@ const AccountLockedPage: NextPage = () => {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('isAccountLocked');
         deleteCookie('isAccountLocked');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        // The whole client-side session is wiped (tokens, user, remember-me
+        // flag, the legacy token key and the persisted user store).
+        try {
+          // The cleanup is centralized in `authService`, so the locked page
+          // removes exactly the same keys as a normal logout.
+          authService._clearLocalSession();
+        } catch {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('remember_me');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user-store');
+        }
 
         if (window.sessionStorage) {
           window.sessionStorage.removeItem('backendToken');

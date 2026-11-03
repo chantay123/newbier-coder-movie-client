@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa';
 import { useRouter } from 'next/router';
 import { getApiOrigin } from '@/config/apiBase';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 // Zustand store cho user (cache profile + favorites)
 import { useUserStore } from '@/stores/useUserStore';
@@ -64,6 +65,7 @@ interface AuthApi {
   user: AuthUser | null;
   logout: () => void;
   isAuthenticated: boolean;
+  loading: boolean;
 }
 
 interface IndicatorStyle {
@@ -250,7 +252,7 @@ const Navbar: React.FC = () => {
   const [searchHistoryLoading, setSearchHistoryLoading] = useState<boolean>(false);
 
   const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
 
   // ---- The Zustand store: the user data is synced with the cache on
   // login and on logout ----
@@ -267,21 +269,23 @@ const Navbar: React.FC = () => {
 
   // The store is synced when the user signs in or signs out.
   useEffect(() => {
+    // The auth state is not resolved yet: the store must not be touched,
+    // otherwise the persisted favorite cache would be wiped on every load.
+    if (authLoading) return;
+
     if (isAuthenticated && user) {
-      // The profile is cached in the Zustand store, which is persisted in
-      // `localStorage`.
+      // The profile is cached in the Zustand store.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setCachedProfile(user as any);
-      // The token is synced when there is one.
-      const token = typeof window !== 'undefined'
-        ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
-        : null;
+      // The token is synced when there is one. It is read from the MEMORY of
+      // the tab: it is not stored in the Web Storage any more.
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
       if (token) setToken(token);
     } else if (!isAuthenticated) {
       // On logout the cache is cleared.
       zustandLogout();
     }
-  }, [isAuthenticated, user, setCachedProfile, setToken, zustandLogout]);
+  }, [isAuthenticated, authLoading, user, setCachedProfile, setToken, zustandLogout]);
 
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -502,7 +506,7 @@ const Navbar: React.FC = () => {
       if (isAuthenticated) {
         saveToSearchHistory(searchQuery);
       }
-      localStorage.setItem('lastSearchQuery', searchQuery.trim());
+      localStorage.removeItem('lastSearchQuery');
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setShowSearchDropdown(false);
       setShowSearchInput(false);
