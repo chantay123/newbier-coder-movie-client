@@ -39,6 +39,7 @@ import NetworkStatusBar from '@/features/shared/components/UI/NetworkStatusBar';
 import CinemaAlert from '@/features/shared/components/UI/CinemaAlert';
 import AdContextProvider from '@/context/AdContext';
 import { registerServiceWorker } from '@/utils/serviceWorker';
+import { cleanupLegacyImageLoadedKeys, cleanupLegacyTokenKeys } from '@/utils/localStorageCleanup';
 import { ROUTES } from '@/config/routesConfig';
 
 // Bỏ qua các lỗi unhandledRejection / runtime từ browser extensions (ví dụ: Urban VPN, adblock, v.v.)
@@ -101,6 +102,14 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('bootstrap/dist/js/bootstrap.bundle.min.js');
       registerServiceWorker();
+      // Remove the legacy `img_loaded_*` keys that older versions wrote
+      // for every rendered poster. The flag now lives in React state, so
+      // no new key is created any more.
+      cleanupLegacyImageLoadedKeys();
+      // Remove the legacy token keys: the tokens now live in an encrypted
+      // `HttpOnly` cookie (server side) and in the memory of the tab, so a
+      // token left in the Web Storage would only be a liability.
+      cleanupLegacyTokenKeys();
     }
   }, []);
 
