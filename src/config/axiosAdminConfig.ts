@@ -1,6 +1,8 @@
 // src/config/axiosAdminConfig.ts
 import axios from 'axios';
 import { getApiBaseUrl } from './apiBase';
+import { getStoredAccessToken } from '@/API/services/authService';
+import { ensureSessionReady } from '@/utils/accessTokenStore';
 
 /**
  * Axios instance used by the admin area.
@@ -24,27 +26,25 @@ const axiosInstance = axios.create({
 });
 
 /**
- * Reads the access token from EVERY storage location the auth flow can use.
- * authService.login() persists the token to:
- *  - localStorage (when rememberMe = true)
- *  - sessionStorage (when rememberMe = false)
- * If only localStorage was read, session-only logins would silently send no
- * Authorization header and the backend would answer 401 for every request.
+ * Reads the access token from the memory of the tab.
  *
- * @returns The token, or null when no token is stored.
+ * The token is NOT read from the Web Storage: a token in the storage can be
+ * read by any script running on the page. The refresh token never reaches
+ * the browser at all — it lives in an encrypted `HttpOnly` cookie, on the
+ * server side.
+ *
+ * @returns The token, or null when there is no session.
  */
 const readAccessTokenFromAnyStorage = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return (
-    localStorage.getItem('auth_token')
-    || localStorage.getItem('token')
-    || (window.sessionStorage ? window.sessionStorage.getItem('auth_token') : null)
-    || (window.sessionStorage ? window.sessionStorage.getItem('token') : null)
-    || null
-  );
+  return getStoredAccessToken();
 };
 
-axiosInstance.interceptors.request.use((config) => {
+axiosInstance.interceptors.request.use(async (config) => {
+  // The session is restored before the first request of the tab, so the
+  // token is available even right after a reload.
+  await ensureSessionReady();
+
   const token = readAccessTokenFromAnyStorage();
 
   if (token) {

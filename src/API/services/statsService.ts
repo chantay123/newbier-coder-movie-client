@@ -7,13 +7,14 @@
 import axios from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from './authService';
 
 /** The backend base URL. It uses the shared resolver instead of reading the environment. */
 const API_URL = getApiBaseUrl();
 
 const getAuthHeader = (): Record<string, string> => {
   if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('token');
+  const token = getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 

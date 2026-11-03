@@ -6,6 +6,7 @@
 import api from '@/API/config/axiosConfig';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiPath, apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from './authService';
 
 export interface SubscriptionPackage {
   _id: string;
@@ -160,9 +161,7 @@ const subscriptionService = {
   },
 
   getUserAdBenefits: async (): Promise<AdBenefits> => {
-    const token = typeof window !== 'undefined'
-      ? (localStorage.getItem('auth_token') || localStorage.getItem('token') || localStorage.getItem('authToken'))
-      : null;
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
 
     if (!token) {
       return { ...emptyAdBenefits(true) };
@@ -231,9 +230,7 @@ const subscriptionService = {
   },
 
   getAdminPendingSubscriptions: async (): Promise<AdminPendingResult> => {
-    const token = typeof window !== 'undefined'
-      ? (localStorage.getItem('auth_token') || localStorage.getItem('authToken'))
-      : null;
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
     if (!token) {
       return {
         success: false,
@@ -294,9 +291,7 @@ const subscriptionService = {
   },
 
   getAdminPendingSubscriptionsCount: async (): Promise<number> => {
-    const token = typeof window !== 'undefined'
-      ? (localStorage.getItem('auth_token') || localStorage.getItem('authToken'))
-      : null;
+    const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
     if (!token) {
 
       return 0;

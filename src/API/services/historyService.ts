@@ -17,6 +17,7 @@
  */
 import axiosInstance from '@/API/config/axiosConfig';
 import { endpoints } from '@/config/API';
+import { getStoredAccessToken } from './authService';
 
 export interface HistoryMovieInput {
   id?: string;
@@ -87,7 +88,7 @@ export interface TotalWatchTime {
 
 const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token') || localStorage.getItem('token');
+  return getStoredAccessToken();
 };
 
 const emptyHistory = (page: number): HistoryListResponse => ({

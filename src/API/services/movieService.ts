@@ -68,12 +68,16 @@ let _tokenRefreshInFlight: Promise<string | null> | null = null;
 const ensureFreshToken = async (): Promise<string | null> => {
   if (typeof window === 'undefined') return null;
 
-  const token =
-    localStorage.getItem('auth_token')
-    || localStorage.getItem('token')
-    || (window.sessionStorage && window.sessionStorage.getItem('auth_token'))
-    || (window.sessionStorage && window.sessionStorage.getItem('token'))
-    || null;
+  // The token is read through the shared helper, so a session-only login
+  // (the token lives in `sessionStorage`) is handled the same way as a
+  // "remember me" login.
+  let token: string | null = null;
+  try {
+    const mod = await import('./authService');
+    token = mod.getStoredAccessToken();
+  } catch {
+    token = null;
+  }
 
   if (!token) return null;
 
