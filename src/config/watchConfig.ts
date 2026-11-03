@@ -1,22 +1,24 @@
 /**
- * @file watchConfig.ts
- * @description Cấu hình tập trung cho trang xem phim và trình phát.
- * Gom kích thước tập phim, đề xuất sidebar, nhãn UI, fallback và mặc định SEO,
- * tránh hardcode giá trị trong component UI.
+ * The central configuration for the watch page and the video player.
+ *
+ * It gathers the episode group size, the sidebar recommendations, the UI
+ * labels, the fallbacks and the SEO defaults, so that the components never
+ * hardcode a value.
  */
 
 export const WATCH_CONFIG = {
-  // Số tập phim mỗi nhóm trong playlist (24 tập mỗi nhóm cho layout cân đối)
+  // The number of episodes in one group of the playlist. 24 episodes per
+  // group keep a balanced layout.
   episodesPerGroup: 24,
 
-  // Cấu hình widget đề xuất sidebar
+  // The configuration of the sidebar recommendation widget.
   recommendations: {
     limit: 10,
     title: 'Phim Đề Xuất',
     emptyText: 'Đang cập nhật danh sách đề xuất...'
   },
 
-  // Nhãn và text cho UI
+  // The labels and the texts used by the UI.
   labels: {
     playlistTitle: 'Danh Sách Tập',
     totalEpisodesSuffix: 'tập',
@@ -38,7 +40,7 @@ export const WATCH_CONFIG = {
     defaultEpisodeName: 'Tập phim'
   },
 
-  // Mặc định SEO & Head
+  // The SEO and the head defaults.
   seo: {
     siteName: 'MovieStreaming',
     defaultBackdrop: '/img/background/movies-wall.jpg',

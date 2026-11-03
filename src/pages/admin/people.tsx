@@ -3,7 +3,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Head from 'next/head';
-import Image from 'next/image';
 import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import AdminLayout from '@/layouts/AdminLayout';
 import BackToTop from '@/features/shared/components/UI/BackToTop';

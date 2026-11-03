@@ -16,6 +16,7 @@ import {
   FaCog
 } from 'react-icons/fa';
 import { useRouter } from 'next/router';
+import { getApiOrigin } from '@/config/apiBase';
 
 // Zustand store cho user (cache profile + favorites)
 import { useUserStore } from '@/stores/useUserStore';
@@ -39,6 +40,7 @@ const movieService = movieServiceRaw as unknown as {
 };
 import { LOCAL_DEFAULT_POSTER } from '@/config/movieFallbackConfig';
 import { TMDB_CONFIG } from '@/config/systemConfig';
+import { apiPath } from '@/config/apiPaths';
 import { useClientYears } from '@/features/client/years/hooks/useClientYears';
 import {
   MAIN_NAV_ITEMS,
@@ -130,9 +132,11 @@ interface CinemaAvatarSvgProps {
 }
 
 /**
- * Modern vector SVG Cinema Avatar — bright, colorful gradient so the
- * default placeholder never looks "đen thui" against dark navbar.
- * Uses the signature cinema palette (warm amber → coral → magenta).
+ * A modern vector SVG cinema avatar.
+ *
+ * The gradient is bright and colorful, so the default placeholder never
+ * looks completely black against the dark navbar. The signature cinema
+ * palette is used (warm amber to coral to magenta).
  */
 export const CinemaAvatarSvg: React.FC<CinemaAvatarSvgProps> = ({ size = 32, className = '' }) => (
   <svg
@@ -172,10 +176,7 @@ const getAvatarUrl = (user: AuthUser | null | undefined): string | null => {
   if (!avatarUrl || avatarUrl === '/img/avatar.png') return null;
 
   if (avatarUrl.startsWith('/')) {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-    const baseWithoutApi = baseUrl.endsWith('/api')
-      ? baseUrl.substring(0, baseUrl.length - 4)
-      : baseUrl;
+    const baseWithoutApi = getApiOrigin();
 
     avatarUrl = `${baseWithoutApi}${avatarUrl}`;
   }
@@ -251,30 +252,33 @@ const Navbar: React.FC = () => {
   const router = useRouter();
   const { user, logout, isAuthenticated } = useAuth();
 
-  // ---- Zustand: sync user data vào cache khi login/logout ----
-  // ⚠️ Lưu ý: Mỗi selector phải trả về giá trị nguyên thủy (primitive)
-  // hoặc reference ổn định (function). KHÔNG trả về object `{...}` mới
-  // vì Zustand sẽ thấy reference khác → re-render vô tận → infinite loop.
+  // ---- The Zustand store: the user data is synced with the cache on
+  // login and on logout ----
+  // IMPORTANT: every selector has to return a primitive value or a stable
+  // reference (a function). It must NOT return a new `{...}` object,
+  // because Zustand would see a different reference, the component would
+  // re-render, and the loop would never end.
   //
-  // → Navbar chỉ re-render khi `isAuthenticated` đổi true/false.
+  // The navbar only re-renders when `isAuthenticated` changes.
   const zustandIsAuthenticated = useUserStore((s) => s.isAuthenticated);
   const setCachedProfile = useUserStore((s) => s.setCachedProfile);
   const setToken = useUserStore((s) => s.setToken);
   const zustandLogout = useUserStore((s) => s.logout);
 
-  // Sync khi user login/logout
+  // The store is synced when the user signs in or signs out.
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Cache profile vào Zustand store (localStorage persist)
+      // The profile is cached in the Zustand store, which is persisted in
+      // `localStorage`.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setCachedProfile(user as any);
-      // Sync token nếu có
+      // The token is synced when there is one.
       const token = typeof window !== 'undefined'
         ? (localStorage.getItem('auth_token') || localStorage.getItem('token'))
         : null;
       if (token) setToken(token);
     } else if (!isAuthenticated) {
-      // Logout → xóa cache
+      // On logout the cache is cleared.
       zustandLogout();
     }
   }, [isAuthenticated, user, setCachedProfile, setToken, zustandLogout]);
@@ -454,11 +458,11 @@ const Navbar: React.FC = () => {
         setSearchActorsResult(Array.isArray(tmdbActors) ? tmdbActors : []);
       } else {
         const [moviesResp, tmdbActors] = await Promise.all([
-          safeFetchJson(`/movies?search=${encodeURIComponent(q)}&limit=${NAVBAR_SEARCH_CONFIG.movieLimit}`, {}, null)
+          safeFetchJson(apiPath(`moviesList`) + `?search=${encodeURIComponent(q)}&limit=${NAVBAR_SEARCH_CONFIG.movieLimit}`, {}, null)
             .then((res: unknown) => {
               const list = extractMovieList(res);
               if (Array.isArray(list) && list.length > 0) return list;
-              return safeFetchJson(`/movies/search?q=${encodeURIComponent(q)}`, {}, [])
+              return safeFetchJson(apiPath(`moviesSearch`) + `?q=${encodeURIComponent(q)}`, {}, [])
                 .then(extractMovieList);
             })
             .catch(() => []),

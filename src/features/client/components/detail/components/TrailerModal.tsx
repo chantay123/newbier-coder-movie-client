@@ -137,7 +137,7 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
   // We never flip this automatically based on a timeout (a slow network
   // is not evidence of a region block).
   const [userMarkedBroken, setUserMarkedBroken] = useState<boolean>(false);
-  // Incremented on every "Thử lại" click to force-remount the iframe.
+  // Incremented on every "Retry" click to force-remount the iframe.
   const [retryNonce, setRetryNonce] = useState<number>(0);
   // Advisory copy after 30s of waiting — does NOT change the state.
   const [slowNetworkHint, setSlowNetworkHint] = useState<boolean>(false);
@@ -213,7 +213,7 @@ const TrailerModal: React.FC<TrailerModalProps> = ({ movie, onClose }) => {
   }, [movie]);
 
   // Convert the embed URL into a plain `watch?v=...` link so the
-  // "Mở trên YouTube" button works even after the iframe is gone.
+  // "Open on YouTube" button works even after the iframe is gone.
   const watchUrl = useMemo(() => {
     if (!embedUrl) return '';
     try {

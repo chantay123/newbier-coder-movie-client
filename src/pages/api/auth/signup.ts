@@ -1,8 +1,13 @@
 /**
- * @file pages/api/auth/signup.ts
- * @description Local signup API route. Forwards registration payload to backend.
+ * The local signup API route. It forwards the registration payload
+ * to the backend.
+ *
+ * Endpoint: `POST {API_BASE}/auth/register` (the real route of backend v1).
+ * The old code built `${NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/register`,
+ * which became `.../api/v1/api/auth/register` → 404 "Route not found".
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getApiBaseUrl } from '@/config/apiBase';
 
 interface ErrorResponse {
   message: string;
@@ -34,7 +39,7 @@ export default async function handler(
     }
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/register`,
+      `${getApiBaseUrl()}/auth/register`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

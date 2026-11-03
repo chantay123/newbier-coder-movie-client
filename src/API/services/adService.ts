@@ -1,11 +1,15 @@
 /**
- * @file adService.ts
- * @description Advertisement client service with safe offline error handling,
+ * adService.ts
+ *
+ * Advertisement client service with safe offline error handling,
  * in-memory caching for video ads, and ad-tracker calls (impression/click/skip).
  */
 import axios from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiPaths';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+/** The backend base URL. It uses the shared resolver instead of reading the environment. */
+const API_URL = getApiBaseUrl();
 const CACHE_DURATION_MS = 300_000;
 
 interface AdCache {
@@ -126,7 +130,7 @@ const adService = {
 
   createAd: async (adData: Record<string, unknown>): Promise<Record<string, unknown>> => {
     try {
-      const response = await axios.post(`${API_URL}/advertisements`, adData, { timeout: 2000 })
+      const response = await axios.post(apiUrl(`adsList`), adData, { timeout: 2000 })
         .then((r) => r.data)
         .catch((err) => err?.response?.data || null);
       return response || { success: false, error: 'Cannot connect to server' };
@@ -137,7 +141,7 @@ const adService = {
 
   updateAd: async (id: string, adData: Record<string, unknown>): Promise<Record<string, unknown>> => {
     try {
-      const response = await axios.put(`${API_URL}/advertisements/${id}`, adData, { timeout: 2000 })
+      const response = await axios.put(apiUrl(`adsById`, id), adData, { timeout: 2000 })
         .then((r) => r.data)
         .catch((err) => err?.response?.data || null);
       return response || { success: false, error: 'Cannot connect to server' };
@@ -148,7 +152,7 @@ const adService = {
 
   deleteAd: async (id: string): Promise<Record<string, unknown>> => {
     try {
-      const response = await axios.delete(`${API_URL}/advertisements/${id}`, { timeout: 2000 })
+      const response = await axios.delete(apiUrl(`adsById`, id), { timeout: 2000 })
         .then((r) => r.data)
         .catch((err) => err?.response?.data || null);
       return response || { success: false, error: 'Cannot connect to server' };

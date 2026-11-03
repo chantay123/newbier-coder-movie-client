@@ -1,7 +1,8 @@
 /**
- * @file movieNormalizer.ts
- * @description Bộ chuyển đổi dữ liệu phòng thủ và chuẩn hoá entity phim.
- * Đảm bảo shape object nhất quán, ngăn UI bị vỡ layout.
+ * movieNormalizer.ts
+ *
+ * Defensive data conversion and normalization for the movie entity.
+ * It guarantees a consistent object shape, so the UI layout never breaks.
  */
 
 import {
@@ -11,13 +12,13 @@ import {
 } from '@/config/movieFallbackConfig';
 import { SYSTEM_CONFIG } from '@/config/systemConfig';
 
-/** Category item chuẩn */
+/** A normalized category item. */
 export interface CategoryItem {
   name: string;
   slug: string;
 }
 
-/** Actor item chuẩn */
+/** A normalized actor item. */
 export interface ActorItem {
   name: string;
   role: string;
@@ -26,7 +27,7 @@ export interface ActorItem {
   [key: string]: unknown;
 }
 
-/** Director item chuẩn */
+/** A normalized director item. */
 export interface DirectorItem {
   name: string;
   role: string;
@@ -34,7 +35,7 @@ export interface DirectorItem {
   [key: string]: unknown;
 }
 
-/** Movie entity đã chuẩn hoá - kế thừa từ raw server shape */
+/** The normalized movie entity. It inherits the raw server shape. */
 export interface NormalizedHeroMovie {
   [key: string]: unknown;
   _id: string;
@@ -53,11 +54,11 @@ export interface NormalizedHeroMovie {
 }
 
 /**
- * Resolves a possibly-relative image URL from the backend into a fully
+ * Resolves a possibly relative image URL from the backend into a fully
  * qualified URL the browser can load.
  *
- * @param url Raw URL từ API
- * @returns URL đầy đủ hoặc input gốc nếu không thể kết hợp an toàn
+ * @param url - The raw URL taken from the API.
+ * @returns The full URL, or the original input when it cannot be joined safely.
  */
 export const resolveImageUrl = (url: string | null | undefined): string => {
   if (!url || typeof url !== 'string') return '';
@@ -67,30 +68,31 @@ export const resolveImageUrl = (url: string | null | undefined): string => {
   // Already absolute (http, https, data, blob).
   if (/^(https?:|data:|blob:)/i.test(cleaned)) return cleaned;
 
-  // Protocol-relative URL.
+  // Protocol relative URL.
   if (cleaned.startsWith('//')) {
     const proto = (typeof window !== 'undefined' && window.location?.protocol) || 'https:';
     return `${proto}${cleaned}`;
   }
 
-  // Host-relative URL: combine with the configured image origin.
+  // Host relative URL: joined with the configured image origin.
   if (cleaned.startsWith('/')) {
     const origin = SYSTEM_CONFIG.imageOrigin || '';
     if (origin) return `${origin}${cleaned}`;
     return cleaned;
   }
 
-  // Unknown shape — return as-is để Network panel hiển thị lỗi rõ ràng.
+  // Unknown shape: returned as is, so the Network panel shows a clear error.
   return cleaned;
 };
 
 /**
  * Safely resolves the best available backdrop or poster URL for a movie.
- * Hệ thống phân cấp: backdrop_url -> poster_url -> thumb_url -> placeholder SVG mặc định.
+ * The order of preference is: backdrop_url -> poster_url -> thumb_url ->
+ * the default placeholder SVG.
  *
- * @param movie Raw movie object từ backend API
- * @param fallbackIndex Index tham số, giữ chữ ký tương thích
- * @returns URL ảnh đã xác thực
+ * @param movie - The raw movie object from the backend API.
+ * @param fallbackIndex - Kept for signature compatibility.
+ * @returns The validated image URL.
  */
 export const resolveMovieBackdrop = (
   movie?: Record<string, unknown> | null,
@@ -118,17 +120,18 @@ export const resolveMovieBackdrop = (
     if (resolved) return resolved;
   }
 
-  // Ép kiểu rõ ràng để dùng fallbackIndex, tránh warning "unused"
+  // The explicit cast keeps fallbackIndex in use and avoids an "unused"
+  // warning.
   void fallbackIndex;
   return LOCAL_DEFAULT_BACKDROP;
 };
 
 /**
- * Safely resolves the subtitle / original title.
- * Ngăn layout nhảy chiều cao khi server chưa có origin_name.
+ * Safely resolves the subtitle, also called the original title.
+ * It prevents the layout from jumping when the server has no `origin_name`.
  *
- * @param movie Movie object
- * @returns Subtitle text hoặc non-breaking space
+ * @param movie - The movie object.
+ * @returns The subtitle text, or a non-breaking space when there is none.
  */
 export const resolveMovieSubTitle = (movie?: Record<string, unknown> | null): string => {
   if (!movie) return '\u00A0';
@@ -141,11 +144,12 @@ export const resolveMovieSubTitle = (movie?: Record<string, unknown> | null): st
 };
 
 /**
- * Safely resolves movie categories.
- * Nếu backend trả về rỗng, tự sinh badge thông tin dựa trên type/lang.
+ * Safely resolves the movie categories.
+ * When the backend returns nothing, an info badge is generated from the
+ * type and the language.
  *
- * @param movie Movie object
- * @returns Mảng category items
+ * @param movie - The movie object.
+ * @returns The list of category items.
  */
 export const resolveMovieCategories = (movie?: Record<string, unknown> | null): CategoryItem[] => {
   if (movie?.category && Array.isArray(movie.category) && movie.category.length > 0) {
@@ -170,10 +174,10 @@ export const resolveMovieCategories = (movie?: Record<string, unknown> | null): 
 };
 
 /**
- * Safely resolves movie release year.
+ * Safely resolves the release year of a movie.
  *
- * @param movie Movie object
- * @returns Năm phát hành
+ * @param movie - The movie object.
+ * @returns The release year.
  */
 export const resolveMovieYear = (movie?: Record<string, unknown> | null): string | number => {
   if (movie?.year && String(movie.year).trim() !== '') {
@@ -183,10 +187,10 @@ export const resolveMovieYear = (movie?: Record<string, unknown> | null): string
 };
 
 /**
- * Safely resolves movie video quality label.
+ * Safely resolves the video quality label of a movie.
  *
- * @param movie Movie object
- * @returns Nhãn chất lượng chuẩn
+ * @param movie - The movie object.
+ * @returns The normalized quality label.
  */
 export const resolveMovieQuality = (movie?: Record<string, unknown> | null): string => {
   if (movie?.quality && typeof movie.quality === 'string' && movie.quality.trim() !== '') {
@@ -196,12 +200,13 @@ export const resolveMovieQuality = (movie?: Record<string, unknown> | null): str
 };
 
 /**
- * Chuẩn hoá phòng thủ cấp cao cho phim Hero Spotlight.
- * Gộp dữ liệu thô từ server với fallback an toàn, sinh schema phim 100% resilient.
+ * High level normalization for the Hero Spotlight movies.
+ * It merges the raw server data with safe fallbacks and produces a fully
+ * resilient movie schema.
  *
- * @param rawMovie Movie object thô từ Backend API
- * @param index Chỉ số slide carousel
- * @returns Movie object đã chuẩn hoá hoặc null nếu input rỗng
+ * @param rawMovie - The raw movie object from the backend API.
+ * @param index - The index of the carousel slide.
+ * @returns The normalized movie, or null when the input is empty.
  */
 export const normalizeHeroMovie = (
   rawMovie?: Record<string, unknown> | null,
@@ -228,6 +233,12 @@ export const normalizeHeroMovie = (
     rawMovie.cover
   ];
 
+  /**
+   * Returns the first candidate that resolves into a usable URL.
+   *
+   * @param candidates - The candidate values, in priority order.
+   * @returns The first usable URL, or an empty string.
+   */
   const resolveFirstUsable = (candidates: unknown[]): string => {
     for (const c of candidates) {
       const r = resolveImageUrl(c as string | null | undefined);
@@ -268,10 +279,10 @@ export const normalizeHeroMovie = (
 };
 
 /**
- * Safely resolves actors array with rich profiles.
+ * Safely resolves the actors array with rich profiles.
  *
- * @param movie Movie object
- * @returns Mảng actor objects { name, role, slug, avatar_url }
+ * @param movie - The movie object.
+ * @returns The list of actor objects: { name, role, slug, avatar_url }.
  */
 export const resolveMovieActors = (movie?: Record<string, unknown> | null): ActorItem[] => {
   if (!movie) return [];
@@ -303,10 +314,10 @@ export const resolveMovieActors = (movie?: Record<string, unknown> | null): Acto
 };
 
 /**
- * Safely resolves directors array.
+ * Safely resolves the directors array.
  *
- * @param movie Movie object
- * @returns Mảng director objects
+ * @param movie - The movie object.
+ * @returns The list of director objects.
  */
 export const resolveMovieDirectors = (movie?: Record<string, unknown> | null): DirectorItem[] => {
   if (!movie) return [];

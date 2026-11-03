@@ -23,6 +23,8 @@ import { useRouter } from 'next/router';  import {
 import styles from '@/styles/AdminSidebar.module.css';
 import loadingStyles from '@/styles/AdminLoading.module.css';
 import axios from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiPaths';
 
 interface MenuItem {
   path: string;
@@ -74,8 +76,8 @@ const AdminSidebar = () => {
         const token = localStorage.getItem('auth_token');
         if (!token) return;
 
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-        const response = await axios.get(`${baseUrl}/feedback/unread/count`, {
+        const baseUrl = getApiBaseUrl();
+        const response = await axios.get(apiUrl(`feedbackUnreadCount`), {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -99,8 +101,8 @@ const AdminSidebar = () => {
         const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
         if (!token) return;
 
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-        const response = await fetch(`${baseUrl}/subscription/admin/pending-subscriptions`, {
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(apiUrl(`subscriptionAdminPendingSubscriptions`), {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -143,13 +145,15 @@ const AdminSidebar = () => {
     { path: '/admin/formats', icon: FaLayerGroup, label: 'Định Dạng Phim' },
     { path: '/admin/years', icon: FaCalendarAlt, label: 'Năm Phát Hành' },
     { path: '/admin/people', icon: FaUserTie, label: 'Diễn viên & Đạo diễn' },
-    // { path: '/admin/upcoming-movies', icon: FaPlayCircle, label: 'Phim sắp ra mắt' },
+    // The following pages are not enabled yet. They are kept here as a
+    // reminder of the planned admin sections.
+    // { path: '/admin/upcoming-movies', icon: FaPlayCircle, label: 'Upcoming movies' },
     { path: '/admin/users', icon: FaUsers, label: 'Users', section: 'Hệ thống' },
     // { path: '/admin/premium', icon: FaCrown, label: 'Premium', badge: pendingPremiumCount },
-    // { path: '/admin/feedback', icon: FaEnvelope, label: 'Góp ý người dùng', badge: unreadFeedbackCount },
-    // { path: '/admin/reports', icon: FaExclamationTriangle, label: 'Báo cáo lỗi' },
-    // { path: '/admin/advertisement', icon: FaAd, label: 'Quảng cáo' },
-    // { path: '/admin/notifications/email', icon: FaBell, label: 'Gửi thông báo' },
+    // { path: '/admin/feedback', icon: FaEnvelope, label: 'User feedback', badge: unreadFeedbackCount },
+    // { path: '/admin/reports', icon: FaExclamationTriangle, label: 'Error reports' },
+    // { path: '/admin/advertisement', icon: FaAd, label: 'Advertisements' },
+    // { path: '/admin/notifications/email', icon: FaBell, label: 'Email notifications' },
   ];
 
   let currentSection = '';

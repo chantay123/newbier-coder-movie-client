@@ -1,12 +1,15 @@
 /**
- * @file movieFallbackConfig.ts
- * @description Khai báo tập trung các hằng số dự phòng cho phim và media.
- * Chỉ chứa cấu hình thuần, không có logic chuyển đổi.
- * Logic chuẩn hoá được tách riêng tại '@/utils/movieNormalizer'.
+ * The central declaration of the fallback constants for the movies and the
+ * media.
+ *
+ * The file only contains pure configuration, without any conversion logic.
+ * The normalization logic lives in `@/utils/movieNormalizer`.
  */
 
-// Backdrop mặc định dạng cinema chất lượng cao, lưu trên CDN toàn cầu.
-// Được dùng khi backend chưa có 'backdrop_url' hoặc 'poster_url' cho phim.
+// The default cinema backdrops. They are high quality images hosted on a
+// global CDN.
+// They are used when the backend has no 'backdrop_url' or 'poster_url' for
+// a movie.
 export const HERO_FALLBACK_BACKDROPS: readonly string[] = [
   'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1920&auto=format&fit=crop',
   'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1920&auto=format&fit=crop',
@@ -15,36 +18,39 @@ export const HERO_FALLBACK_BACKDROPS: readonly string[] = [
   'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1920&auto=format&fit=crop'
 ];
 
-// Backdrop dự phòng cục bộ, nằm trong thư mục public của dự án.
-// Là ảnh placeholder dạng OS, tỉ lệ 16:9.
+// The local fallback backdrop, located in the public folder of the project.
+// It is an operating system style placeholder image with a 16:9 ratio.
 export const LOCAL_DEFAULT_BACKDROP = '/img/placeholder-backdrop.svg';
 
-// Poster dự phòng cục bộ, nằm trong thư mục public của dự án.
-// Là ảnh placeholder dạng OS, tỉ lệ 2:3.
+// The local fallback poster, located in the public folder of the project.
+// It is an operating system style placeholder image with a 2:3 ratio.
 export const LOCAL_DEFAULT_POSTER = '/img/placeholder-poster.svg';
 
-// Giá trị mặc định khi các thuộc tính từ backend là null, undefined hoặc rỗng.
+// The default values used when a property coming from the backend is null,
+// undefined or empty.
 export const MOVIE_FALLBACK_DEFAULTS = {
-  // Năm phát hành mặc định khi server trả về rỗng
+  // The default release year, used when the server returns an empty value.
   year: new Date().getFullYear(),
 
-  // Nhãn độ phân giải video mặc định
+  // The default label of the video resolution.
   quality: 'FHD',
 
-  // Điểm đánh giá mặc định khi tmdb.vote_average hoặc rating bằng 0 / thiếu
+  // The default rating, used when `tmdb.vote_average` or `rating` is 0 or
+  // missing.
   rating: '8.6',
 
-  // Mô tả mặc định khi description / content bị thiếu
+  // The default description, used when the description or the content is
+  // missing.
   description:
     'Khám phá ngay bộ phim hấp dẫn với chất lượng hình ảnh sắc nét, âm thanh sống động và trải nghiệm điện ảnh đỉnh cao.',
 
-  // Quy tắc dự phòng tiêu đề phụ: nếu origin_name rỗng thì dùng movie.name
-  // để tránh giao diện bị co lại.
+  // The fallback rule of the subtitle: when `origin_name` is empty the
+  // `movie.name` is used, so the layout does not shrink.
   useNameAsSubTitle: true
 } as const;
 
-// Tái xuất các hàm chuẩn hoá từ '@/utils/movieNormalizer' để giữ tương thích ngược
-// với tất cả các import hiện có.
+// The normalization helpers are re-exported from `@/utils/movieNormalizer`,
+// so every existing import keeps working.
 export {
   resolveMovieBackdrop,
   resolveMovieSubTitle,

@@ -3,6 +3,7 @@ import MovieCarouselSection from './MovieCarouselSection';
 import { MOVIE_CONFIG } from '@/config/movieConfig';
 import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 import type { MovieLite } from '@/features/shared/components/MovieCard/MovieCardVertical';
+import { apiUrl } from '@/config/apiPaths';
 
 type CountryMovie = {
   country?: Array<{ slug?: string; name?: string }>;
@@ -30,7 +31,7 @@ const MovieCountrySection: React.FC<MovieCountrySectionProps> = ({ onPlayTrailer
     const fetchCountryMovies = async (): Promise<void> => {
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE}/movies?page=1&limit=60`);
+        const res = await fetch(apiUrl(`moviesList`) + `?page=1&limit=60`);
         if (!res.ok) throw new Error('Failed to fetch country movies');
         const data = await res.json();
         const allMovies: CountryMovie[] = data?.data?.movies || data?.movies || [];

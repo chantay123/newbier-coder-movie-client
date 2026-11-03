@@ -1,6 +1,5 @@
 /**
- * @file formats/index.tsx
- * @description Standalone Admin page for managing Movie Formats (Định Dạng Phim).
+ * A standalone admin page for managing the movie formats.
  */
 'use client';
 

@@ -10,7 +10,7 @@ import styles from './TrendingRadarSection.module.css';
 /** Delta indicator type */
 export type DeltaType = 'up' | 'down' | 'new' | 'same' | string | undefined;
 
-/** Radar movie entry (loose shape từ service) */
+/** A radar movie entry (loose shape coming from the service). */
 export interface RadarMovie {
   _id?: string;
   slug?: string;

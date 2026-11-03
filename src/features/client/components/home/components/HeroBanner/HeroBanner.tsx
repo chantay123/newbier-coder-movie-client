@@ -14,13 +14,13 @@ import {
 } from '@/config/movieConfig';
 import { hasValidTrailer } from '@/utils/trailer';
 
-/** Category entry dùng cho pill chips */
+/** A category entry used for the pill chips. */
 interface CategoryEntry {
   slug?: string;
   name?: string;
 }
 
-/** Movie thô từ API - loose shape */
+/** A raw movie coming from the API. The shape is loose. */
 export type HeroMovie = Record<string, unknown> & {
   _id?: string;
   id?: string;
@@ -263,19 +263,21 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ movies = [], loading = false, o
   const rawList = movies && Array.isArray(movies) && movies.length > 0 ? movies.slice(0, 5) : [];
   const candidateMovies = rawList.map((m, idx) => normalizeHeroMovie(m as never, idx) as unknown as HeroMovie);
 
-  // Defense in depth: Hero MỚI chỉ hiển thị phim có trailer hợp lệ.
-  // Trước đó yêu cầu này chỉ áp dụng ở `useHomeData.compactHeroMovies`,
-  // nhưng nếu một caller khác truyền `movies` không qua filter này, Hero
-  // vẫn để lọt phim không trailer → bấm nút "Trailer" mở modal trống.
-  // Lọc bằng cùng helper single-source-of-truth (`hasValidTrailer`) để
-  // hành vi của Hero luôn khớp với các rail khác.
+  // The defense in depth: the new hero only shows the movies that have a
+  // valid trailer. The rule used to be applied only in
+  // `useHomeData.compactHeroMovies`, so when another caller passed `movies`
+  // without that filter, a movie without a trailer could still reach the
+  // hero and the "Trailer" button opened an empty modal. The same single
+  // source of truth helper (`hasValidTrailer`) is used, so the behavior of
+  // the hero always matches the other rails.
   const trailerableMovies = candidateMovies.filter((m) => hasValidTrailer(m as never));
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
-  // currentIndex có thể đã trỏ vào phim đã bị loại sau khi prop `movies`
-  // thay đổi (ví dụ: lúc đầu có phim A,B,C, sau đó filter chỉ còn A).
-  // Đảm bảo index luôn nằm trong tập hợp còn lại.
+  // The `currentIndex` can already point to a movie that was removed
+  // after the prop `movies` changed (for example: at the start there were
+  // the movies A, B and C, and after the filter only A is left). The index
+  // is always kept inside the remaining list.
   const safeIndex = trailerableMovies.length === 0
     ? 0
     : Math.min(currentIndex, trailerableMovies.length - 1);
@@ -302,18 +304,19 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ movies = [], loading = false, o
    * Selects a specific featured movie by index.
    */
   const handleSelectSpotlight = (index: number): void => {
-    // Clamp index trong khoảng hợp lệ của danh sách hiện tại.
+    // The index is clamped inside the valid range of the current list.
     if (trailerableMovies.length === 0) return;
     const safeClamped = Math.max(0, Math.min(index, trailerableMovies.length - 1));
     setCurrentIndex(safeClamped);
   };
 
-  // QUAN TRỌNG: chỉ hiển thị skeleton khi ĐANG THỰC SỰ LOAD.
-  // Trước đây điều kiện là `loading || !activeMovie`, khiến Hero rơi vào
-  // skeleton VĨNH VIỄN nếu danh sách rỗng (ví dụ mọi phim trả về đều có
-  // `trailer: null` và bị `filterMoviesWithValidTrailer` loại hết).
-  // Nếu đã load xong mà không có phim nào, render null cho gọn thay vì
-  // để user nhìn một khối skeleton vĩnh viễn.
+  // IMPORTANT: the skeleton is only shown while the data is REALLY
+  // loading. The condition used to be `loading || !activeMovie`, which
+  // left the hero on the skeleton FOREVER when the list was empty (for
+  // example when every returned movie had `trailer: null` and was removed
+  // by `filterMoviesWithValidTrailer`). When the load is finished and
+  // there is no movie at all, `null` is rendered instead, so the user
+  // never stares at a permanent skeleton block.
   if (loading) {
     return <HeroBannerSkeleton />;
   }

@@ -5,8 +5,7 @@ import { MovieSection as MovieSectionRaw } from '@/features/shared/components/Mo
 const MovieSection = MovieSectionRaw as unknown as React.FC<Record<string, unknown>>;
 
 /**
- * @file TrendingTop10Section.tsx
- * @description Preset component for 'Phim Được Xem Nhiều Nhất (TOP 10)' carousel rail.
+ * A preset component for the "Most watched movies (Top 10)" carousel rail.
  */
 
 export interface TrendingTop10SectionProps {

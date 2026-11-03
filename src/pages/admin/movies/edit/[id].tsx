@@ -44,6 +44,7 @@ import {
   SERVER_TEMPLATES
 } from '@/config/addMovieConfig';
 import { MOCK_ADMIN_MOVIES } from '@/mock/admin';
+import { apiPath } from '@/config/apiPaths';
 
 interface EpisodeItem {
   name: string;
@@ -112,7 +113,7 @@ const EditMoviePage = () => {
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
   const [movieId, setMovieId] = useState<string>('');
 
-  // Wizard Step State (1: Cơ bản, 2: Phân loại, 3: Media, 4: Server, 5: Xuất bản)
+  // Wizard step state (1: Basic info, 2: Taxonomy, 3: Media, 4: Server, 5: Publish)
   const [currentStep, setCurrentStep] = useState<number>(1);
 
   // Movie Form State
@@ -434,7 +435,7 @@ const EditMoviePage = () => {
     const fetchMovieData = async () => {
       try {
         setInitialLoading(true);
-        const res = await axios.get(`/admin/movies/${currentId}`);
+        const res = await axios.get(apiPath(`adminMoviesById`, currentId));
         let fetched = res.data?.movie || res.data;
 
         if (!fetched || !fetched.name) {
@@ -786,7 +787,7 @@ const EditMoviePage = () => {
       };
 
       try {
-        await axios.put(`/admin/movies/${movieId || id}`, payload);
+        await axios.put(apiPath(`adminMoviesById`, movieId || (Array.isArray(id) ? id[0] : id)), payload);
       } catch (apiErr) {
 
       }

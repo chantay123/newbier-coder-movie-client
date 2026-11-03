@@ -5,13 +5,13 @@ import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 const MovieSection = MovieSectionRaw as unknown as React.FC<Record<string, unknown>>;
 
 /**
- * @file CountryMoviesSection.tsx
- * @description Dynamic, config-driven component for Country Drama rails.
- * Completely decoupled: rail titles, badges, links, and data loaders are
- * defined in homeSectionsConfig.
+ * A dynamic and config driven component for the country drama rails.
+ *
+ * It is completely decoupled: the rail titles, the badges, the links and
+ * the data loaders are defined in `homeSectionsConfig`.
  */
 
-/** Rail entry từ config */
+/** A rail entry coming from the config. */
 export interface RailConfig {
   id: string;
   title?: string;
@@ -21,11 +21,13 @@ export interface RailConfig {
 }
 
 /**
- * Defensive: xác định một phim có poster URL hợp lệ để <img> tải được.
- * Trả về false khi payload thiếu `poster_url`/`thumb_url`/`imagePoster`
- * hoặc URL rỗng / không phải http(s). Mục đích là ẩn những phim không
- * hiển thị được ảnh trước khi truyền xuống MovieSection, tránh hiển thị
- * broken-image icon trên trang chủ.
+ * The defensive check that tells whether a movie has a poster URL the
+ * `<img>` element can load.
+ *
+ * It returns `false` when the payload has no `poster_url`, `thumb_url` or
+ * `imagePoster`, or when the URL is empty or is not http(s). The purpose
+ * is to hide the movies that cannot show an image before they reach the
+ * `MovieSection`, so the home page never shows a broken image icon.
  */
 const hasDisplayablePoster = (m: Record<string, unknown>): boolean => {
   const candidates = [m.poster_url, m.posterUrl, m.thumb_url, m.thumbUrl, m.imagePoster];
@@ -66,16 +68,18 @@ const CountryMoviesSection: React.FC<CountryMoviesSectionProps> = ({
             }
             const rawData = await rail.load([]);
 
-            // BƯỚC 1: chỉ giữ phim có trailer hợp lệ (đồng bộ với
-            // Hero/Top10 — bạn yêu cầu "chỉ hiển thị phim có trailer").
+            // STEP 1: only the movies with a valid trailer are kept. This
+            // is the same rule as the hero and the Top 10, so every rail
+            // shows the same kind of movie.
             const withTrailer = filterMoviesWithValidTrailer(
               (Array.isArray(rawData) ? rawData : []) as unknown[]
             );
 
-            // BƯỚC 2: lọc tiếp phim không có poster URL hợp lệ, để
-            // ảnh không bao giờ hiển thị icon broken-image. Defense in
-            // depth: nếu MovieSection không có onError thì country
-            // rail vẫn không hiển thị phim lỗi ảnh.
+            // STEP 2: the movies without a valid poster URL are removed
+            // as well, so the image never shows a broken image icon. This
+            // is the defense in depth: even when the `MovieSection` has
+            // no `onError` handler, the country rail never shows a movie
+            // with a broken image.
             const withPoster = withTrailer.filter((m) =>
               hasDisplayablePoster(m as Record<string, unknown>)
             );

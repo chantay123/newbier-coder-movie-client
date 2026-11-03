@@ -1,9 +1,12 @@
 /**
  * @file pages/api/auth/google-login.ts
  * @description Google OAuth callback API route. Forwards Google profile to backend.
+ *
+ * Endpoint: `POST {API_BASE}/auth/google-login`.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
 
 interface ErrorResponse {
   message: string;
@@ -30,7 +33,7 @@ export default async function handler(
     }
 
     const response = await axios.post(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/google-login`,
+      `${getApiBaseUrl()}/auth/google-login`,
       { email, name, googleId, picture }
     );
 

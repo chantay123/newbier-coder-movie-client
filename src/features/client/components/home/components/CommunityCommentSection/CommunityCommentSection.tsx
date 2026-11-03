@@ -5,7 +5,7 @@ import commentService from '@/API/services/commentService';
 import { LOCAL_DEFAULT_BACKDROP } from '@/config/movieConfig';
 import styles from './CommunityCommentSection.module.css';
 
-// Zustand store cho comment caching (dùng chung với movie detail page)
+// Zustand store used for comment caching (shared with the movie detail page)
 import { useCommentStore } from '@/stores/useCommentStore';
 
 /**
@@ -15,7 +15,7 @@ import { useCommentStore } from '@/stores/useCommentStore';
  * - Right (col-xl-3): Vertical Live Chat stream with scroll loader and pulsating dot.
  */
 
-/** Movie thô (loose shape) */
+/** The raw movie data (loose shape). */
 interface CommentMovie {
   name?: string;
   slug?: string;
@@ -24,7 +24,7 @@ interface CommentMovie {
   poster_url?: string;
 }
 
-/** User thô */
+/** The raw user data. */
 interface CommentUser {
   name?: string;
   badge?: string;
@@ -89,7 +89,7 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
   const feedRef = useRef<HTMLDivElement | null>(null);
 
   // ---- Zustand cache selectors ----
-  // Dùng selector để tránh re-render khi cache không liên quan thay đổi
+  // Use a selector so the component does not re-render when an unrelated cache entry changes
   const getCachedTopComments = useCommentStore((s) => s.getCachedTopComments);
   const setCachedTopComments = useCommentStore((s) => s.setCachedTopComments);
   const getCachedLiveBuzz = useCommentStore((s) => s.getCachedLiveBuzz);
@@ -99,7 +99,7 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
   useEffect(() => {
     let isSubscribed = true;
 
-    // 🆕 Cache-first: đọc từ Zustand store trước
+    // Cache-first: read the comments from the Zustand store before calling the API
     const cached = getCachedTopComments('week');
     if (cached && cached.comments && cached.comments.length > 0) {
       if (isSubscribed) setWeekComments(cached.comments as unknown as Comment[]);
@@ -111,7 +111,7 @@ const CommunityCommentSection: React.FC<CommunityCommentSectionProps> = ({
         const data = (await commentService.getTopComments({ period: 'week', limit })) as unknown as { comments?: Comment[] };
         if (isSubscribed && data?.comments) {
           setWeekComments(data.comments);
-          // 🆕 Ghi cache (cast về CommentItem[])
+          // Write the fetched comments back into the cache
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setCachedTopComments('week', { comments: data.comments as any, total: data.comments.length, period: 'week' });
         }

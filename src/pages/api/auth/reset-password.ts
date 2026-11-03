@@ -1,9 +1,12 @@
 /**
  * @file pages/api/auth/reset-password.ts
  * @description Reset password API route. Validates new password and forwards to backend.
+ *
+ * Endpoint: `POST {API_BASE}/auth/reset-password`.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
 
 interface ErrorResponse {
   message: string;
@@ -35,7 +38,7 @@ export default async function handler(
     }
 
     const response = await axios.post(
-      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/reset-password`,
+      `${getApiBaseUrl()}/auth/reset-password`,
       { token, newPassword, confirmPassword }
     );
 

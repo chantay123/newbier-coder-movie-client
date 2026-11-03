@@ -1,9 +1,10 @@
 /**
- * @file adminUtils.ts
- * @description Các hàm tiện ích kiểm soát truy cập admin.
+ * adminUtils.ts
+ *
+ * Utility functions that control the access to the admin area.
  */
 
-/** User object mặc định cho admin. */
+/** The default user object used by the admin area. */
 interface AdminUser {
   id: string;
   fullname: string;
@@ -20,9 +21,15 @@ const FALLBACK_ADMIN: AdminUser = {
   role: 'admin'
 };
 
-/** Obfuscation key — phải khớp với authService.ts và auth.tsx */
+/** Obfuscation key. It must match authService.ts and auth.tsx. */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
 
+/**
+ * Decodes an obfuscated user payload.
+ *
+ * @param encoded - The encoded value read from the storage.
+ * @returns The decoded string, or null when it cannot be decoded.
+ */
 const obfDecode = (encoded: string): string | null => {
   try {
     const decoded = decodeURIComponent(atob(encoded).split('').map(c =>
@@ -38,13 +45,22 @@ const obfDecode = (encoded: string): string | null => {
   }
 };
 
-/** Kiểm tra user có phải admin không */
+/**
+ * Checks whether the current user is an admin.
+ *
+ * @returns true when the user is an admin.
+ */
 export const isAdmin = (): boolean => true;
 
-/** Lấy dữ liệu user hiện tại.
+/**
+ * Returns the data of the current user.
  *
- * User info được đọc từ sessionStorage (obfuscated), fallback localStorage (obfuscated).
- * Admin UI nên dùng `useAuth()` hook thay vì hàm này. */
+ * The user info is read from sessionStorage (obfuscated), with localStorage
+ * (obfuscated) as the fallback. The admin UI should use the `useAuth()` hook
+ * instead of this function.
+ *
+ * @returns The current user, or the fallback admin when it cannot be read.
+ */
 export const getCurrentUser = (): AdminUser => {
   try {
     if (typeof window === 'undefined') {
@@ -61,10 +77,18 @@ export const getCurrentUser = (): AdminUser => {
   }
 };
 
-/** Kiểm tra user đã xác thực chưa */
+/**
+ * Checks whether the user is authenticated.
+ *
+ * @returns true when the user is authenticated.
+ */
 export const isAuthenticated = (): boolean => true;
 
-/** Lấy vai trò user hiện tại */
+/**
+ * Returns the role of the current user.
+ *
+ * @returns The lowercase role, or 'admin' when it cannot be read.
+ */
 export const getUserRole = (): string => {
   try {
     const user = getCurrentUser();
@@ -74,10 +98,19 @@ export const getUserRole = (): string => {
   }
 };
 
-/** Kiểm tra user có vai trò cụ thể */
+/**
+ * Checks whether the current user has a specific role.
+ *
+ * @param _requiredRole - The role to check for.
+ * @returns true when the role matches.
+ */
 export const hasRole = (_requiredRole: string): boolean => true;
 
-/** Kiểm tra user có thể truy cập admin routes */
+/**
+ * Checks whether the user can access the admin routes.
+ *
+ * @returns true when the admin area is accessible.
+ */
 export const canAccessAdmin = (): boolean => true;
 
 export default { isAdmin, getCurrentUser, isAuthenticated, getUserRole, hasRole, canAccessAdmin };

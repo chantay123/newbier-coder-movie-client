@@ -1,11 +1,17 @@
 // src/config/axiosAdminConfig.ts
 import axios from 'axios';
+import { getApiBaseUrl } from './apiBase';
 
-const baseURL =
-  process.env.NEXT_PUBLIC_ADMIN_API_URL ||
-  process.env.NEXT_PUBLIC_CORE_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://core-movie-service.onrender.com/api/v1';
+/**
+ * Axios instance used by the admin area.
+ *
+ * This file used to read `NEXT_PUBLIC_API_URL` on its own (ignoring
+ * `NEXT_PUBLIC_CORE_API_URL`) with a `http://localhost:5000/api` fallback, so
+ * the admin called the wrong host or the wrong version whenever only
+ * `CORE_API_URL` was configured. It now shares the `getApiBaseUrl()` resolver,
+ * so the admin and the rest of the app always talk to the same backend.
+ */
+const baseURL = getApiBaseUrl();
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -18,12 +24,14 @@ const axiosInstance = axios.create({
 });
 
 /**
- * Read the access token from EVERY storage location the auth flow can use.
+ * Reads the access token from EVERY storage location the auth flow can use.
  * authService.login() persists the token to:
  *  - localStorage (when rememberMe = true)
  *  - sessionStorage (when rememberMe = false)
- * If we only read localStorage, session-only logins would silently send
- * no Authorization header and the backend would 401 every request.
+ * If only localStorage was read, session-only logins would silently send no
+ * Authorization header and the backend would answer 401 for every request.
+ *
+ * @returns The token, or null when no token is stored.
  */
 const readAccessTokenFromAnyStorage = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -70,10 +78,18 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Log 401 an toàn - KHÔNG log token/cookie. Chỉ log endpoint + status.
+    // Log 401 safely - NEVER log the token or the cookie. Only the endpoint
+    // and the status are logged.
     if (error.response && error.response.status === 401) {
       const url = error.config?.url || '<unknown>';
       const method = (error.config?.method || 'get').toUpperCase();
+      // eslint-disable-next-line no-console
+
+      // The token is not deleted and the user is not redirected to the login
+      // page here, because the failure may come from a public endpoint, a
+      // network problem, or an expired token that still has to be refreshed.
+      // AuthContext (useAuth) decides when to log out, based on the overall
+      // session state.
     }
 
     if (error.response && error.response.status === 403) {

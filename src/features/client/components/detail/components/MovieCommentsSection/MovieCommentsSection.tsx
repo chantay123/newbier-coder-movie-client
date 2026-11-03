@@ -53,7 +53,10 @@ const SEED_COMMENTS: SeedComment[] = [
   }
 ];
 
-/** Comment shape - compatible với cả seed và API */
+/**
+ * The shape of a single comment.
+ * It works with both the seed data and the API response.
+ */
 export interface CommentItem {
   id?: string;
   _id?: string;

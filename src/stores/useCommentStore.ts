@@ -1,14 +1,16 @@
 /**
- * @file useCommentStore.ts
- * @description Zustand store cho comments — cache trong localStorage:
- * 1. Cache comments theo movie slug
- * 2. Cache top comments + live buzz cho homepage
- * 3. Dùng chung cho cả homepage và movie detail page
+ * Zustand store for the comments.
  *
- * Cấu trúc comments:
- * - Movie comments: /movies/{slug}/comments → array
- * - Top comments: /comments/top?period=week|month → { comments, total }
- * - Live buzz: /comments/live-buzz → { comments }
+ * The store keeps the data in `localStorage` so that:
+ * 1. The comments of each movie are cached by slug.
+ * 2. The top comments and the live buzz of the home page are cached.
+ * 3. The same store is used by the home page and by the movie detail page.
+ *
+ * The comment endpoints:
+ * - Movie comments: `/movies/{slug}/comments` returns an array.
+ * - Top comments: `/comments/top?period=week|month` returns
+ *   `{ comments, total }`.
+ * - Live buzz: `/comments/live-buzz` returns `{ comments }`.
  */
 
 import { create } from 'zustand';
@@ -18,11 +20,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 // TYPES
 // ============================================================
 
-/** Comment item (dùng chung cho cả 3 loại) */
+/** A comment item. The same shape is used by the three comment endpoints. */
 export interface CommentItem {
   _id: string;
   content: string;
-  user_name?: string; // alias for display name
+  user_name?: string; // The alias of the display name.
   displayName?: string;
   createdAt?: string;
   created_at?: string;
@@ -46,14 +48,14 @@ export interface CommentItem {
   [key: string]: unknown;
 }
 
-/** Top comment response */
+/** The response of the top comments endpoint. */
 export interface TopCommentsResponse {
   comments: CommentItem[];
   total: number;
   period: string;
 }
 
-/** Live buzz response */
+/** The response of the live buzz endpoint. */
 export interface LiveBuzzResponse {
   comments: {
     _id: string;
@@ -66,7 +68,7 @@ export interface LiveBuzzResponse {
   }[];
 }
 
-/** Cache entry */
+/** A cache entry. */
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -77,10 +79,10 @@ interface CacheEntry<T> {
 // ============================================================
 
 interface CommentStoreState {
-  // Movie comments theo slug
+  // The movie comments, by slug.
   movieComments: Record<string, CacheEntry<CommentItem[]>>;
 
-  // Homepage comments
+  // The home page comments.
   topCommentsWeek: CacheEntry<TopCommentsResponse> | null;
   topCommentsMonth: CacheEntry<TopCommentsResponse> | null;
   topCommentsAll: CacheEntry<TopCommentsResponse> | null;
@@ -124,15 +126,22 @@ interface CommentStoreActions {
 // CONSTANTS
 // ============================================================
 
-/** TTL: 3 phút cho movie comments */
+/** The TTL of the movie comments: 3 minutes. */
 const MOVIE_COMMENTS_TTL_MS = 3 * 60 * 1000;
 
-/** TTL: 2 phút cho top comments */
+/** The TTL of the top comments: 2 minutes. */
 const TOP_COMMENTS_TTL_MS = 2 * 60 * 1000;
 
-/** TTL: 30 giây cho live buzz (cập nhật liên tục) */
+/** The TTL of the live buzz: 30 seconds, because it updates continuously. */
 const LIVE_BUZZ_TTL_MS = 30 * 1000;
 
+/**
+ * Tells whether a cache entry is too old to be used.
+ *
+ * @param timestamp - The moment the entry was written.
+ * @param ttlMs - The lifetime of the entry in milliseconds.
+ * @returns `true` when the entry is expired.
+ */
 const isExpired = (timestamp: number, ttlMs: number): boolean => {
   return Date.now() - timestamp > ttlMs;
 };
@@ -262,7 +271,7 @@ export const useCommentStore = create<CommentStoreState & CommentStoreActions>()
         const now = Date.now();
 
         set((state) => {
-          // Filter movieComments
+          // The movie comment entries that are still valid.
           const movieComments = Object.fromEntries(
             Object.entries(state.movieComments).filter(
               ([, entry]) => !isExpired(entry.timestamp, MOVIE_COMMENTS_TTL_MS)
@@ -271,14 +280,14 @@ export const useCommentStore = create<CommentStoreState & CommentStoreActions>()
 
           return {
             movieComments,
-            // Reset expired top comments
+            // The expired top comments are reset to `null`.
             topCommentsWeek: state.topCommentsWeek && !isExpired(state.topCommentsWeek.timestamp, TOP_COMMENTS_TTL_MS)
               ? state.topCommentsWeek : null,
             topCommentsMonth: state.topCommentsMonth && !isExpired(state.topCommentsMonth.timestamp, TOP_COMMENTS_TTL_MS)
               ? state.topCommentsMonth : null,
             topCommentsAll: state.topCommentsAll && !isExpired(state.topCommentsAll.timestamp, TOP_COMMENTS_TTL_MS)
               ? state.topCommentsAll : null,
-            // Reset expired live buzz
+            // The expired live buzz is reset to `null`.
             liveBuzz: state.liveBuzz && !isExpired(state.liveBuzz.timestamp, LIVE_BUZZ_TTL_MS)
               ? state.liveBuzz : null
           };
@@ -300,7 +309,8 @@ export const useCommentStore = create<CommentStoreState & CommentStoreActions>()
       name: 'comment-cache',
       storage: createJSONStorage(() => localStorage),
 
-      // Chỉ persist comments data, KHÔNG persist loading states
+      // Only the comment data is persisted. The loading states are not,
+      // because a page that is reloaded must show the loading state again.
       partialize: (state) => ({
         movieComments: state.movieComments,
         topCommentsWeek: state.topCommentsWeek,

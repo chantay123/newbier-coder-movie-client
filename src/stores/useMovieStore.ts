@@ -1,14 +1,19 @@
 /**
- * @file useMovieStore.ts
- * @description Zustand store cho movie data — cache trong localStorage để:
- * 1. Không gọi lại API khi user quay lại trang đã xem
- * 2. Chia sẻ data giữa các component (MovieCard, MovieDetail, HomeRails...)
+ * Zustand store for the movie data.
  *
- * Cache strategy: localStorage + in-memory Map
- * - Đọc từ localStorage khi store khởi tạo ( hydration )
- * - Ghi vào localStorage mỗi khi data thay đổi
- * - TTL: 5 phút cho movie detail (vì phim hay thay đổi)
- * - TTL: 2 phút cho homepage movies (vì ranking thay đổi thường xuyên)
+ * The store keeps the data in memory and in `localStorage` so that:
+ * 1. The API is not called again when the user comes back to a page
+ *    that was already visited.
+ * 2. Every component (MovieCard, MovieDetail, HomeRails...) reads the same
+ *    data instead of asking the backend for its own copy.
+ *
+ * Cache strategy: `localStorage` plus an in-memory map.
+ * - The data is read from `localStorage` when the store is created
+ *   (the hydration step).
+ * - The data is written to `localStorage` every time it changes.
+ * - TTL: 5 minutes for a movie detail, because a movie changes often.
+ * - TTL: 2 minutes for the home page movies, because the ranking changes
+ *   often.
  */
 
 import { create } from 'zustand';
@@ -17,7 +22,7 @@ import { create } from 'zustand';
 // TYPES
 // ============================================================
 
-/** Thông tin phim đã normalize (từ useMovieDetail.normalizeMovieDetail) */
+/** A movie that was already normalized by `useMovieDetail.normalizeMovieDetail`. */
 export interface CachedMovieDetail {
   _id: string;
   slug: string;
@@ -39,7 +44,7 @@ export interface CachedMovieDetail {
   [key: string]: unknown;
 }
 
-/** Movie item cho homepage rails */
+/** A movie item used by the home page rails. */
 export interface CachedMovieItem {
   _id: string;
   slug: string;
@@ -54,13 +59,13 @@ export interface CachedMovieItem {
   [key: string]: unknown;
 }
 
-/** Cache entry với timestamp */
+/** A cache entry with the moment it was written. */
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
 }
 
-/** Homepage cache theo section key */
+/** The home page cache, one entry per section key. */
 interface HomeCacheEntry {
   movies: CachedMovieItem[];
   timestamp: number;
@@ -71,16 +76,16 @@ interface HomeCacheEntry {
 // ============================================================
 
 interface MovieStoreState {
-  // ---- Movie Detail Cache ----
-  /** Cache movie chi tiết theo slug, có TTL 5 phút */
+  // ---- Movie detail cache ----
+  /** The cached movie details, by slug, with a 5 minute TTL. */
   movieCache: Record<string, CacheEntry<CachedMovieDetail>>;
 
-  // ---- Related Movies Cache ----
-  /** Cache phim liên quan theo movie slug */
+  // ---- Related movies cache ----
+  /** The cached related movies, by movie slug. */
   relatedCache: Record<string, CacheEntry<CachedMovieItem[]>>;
 
-  // ---- Homepage Movies Cache ----
-  /** Cache movies theo section key: 'hero' | 'top10' | 'latest' | 'bigSlide' */
+  // ---- Home page movies cache ----
+  /** The cached movies, by section key: 'hero' | 'top10' | 'latest' | 'bigSlide'. */
   homeCache: Record<string, HomeCacheEntry>;
 
   // ---- Loading states ----
@@ -98,22 +103,31 @@ interface MovieStoreState {
 // ============================================================
 
 interface MovieStoreActions {
-  // --- Movie Detail ---
-  /** Lấy movie từ cache (null nếu hết hạn hoặc chưa có) */
+  // --- Movie detail ---
+  /**
+   * Reads a movie from the cache.
+   *
+   * @param slug - The slug of the movie.
+   * @returns The cached movie, or `null` when it is missing or expired.
+   */
   getCachedMovie: (slug: string) => CachedMovieDetail | null;
 
-  /** Set movie vào cache */
+  /** Saves a movie in the cache. */
   setCachedMovie: (slug: string, movie: CachedMovieDetail) => void;
 
-  /** Xóa movie khỏi cache */
+  /** Removes a movie from the cache. */
   invalidateMovie: (slug: string) => void;
 
-  // --- Related Movies ---
+  // --- Related movies ---
+  /** Reads the related movies from the cache. */
   getCachedRelated: (slug: string) => CachedMovieItem[] | null;
+  /** Saves the related movies in the cache. */
   setCachedRelated: (slug: string, related: CachedMovieItem[]) => void;
 
-  // --- Homepage ---
+  // --- Home page ---
+  /** Reads the cached movies of a home page section. */
   getCachedHomeMovies: (section: string) => CachedMovieItem[] | null;
+  /** Saves the movies of a home page section in the cache. */
   setCachedHomeMovies: (section: string, movies: CachedMovieItem[]) => void;
 
   // --- Loading ---
@@ -126,7 +140,9 @@ interface MovieStoreActions {
   setHomeError: (section: string, error: string | null) => void;
 
   // --- Utility ---
+  /** Removes every expired entry from the cache. */
   clearExpiredCache: () => void;
+  /** Removes every entry from the cache. */
   clearAllCache: () => void;
 }
 
@@ -134,13 +150,19 @@ interface MovieStoreActions {
 // CONSTANTS
 // ============================================================
 
-/** TTL cho movie detail: 5 phút */
+/** The TTL of a movie detail: 5 minutes. */
 const MOVIE_DETAIL_TTL_MS = 5 * 60 * 1000;
 
-/** TTL cho homepage movies: chỉ dùng trong bộ nhớ, không persist */
+/** The TTL of the home page movies: kept in memory only, never persisted. */
 const HOME_MOVIES_TTL_MS = 2 * 60 * 1000;
 
-/** Kiểm tra cache có hết hạn không */
+/**
+ * Tells whether a cache entry is too old to be used.
+ *
+ * @param timestamp - The moment the entry was written.
+ * @param ttlMs - The lifetime of the entry in milliseconds.
+ * @returns `true` when the entry is expired.
+ */
 const isExpired = (timestamp: number, ttlMs: number): boolean => {
   return Date.now() - timestamp > ttlMs;
 };
@@ -149,10 +171,11 @@ const isExpired = (timestamp: number, ttlMs: number): boolean => {
 // STORE
 // ============================================================
 
-// Homepage cache KHÔNG persist vì:
-// 1. localStorage read đồng bộ → chặn initial render
-// 2. Homepage data thay đổi thường xuyên → persist không cần thiết
-// 3. User quay lại trang → data vẫn được cache trong component state
+// The home page cache is NOT persisted because:
+// 1. Reading `localStorage` is synchronous and it blocks the first render.
+// 2. The home page data changes often, so persisting it is not useful.
+// 3. When the user comes back to the page, the data is still cached in the
+//    component state.
 
 export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
   (set, get) => ({
@@ -174,7 +197,7 @@ export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
         const entry = get().movieCache[slug];
         if (!entry) return null;
         if (isExpired(entry.timestamp, MOVIE_DETAIL_TTL_MS)) {
-          // Hết hạn → xóa
+          // The entry is expired, so it is removed from the cache.
           set((state) => {
             const { [slug]: _, ...rest } = state.movieCache;
             return { movieCache: rest };
@@ -309,26 +332,26 @@ export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
       // UTILITY
       // ============================================================
 
-      /** Xóa cache hết hạn (gọi định kỳ hoặc khi cần) */
+      /** Removes the expired entries from the cache. */
       clearExpiredCache: (): void => {
         const now = Date.now();
 
         set((state) => {
-          // Filter movieCache
+          // The movie detail entries that are still valid.
           const movieCache = Object.fromEntries(
             Object.entries(state.movieCache).filter(
               ([, entry]) => !isExpired(entry.timestamp, MOVIE_DETAIL_TTL_MS)
             )
           );
 
-          // Filter relatedCache
+          // The related movie entries that are still valid.
           const relatedCache = Object.fromEntries(
             Object.entries(state.relatedCache).filter(
               ([, entry]) => !isExpired(entry.timestamp, MOVIE_DETAIL_TTL_MS)
             )
           );
 
-          // Filter homeCache
+          // The home page entries that are still valid.
           const homeCache = Object.fromEntries(
             Object.entries(state.homeCache).filter(
               ([, entry]) => !isExpired(entry.timestamp, HOME_MOVIES_TTL_MS)
@@ -339,7 +362,7 @@ export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
         });
       },
 
-      /** Xóa toàn bộ cache */
+      /** Removes every entry from the cache. */
       clearAllCache: (): void => {
         set({
           movieCache: {},

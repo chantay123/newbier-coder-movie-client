@@ -15,7 +15,7 @@ import { SessionProvider } from 'next-auth/react';
 import { AuthProvider, withAccountStatus, withAuth } from '@/utils/auth';
 import { useEffect, useState, useCallback } from 'react';
 
-/** Obfuscation helpers — giấu user info trong DevTools */
+/** Obfuscation helpers — they hide the user info in DevTools */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
 
 const obfDecode = (encoded: string): string | null => {
@@ -145,7 +145,8 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
 
   const initializeUser = useCallback((): void => {
     if (typeof window !== 'undefined' && !isInitialized) {
-      // ✅ Đọc user từ sessionStorage (fallback localStorage cho remember-me)
+      // Read the user from sessionStorage (fallback to localStorage for
+      // the "remember me" mode)
       const remembered = localStorage.getItem('remember_me') === '1';
       const userData = (() => {
         if (window.sessionStorage) {

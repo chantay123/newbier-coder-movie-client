@@ -4,6 +4,7 @@
  * instance) because some endpoints are public and don't need credentials.
  */
 import { API_URL } from '@/config/API';
+import { apiUrl } from '@/config/apiPaths';
 
 const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -50,7 +51,7 @@ const ratingService = {
       return { success: false, message: 'Authentication info not found', data: [] };
     }
     try {
-      const res = await fetch(`${API_URL}/ratings/user/${userId}`, {
+      const res = await fetch(apiUrl(`ratingsUserById`, userId), {
         method: 'GET',
         headers: authHeader(token)
       });
@@ -69,7 +70,7 @@ const ratingService = {
       return { success: false, message: 'Authentication info not found' };
     }
     try {
-      const res = await fetch(`${API_URL}/ratings/user/${userId}/movie/${movieSlug}`, {
+      const res = await fetch(apiUrl(`ratingsUserMovie`, userId, movieSlug), {
         method: 'GET',
         headers: authHeader(token)
       });
@@ -86,7 +87,7 @@ const ratingService = {
     const token = getAuthToken();
     if (!token) return { success: false, message: 'Authentication token not found' };
     try {
-      const res = await fetch(`${API_URL}/ratings`, {
+      const res = await fetch(apiUrl(`ratingsCreate`), {
         method: 'POST',
         headers: authHeader(token),
         body: JSON.stringify({ movieSlug, rating })
@@ -103,7 +104,7 @@ const ratingService = {
     const token = getAuthToken();
     if (!token) return { success: false, message: 'Authentication token not found' };
     try {
-      const res = await fetch(`${API_URL}/ratings/${ratingId}`, {
+      const res = await fetch(apiUrl(`ratingsById`, ratingId), {
         method: 'DELETE',
         headers: authHeader(token)
       });
@@ -117,7 +118,7 @@ const ratingService = {
 
   getMovieRatingStats: async (movieSlug: string): Promise<RatingServiceResponse<MovieRatingStats>> => {
     try {
-      const res = await fetch(`${API_URL}/ratings/stats/${movieSlug}`, {
+      const res = await fetch(apiUrl(`ratingsStats`, movieSlug), {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -131,7 +132,7 @@ const ratingService = {
 
   getMovieRatings: async (movieId: string): Promise<RatingServiceResponse<UserRatingItem[]>> => {
     try {
-      const res = await fetch(`${API_URL}/ratings/movie/${movieId}`, {
+      const res = await fetch(apiUrl(`ratingsMovie`, movieId), {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });

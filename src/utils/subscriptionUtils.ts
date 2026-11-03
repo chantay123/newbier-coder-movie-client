@@ -1,26 +1,65 @@
 /**
- * @file subscriptionUtils.ts
- * @description Các hàm tiện ích kiểm tra trạng thái subscription và payment.
+ * subscriptionUtils.ts
+ *
+ * Utility functions that check the subscription and the payment state.
  */
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiPaths';
 
-/** Kiểm tra user có pending payment request không */
+/**
+ * Checks whether the user has a pending payment request.
+ *
+ * @param userId - The id of the user to check.
+ * @returns true when a pending request exists, false otherwise.
+ */
 export const checkPaymentSent = async (userId: string): Promise<boolean> => {
   try {
-    const response = await fetch('/api/subscription/check-pending-for-user', {
-      method: 'POST',
+    // NOTE: This used to call `/api/subscription/check-pending-for-user`. That
+    // route does not exist in the Next.js API (src/pages/api) nor on the v1
+    // backend, so the request fell into a 404 HTML page and
+    // `response.json()` threw. The real subscription endpoint
+    // (`GET /subscription/current`) is used instead, and the pending state is
+    // derived from `subscription.status`.
+    const response = await fetch(apiUrl(`subscriptionCurrent`), {
+      method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId })
+      credentials: 'include'
     });
 
-    const data = await response.json() as { hasPending?: boolean };
-    return data.hasPending ?? false;
+    if (!response.ok) return false;
+
+    const data = await response.json() as {
+      data?: {
+        subscription?: { status?: string; userId?: string | { _id?: string } } | null;
+        hasPendingSubscription?: boolean;
+      };
+      hasPending?: boolean;
+    };
+
+    if (typeof data.data?.hasPendingSubscription === 'boolean') {
+      return data.data.hasPendingSubscription;
+    }
+    if (typeof data.hasPending === 'boolean') return data.hasPending;
+
+    const subscription = data.data?.subscription;
+    if (!subscription || subscription.status !== 'pending') return false;
+
+    const owner = subscription.userId;
+    const ownerId = typeof owner === 'string' ? owner : owner?._id;
+    if (ownerId && userId) return String(ownerId) === String(userId);
+    return true;
   } catch (error) {
 
     return false;
   }
 };
 
-/** Kiểm tra response có phải subscription thành công không */
+/**
+ * Checks whether a response describes a successful subscription.
+ *
+ * @param response - The API response to inspect.
+ * @returns true when the response contains any success marker.
+ */
 export const isSuccessfulSubscription = (response: Record<string, unknown> | null): boolean => {
   if (!response) return false;
 
@@ -32,7 +71,13 @@ export const isSuccessfulSubscription = (response: Record<string, unknown> | nul
   return hasSuccess || hasSubscription || hasPackage || hasPayment;
 };
 
-/** Lấy ID có thể so sánh từ nhiều dạng identifier */
+/**
+ * Reads an identifier that can be compared, whatever shape it has.
+ *
+ * @param value - The identifier to normalize. It can be a string, an object
+ *                with an `_id` or `id` field, or any other value.
+ * @returns The identifier as a string, or null when the value is empty.
+ */
 const getComparableId = (value: unknown): string | null => {
   if (value === null || typeof value === 'undefined') return null;
 
@@ -66,7 +111,13 @@ interface SubscriptionItem {
   };
 }
 
-/** Kiểm tra package có phải subscription đang active không */
+/**
+ * Checks whether the package is the one of the active subscription.
+ *
+ * @param pkg - The package to compare.
+ * @param subscription - The current subscription state.
+ * @returns true when the package is the subscribed one.
+ */
 export const isCurrentSubscribedPackage = (pkg: PackageItem, subscription: SubscriptionItem): boolean => {
   if (!pkg || pkg._id === undefined || pkg._id === null) {
 
@@ -93,7 +144,13 @@ export const isCurrentSubscribedPackage = (pkg: PackageItem, subscription: Subsc
   return subscriptionPackageId === packageId || !!nameMatch;
 };
 
-/** Kiểm tra package có đang chờ duyệt không */
+/**
+ * Checks whether the package is waiting for approval.
+ *
+ * @param pkg - The package to compare.
+ * @param pendingSubscription - The pending subscription state.
+ * @returns true when the package is the one waiting for approval.
+ */
 export const isPendingSubscribedPackage = (pkg: PackageItem, pendingSubscription: SubscriptionItem): boolean => {
   if (!pkg || pkg._id === undefined || pkg._id === null) {
 

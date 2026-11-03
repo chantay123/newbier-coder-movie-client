@@ -1,36 +1,45 @@
 /**
- * @file authConfig.ts
- * @description Cấu hình tập trung cho giao diện xác thực, asset artwork,
- * đặc tả endpoint API, nhãn UI, placeholder, và thông báo lỗi.
+ * authConfig.ts
+ *
+ * Central configuration for the authentication screens: artwork, API endpoint
+ * contract, UI labels, placeholders and error messages.
  */
 
+import { getApiBaseUrl } from './apiBase';
+import { apiUrl } from './apiPaths';
+
 export const AUTH_CONFIG = {
-  // Endpoint và contract cho backend authentication
+  // The endpoint and the contract used by the backend authentication.
   api: {
-    // Khớp với endpoint backend: /api/v1/auth/login
-    endpoint: (
-      process.env.NEXT_PUBLIC_CORE_API_URL
-        ? `${process.env.NEXT_PUBLIC_CORE_API_URL.replace(/\/+$/, '')}/auth/login`
-        : (process.env.NEXT_PUBLIC_API_URL
-            ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, '')}/api/v1/auth/login`
-            : 'http://localhost:5000/api/v1/auth/login')
-    ),
+    /**
+     * The login endpoint of the backend.
+     *
+     * The URL is built by `apiUrl()`, which returns the relative path
+     * joined with the base URL of the current runtime. The backend host
+     * never reaches the client bundle.
+     *
+     * This URL used to be built by applying a manual string replacement to
+     * `NEXT_PUBLIC_API_URL`. With the environment set to `https://host/api/v1`
+     * the pattern `replace(/\/api\/?$/, '')` did not match, so the endpoint
+     * became `https://host/api/v1/api/v1/auth/login` and answered 404.
+     */
+    endpoint: apiUrl('authLogin'),
     successCode: '000000',
     invalidCredentialsCode: '00000204'
   },
 
-  // Cấu hình artwork
+  // Artwork configuration.
   artwork: {
     defaultLoginImage: process.env.NEXT_PUBLIC_LOGIN_IMAGE || '/img/chantay.jpg',
     defaultRegisterImage: process.env.NEXT_PUBLIC_REGISTER_IMAGE || '/img/chantay.jpg',
     altText: 'Welcome Illustration'
   },
 
-  // Alias tương thích ngược
+  // Backwards compatible aliases.
   defaultLoginArtwork: process.env.NEXT_PUBLIC_LOGIN_IMAGE || '/img/chantay.jpg',
   artworkAlt: 'Welcome Illustration',
 
-  // Tất cả text, copy, placeholder và thông báo lỗi cho màn Login
+  // All the text, copy, placeholders and error messages of the Login screen.
   login: {
     meta: {
       title: 'Welcome - Đăng nhập',

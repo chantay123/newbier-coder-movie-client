@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Button, Alert } from 'react-bootstrap';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import axiosInstance from '@/config/axiosAdminConfig';
+import { apiPath } from '@/config/apiPaths';
 
 interface ReleasedMovieLinkProps {
   upcomingMovieId: string;
@@ -24,11 +25,11 @@ const ReleasedMovieLink: React.FC<ReleasedMovieLinkProps> = ({ upcomingMovieId }
     setLoading(true);
     try {
       // Fetch the upcoming movie first
-      const response = await axiosInstance.get(`/upcoming-movies/${upcomingMovieId}`);
+      const response = await axiosInstance.get(apiPath(`upcomingBySlug`, upcomingMovieId));
 
       if (response.data?.upcomingMovie?.is_released) {
         // If released, search for the movie with same name or slug in the movies collection
-        const searchResponse = await axiosInstance.get('/movies', {
+        const searchResponse = await axiosInstance.get(apiPath(`moviesList`), {
           params: {
             search: response.data.upcomingMovie.name,
             limit: 5

@@ -1,7 +1,9 @@
 /**
- * @file scheduleConfig.ts
- * @description Cấu hình tập trung cho lịch chiếu và lịch phát sóng.
- * Khai báo các ngày trong tuần, nhãn và tiêu chuẩn giờ phát.
+ * The central configuration for the schedule page and the broadcast
+ * schedule.
+ *
+ * It declares the days of the week, the labels and the broadcast time
+ * standards.
  */
 
 export const DAYS_OF_WEEK = [

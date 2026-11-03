@@ -1,25 +1,28 @@
 /**
- * @file axiosConfig.ts
- * @description Cấu hình axios dùng chung cho toàn bộ API layer.
- * Gom baseURL resolver, request/response interceptor, và chiến lược refresh-token.
+ * axiosConfig.ts
+ *
+ * The axios configuration shared by the whole API layer.
+ * It groups the base URL resolver, the request and response interceptors,
+ * and the refresh-token strategy.
  */
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { AP } from '@/config/apiPaths';
 
-/** Bỏ slash cuối của URL một cách an toàn */
-const stripTrailingSlash = (value: string | undefined | null): string =>
-  value ? String(value).replace(/\/+$/, '') : '';
+export type { AxiosError };
 
-/** Resolver base URL tập trung — ưu tiên NEXT_PUBLIC_CORE_API_URL, fallback NEXT_PUBLIC_API_URL, mặc định localhost */
-const resolveBaseURL = (): string => {
-  const core = stripTrailingSlash(process.env.NEXT_PUBLIC_CORE_API_URL);
-  if (core) return core; // đã bao gồm /api/v1
-  const legacy = stripTrailingSlash(process.env.NEXT_PUBLIC_API_URL);
-  if (legacy) return legacy; // thường kết thúc bằng /api
-  return 'http://localhost:5000/api';
-};
-
-const baseURL = resolveBaseURL();
+/**
+ * The base URL of the axios instance.
+ *
+ * This file used to resolve the base URL on its own
+ * (`NEXT_PUBLIC_CORE_API_URL` -> `NEXT_PUBLIC_API_URL` ->
+ * `http://localhost:5000/api`) while `config/API.ts`, `adService`,
+ * `statsService` and others resolved it in a different way, so one app sent
+ * its requests to two different base URLs. Everything now shares
+ * `getApiBaseUrl()`.
+ */
+const baseURL = getApiBaseUrl();
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -31,61 +34,174 @@ const axiosInstance = axios.create({
   withCredentials: true
 });
 
-/** Đọc Bearer token hiện có từ localStorage / sessionStorage theo cơ chế
- * remember-me đã lưu trong authService. Khi remember-me tắt, access token
- * chỉ tồn tại trong sessionStorage (mất khi đóng tab) và refresh token
- * không có sẵn. */
-const REMEMBER_ME_KEY = 'remember_me';
+/**
+ * Reads the Bearer token from localStorage or sessionStorage, following the
+ * remember-me mechanism implemented in authService.
+ *
+ * WHY EVERY LOCATION IS READ
+ * `authService.login()` writes the token to:
+ *   - localStorage  -> when the user ticks "Remember me"
+ *   - sessionStorage -> when the user does not tick it, so the token only
+ *     lives inside the tab
+ * If only localStorage was read, every session login would send a request
+ * without the `Authorization` header and the backend would answer 401. In
+ * the UI that shows up as "You need to sign in" even though the user is
+ * signed in.
+ *
+ * That is why sessionStorage is read FIRST (the token of the current
+ * session), and localStorage is only the fallback. The `remember_me` flag
+ * decides whether the token PERSISTS across new tabs, not where it is read.
+ */
 const ACCESS_KEYS = ['auth_token', 'token'];
 
+/**
+ * Reads the access token from the browser storage.
+ *
+ * @returns The token, or null when no usable token is stored.
+ */
 const readAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
-  if (remembered) {
-    for (const key of ACCESS_KEYS) {
-      const value = localStorage.getItem(key);
-      if (value && value !== 'undefined' && value !== 'null') return value;
-    }
-    return null;
-  }
+
+  const isUsable = (value: string | null): value is string =>
+    Boolean(value) && value !== 'undefined' && value !== 'null';
+
+  // 1. sessionStorage - the token of the current login session.
   if (window.sessionStorage) {
     for (const key of ACCESS_KEYS) {
       const value = window.sessionStorage.getItem(key);
-      if (value && value !== 'undefined' && value !== 'null') return value;
+      if (isUsable(value)) return value;
     }
+    // The token granted by the NextAuth session (the AuthProvider stores it
+    // in sessionStorage).
+    const backendToken = window.sessionStorage.getItem('backendToken');
+    if (isUsable(backendToken)) return backendToken;
   }
-  // Fallback: tab reload trong cùng session — vẫn ưu tiên localStorage nếu có
+
+  // 2. localStorage - the token that persists across tabs (remember me), or
+  //    one left over from an earlier session in the same tab.
   for (const key of ACCESS_KEYS) {
     const value = localStorage.getItem(key);
-    if (value && value !== 'undefined' && value !== 'null') return value;
+    if (isUsable(value)) return value;
   }
+
   return null;
 };
 
-/** Mở rộng kiểu AxiosRequestConfig để đánh dấu đã retry */
+/** Extends AxiosRequestConfig with a flag that marks an already retried request. */
 interface RetryableRequest extends AxiosRequestConfig {
   _retry?: boolean;
 }
 
+/**
+ * The paths of the endpoints that need the Bearer token.
+ *
+ * The request URLs carry the RELATIVE PATH of the endpoint (the base URL is
+ * added by axios), so the paths are used to recognize an endpoint here.
+ */
+const AUTH_REQUIRED_PATHS = new Set<string>([
+  AP.subscriptionCurrent,
+  AP.subscriptionHistory,
+  AP.subscriptionAdminSubscriptions,
+  AP.subscriptionAdminPendingSubscriptions,
+  AP.userStatsWatch,
+  AP.userStatsWeeklyActivity,
+  AP.userStatsActivityWeek,
+  AP.userStatsGenreDistribution,
+  AP.userStatsDailyViewingTime,
+  AP.userStatsSeriesProgress,
+  AP.userStatsInProgressSeries,
+  AP.userStatsAchievements,
+  AP.usersMeHistory,
+  AP.usersMeFavorites,
+  AP.usersHistoryByUser,
+  AP.adminUsersList,
+  AP.adminUsersById,
+  AP.adminUsersCreate,
+  AP.adminUsersUpdate,
+  AP.adminUsersDelete,
+  AP.adminUsersRole,
+  AP.adminUsersBan,
+  AP.adminUsersUnban,
+  AP.adminUsersToggleStatus,
+  AP.adminUsersAvatar,
+]);
+
+/**
+ * The paths of the authentication endpoints.
+ *
+ * A 401 on one of them must NOT trigger the refresh-and-retry flow: that
+ * would loop forever, because the refresh endpoint itself answers 401.
+ */
+const AUTH_ENDPOINT_PATHS = new Set<string>([
+  AP.authLogin,
+  AP.authRefreshToken,
+  AP.authLogout,
+  AP.authRegister,
+]);
+
+/**
+ * Builds a matcher for a path template.
+ *
+ * The templates of `AP` use `{0}`, `{1}`, ... for the path parameters, so
+ * they are turned into a regular expression that matches any value in
+ * their place. The match is anchored, so `/watchlist` does not match
+ * `/watchlist/add`.
+ *
+ * @param template - The path template, for example `/admin/users/{0}`.
+ * @returns The regular expression that matches the concrete paths.
+ */
+const pathMatcher = (template: string): RegExp => {
+  const pattern = template
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\\\{\d+\\\}/g, '[^/]+');
+  return new RegExp(`^${pattern}$`);
+};
+
+/**
+ * Tells whether a request URL targets a given endpoint.
+ *
+ * The URLs of the axios instance are relative paths (the base URL is added
+ * by axios), so the path of the URL is compared with the template of the
+ * endpoint.
+ *
+ * @param url - The URL of the request.
+ * @param template - The path template of the endpoint.
+ * @returns `true` when the URL targets the endpoint.
+ */
+const matchesEndpoint = (url: string | undefined, template: string): boolean => {
+  if (!url) return false;
+  const path = url.split('?')[0].replace(/\/+$/, '') || '/';
+  return pathMatcher(template).test(path);
+};
+
+/**
+ * Tells whether a request URL targets one of the given endpoints.
+ *
+ * @param url - The URL of the request.
+ * @param templates - The path templates of the endpoints.
+ * @returns `true` when the URL targets one of the endpoints.
+ */
+const matchesAnyEndpoint = (
+  url: string | undefined,
+  templates: Set<string>
+): boolean => {
+  for (const template of templates) {
+    if (matchesEndpoint(url, template)) return true;
+  }
+  return false;
+};
+
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = readAuthToken();
 
+  // The Bearer token is attached to EVERY request, so the backend can
+  // answer 401 on the endpoints that need it.
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    const importantEndpoints = ['/subscription/', '/user/', '/auth/'];
-    if (importantEndpoints.some((endpoint) => config.url?.includes(endpoint))) {
-      // Đã gắn token đầy đủ cho các endpoint quan trọng
-    }
-  } else {
-    const authRequiredEndpoints = [
-      '/subscription/current',
-      '/subscription/history',
-      '/user/'
-    ];
-
-    if (authRequiredEndpoints.some((endpoint) => config.url?.includes(endpoint))) {
-
-    }
+  } else if (matchesAnyEndpoint(config.url, AUTH_REQUIRED_PATHS)) {
+    // The endpoint needs a token but none is stored: the backend will
+    // answer 401 and the response interceptor handles it. A silent
+    // diagnostic helps to spot a broken session early.
   }
 
   if (config.method === 'patch' || config.method === 'PATCH') {
@@ -101,8 +217,9 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 axiosInstance.interceptors.response.use(
   (response) => {
-    if (response.config.url?.includes('favorites')) {
-      // Silent diagnostics - không cần log token hoặc payload
+    // The favorites endpoint is recognized by its path.
+    if (matchesEndpoint(response.config.url, AP.usersMeFavorites)) {
+      // Silent diagnostics. The path and the payload are never logged.
     }
     return response;
   },
@@ -128,58 +245,19 @@ axiosInstance.interceptors.response.use(
     }
 
     // ---- MOCK-MODE 404 SHIM -----------------------------------------------
-    // The deployed backend (core-movie-service.onrender.com) is missing a
-    // handful of admin endpoints. Rather than letting every page spew 404s
-    // and break their error handlers, we recognise the known-missing routes
-    // here, fabricate a realistic empty response, and resolve the original
-    // request as if it had succeeded. Each branch documents the shape the
-    // caller expects so it's easy to remove when the real endpoint ships.
+    // The deployed backend is missing a handful of admin endpoints. Rather
+    // than letting every page spew 404s and break their error handlers, we
+    // recognise the known-missing routes here, fabricate a realistic empty
+    // response, and resolve the original request as if it had succeeded.
+    // Each branch documents the shape the caller expects so it's easy to
+    // remove when the real endpoint ships.
+    //
+    // NOTE: the endpoints are recognized by their PATH.
     if (status === 404) {
-      const path = (url || '').split('?')[0];
-
-      // GET /admin/notifications → empty feed so the bell stays usable
-      if (path === '/admin/notifications') {
-        return { data: [], status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
-      }
-
-      // GET /admin/movies/categories → empty list, page already has its own
-      // mock categories (INITIAL_CATEGORIES) fallback
-      if (path === '/admin/movies/categories') {
+      // GET /admin/movies/categories -> empty list. The page already has its
+      // own mock categories (INITIAL_CATEGORIES) as a fallback.
+      if (matchesEndpoint(url, AP.adminMoviesCategories)) {
         return { data: { categories: [] }, status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
-      }
-
-      // GET /admin/dashboard/stats → flat stats object
-      if (path === '/admin/dashboard/stats') {
-        return {
-          data: {
-            data: {
-              totalMovies: 0, newUsers: 0, engagementRate: 0, reports: 0,
-              totalUsers: 0, totalViews: 0, totalComments: 0
-            }
-          },
-          status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg
-        } as never;
-      }
-
-      // GET /admin/dashboard/analytics → empty analytics blob
-      if (path === '/admin/dashboard/analytics') {
-        return {
-          data: { data: { viewsByDay: [], usersByDay: [], topMovies: [] } },
-          status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg
-        } as never;
-      }
-
-      // GET /admin/dashboard/feedback-stats → empty breakdown
-      if (path === '/admin/dashboard/feedback-stats') {
-        return {
-          data: { data: { byType: [], byStatus: [], byDay: { labels: [], data: [] } } },
-          status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg
-        } as never;
-      }
-
-      // GET /admin/reports/stats → empty report stats
-      if (path === '/admin/reports/stats') {
-        return { data: { data: {} }, status: 200, statusText: 'OK (mock-empty)', headers: {}, config: cfg } as never;
       }
     }
     // ---- END MOCK-MODE 404 SHIM -------------------------------------------
@@ -190,8 +268,7 @@ axiosInstance.interceptors.response.use(
     // retry", which spams the console. We short-circuit that specific
     // endpoint so it returns a clean "no subscription" payload.
     if (status === 401) {
-      const path = (url || '').split('?')[0];
-      if (path === '/subscription/current') {
+      if (matchesEndpoint(url, AP.subscriptionCurrent)) {
         return {
           data: {
             data: {
@@ -222,11 +299,7 @@ axiosInstance.interceptors.response.use(
     // 401: try a single silent refresh, then retry the original request.
     // We never retry auth endpoints themselves (login/refresh/logout) to
     // avoid infinite refresh loops.
-    const isAuthEndpoint =
-      url.includes('/auth/login') ||
-      url.includes('/auth/refresh-token') ||
-      url.includes('/auth/logout') ||
-      url.includes('/auth/register');
+    const isAuthEndpoint = matchesAnyEndpoint(url, AUTH_ENDPOINT_PATHS);
 
     if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;

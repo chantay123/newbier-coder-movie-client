@@ -1,8 +1,18 @@
 /**
- * @file upcomingMovieService.ts
- * @description Public upcoming-movie reads (list / by-id / by-slug / by-category).
+ * upcomingMovieService.ts
+ *
+ * Public upcoming-movie reads (list / by-id / by-slug / by-category).
+ *
+ * This file used to build the base URL from the environment on its own, with
+ * an empty string as the fallback. Without the environment variable every
+ * request became `/upcoming-movies?...`, a relative URL, so it was sent to
+ * the Next.js server itself and answered with HTML instead of JSON. It now
+ * uses `getApiBaseUrl()`.
  */
-const API_URL = (process.env.NEXT_PUBLIC_CORE_API_URL || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiPaths';
+
+const API_URL = getApiBaseUrl();
 
 export interface UpcomingMovie {
   _id: string;
@@ -74,7 +84,7 @@ const upcomingMovieService = {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 1200) : null;
     const data = await fetchJson(
-      `${API_URL}/upcoming-movies?page=${page}&limit=${limit}`,
+      apiUrl(`upcomingList`) + `?page=${page}&limit=${limit}`,
       controller ? { signal: controller.signal } : undefined
     );
     if (timeoutId) clearTimeout(timeoutId);
@@ -99,7 +109,7 @@ const upcomingMovieService = {
   },
 
   getUpcomingMovieById: async (movieId: string): Promise<{ success: boolean; upcomingMovie: UpcomingMovie | null }> => {
-    const data = await fetchJson(`${API_URL}/admin/upcoming-movies/${movieId}`);
+    const data = await fetchJson(apiUrl(`upcomingAdminById`, movieId));
     if (!data || typeof data !== 'object') return { success: false, upcomingMovie: null };
     const payload = data as { success?: boolean; upcomingMovie?: UpcomingMovie };
     if (payload.success && payload.upcomingMovie) {
@@ -109,13 +119,13 @@ const upcomingMovieService = {
   },
 
   getUpcomingMovieBySlug: async (slug: string): Promise<{ success: boolean; movie: UpcomingMovie | null }> => {
-    const data = await fetchJson(`${API_URL}/upcoming-movies/${slug}`);
+    const data = await fetchJson(apiUrl(`upcomingBySlug`, slug));
     if (!data || typeof data !== 'object') return { success: false, movie: null };
     return data as { success: boolean; movie: UpcomingMovie | null };
   },
 
   getUpcomingMoviesByCategory: async (categorySlug: string, page = 1, limit = 10): Promise<{ success: boolean; upcomingMovies: UpcomingMovie[] }> => {
-    const data = await fetchJson(`${API_URL}/upcoming-movies/category/${categorySlug}?page=${page}&limit=${limit}`);
+    const data = await fetchJson(apiUrl(`upcomingByCategory`, categorySlug) + `?page=${page}&limit=${limit}`);
     if (!data || typeof data !== 'object') return { success: false, upcomingMovies: [] };
     return data as { success: boolean; upcomingMovies: UpcomingMovie[] };
   }

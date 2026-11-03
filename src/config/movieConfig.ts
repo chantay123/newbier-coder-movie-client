@@ -1,7 +1,8 @@
 /**
- * @file movieConfig.ts
- * @description Cấu hình tập trung cho trang phim, hero banner, và data providers.
- * Đồng bộ với SYSTEM_CONFIG và movieFallbackConfig.
+ * The central configuration for the movie page, the hero banner and the
+ * data providers.
+ *
+ * It stays in sync with `SYSTEM_CONFIG` and `movieFallbackConfig`.
  */
 
 import { SYSTEM_CONFIG } from './systemConfig';
@@ -10,6 +11,7 @@ import {
   LOCAL_DEFAULT_POSTER,
   MOVIE_FALLBACK_DEFAULTS
 } from './movieFallbackConfig';
+import { AP } from './apiPaths';
 
 export {
   HERO_FALLBACK_BACKDROPS,
@@ -28,7 +30,8 @@ export {
 } from './movieFallbackConfig';
 
 /**
- * Cấu hình phim, đồng bộ với SYSTEM_CONFIG toàn cục.
+ * The movie configuration. It is kept in sync with the global
+ * `SYSTEM_CONFIG`.
  */
 export const MOVIE_CONFIG = {
   useMockData: SYSTEM_CONFIG.useMockData,
@@ -45,17 +48,19 @@ export const MOVIE_CONFIG = {
     new: {
       id: 'new',
       title: 'Phim mới',
-      endpoint: 'movies/latest'
+      // The relative path of the endpoint. The base URL is added by the
+      // shared API layer, so the backend host never reaches the client.
+      endpoint: AP.moviesLatest
     },
     series: {
       id: 'series',
       title: 'Phim bộ',
-      endpoint: 'formats/series/movies'
+      endpoint: AP.formatsSeriesMovies
     },
     single: {
       id: 'single',
       title: 'Phim lẻ',
-      endpoint: 'formats/single/movies'
+      endpoint: AP.formatsSingleMovies
     }
   },
 
@@ -67,20 +72,9 @@ export const MOVIE_CONFIG = {
 } as const;
 
 /**
- * Lấy endpoint API đã cấu hình cho một category.
+ * Tells whether the mock data mode is enabled.
  *
- * @param categoryKey Khóa định danh category
- * @returns Endpoint API đầy đủ hoặc tương đối
- */
-export const getCategoryEndpoint = (categoryKey: string): string => {
-  const category = (MOVIE_CONFIG.categories as Record<string, { endpoint: string }>)[categoryKey];
-  return category ? category.endpoint : MOVIE_CONFIG.categories.new.endpoint;
-};
-
-/**
- * Kiểm tra mock data mode có đang bật không.
- *
- * @returns True nếu nên dùng mock data
+ * @returns `true` when the mock data has to be used.
  */
 export const isMockModeActive = (): boolean => {
   return MOVIE_CONFIG.useMockData;

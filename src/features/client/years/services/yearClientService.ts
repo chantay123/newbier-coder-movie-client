@@ -9,6 +9,7 @@ import axios from 'axios';
 import { YearEntity } from '@/features/admin/years/types/year.types';
 import { extractYearList } from '@/features/admin/years/services/yearAdminService';
 import { INITIAL_YEARS } from '@/mock/admin/mockTaxonomies';
+import { apiUrl } from '@/config/apiPaths';
 
 export interface IYearClientService {
   getActiveYears(signal?: AbortSignal): Promise<YearEntity[]>;
@@ -17,16 +18,6 @@ export interface IYearClientService {
 export class YearClientService implements IYearClientService {
   private cachedActiveYears: YearEntity[] | null = null;
   private inFlightPromise: Promise<YearEntity[]> | null = null;
-  private readonly apiUrl: string;
-
-  constructor(apiUrl?: string) {
-    const rawUrl =
-      apiUrl ||
-      process.env.NEXT_PUBLIC_CORE_API_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      'https://core-movie-service.onrender.com/api/v1';
-    this.apiUrl = rawUrl.replace(/\/+$/, '');
-  }
 
   /**
    * Retrieves all active release years for client navigation and filtering.
@@ -48,7 +39,10 @@ export class YearClientService implements IYearClientService {
       let candidateYears: YearEntity[] = [];
 
       try {
-        const response = await axios.get(`${this.apiUrl}/years`, {
+        // The URL is built by `apiUrl()`, so the browser reaches the
+        // same-origin proxy and the backend host never reaches the client
+        // bundle.
+        const response = await axios.get(apiUrl('taxonomyYears'), {
           signal,
           headers: {
             Accept: 'application/json',

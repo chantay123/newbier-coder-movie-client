@@ -75,12 +75,12 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
   }, [router, slug]);
 
   const handleOpenTrailer = useCallback((targetMovie?: unknown) => {
-    // Final guard before opening the modal. List-level filtering
+    // Final guard before opening the modal. The list-level filtering
     // elsewhere in the app should already have removed movies
     // without a trailer, but this is the single entry point that
-    // can directly open the modal — keep the check here so we
-    // never end up showing the "Trailer chưa được cung cấp"
-    // panel as a result of a developer wiring a new "Xem trailer"
+    // can directly open the modal, so keep the check here. That way we
+    // never end up showing the "trailer not available" panel
+    // when a developer wires a new "Watch trailer"
     // button without going through the filter helper.
     const candidate = (targetMovie as TrailerMovie | null) || (movie as TrailerMovie | null);
     if (!candidate) return;
@@ -106,8 +106,8 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
   if (!loading && error) {
     if (error === 'auth-required') {
       // 401 from the backend: either the user is not logged in or
-      // their refresh token was rejected. A "Thử lại" button is
-      // useless here because the next attempt will 401 too — guide
+      // their refresh token was rejected. A "Try again" button is
+      // useless here because the next attempt will 401 too, so guide
       // the user to the login page instead, preserving the
       // `?redirect=` param so they land back on the same movie
       // after authenticating.

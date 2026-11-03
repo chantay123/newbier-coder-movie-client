@@ -1,6 +1,5 @@
 /**
- * @file genres/index.tsx
- * @description Standalone Admin page for managing Movie Genres (Thể Loại).
+ * A standalone admin page for managing the movie genres.
  */
 'use client';
 

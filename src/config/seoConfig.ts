@@ -1,7 +1,7 @@
 /**
- * @file seoConfig.ts
- * @description Cấu hình tập trung cho SEO & Social Metadata.
- * Ép chuẩn tiêu đề, OpenGraph và mặc định metadata.
+ * The central configuration for the SEO and the social metadata.
+ *
+ * It standardizes the title, the OpenGraph tags and the default metadata.
  */
 
 export const SEO_CONFIG = {
@@ -17,10 +17,10 @@ export const SEO_CONFIG = {
   twitterCard: 'summary_large_image',
 
   /**
-   * Tạo tiêu đề tài liệu theo chuẩn.
+   * Builds the title of the document.
    *
-   * @param pageTitle Tiêu đề riêng của trang
-   * @returns Tiêu đề đã định dạng (ví dụ: "Phim Lẻ | MovieStreaming")
+   * @param pageTitle - The title of the page.
+   * @returns The formatted title, for example "Movie Listing | MovieStreaming".
    */
   formatTitle: (pageTitle: string | null | undefined): string => {
     if (!pageTitle) return SEO_CONFIG.defaultTitle;

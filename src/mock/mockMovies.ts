@@ -1,11 +1,11 @@
 /**
- * @file mockMovies.ts
- * @description Mock data chuẩn hoá và Schema Contract cho Backend API.
- * Dùng làm đặc tả cho backend engineer khi triển khai response của các endpoint.
+ * Normalized mock data and the schema contract for the backend API.
+ * It is used as the specification for backend engineers when they
+ * implement the response of each endpoint.
  */
 
 /**
- * Item thể loại phim.
+ * A single movie genre.
  */
 export interface CategoryItem {
   name: string;
@@ -13,7 +13,7 @@ export interface CategoryItem {
 }
 
 /**
- * Item quốc gia sản xuất.
+ * A country where a movie was produced.
  */
 export interface CountryItem {
   name: string;
@@ -38,7 +38,7 @@ export interface EpisodeServer {
 }
 
 /**
- * Schema chuẩn cho phim từ API.
+ * The standard schema of a movie returned by the API.
  */
 export interface MovieSchema {
   _id: string;
@@ -66,7 +66,7 @@ export interface MovieSchema {
 }
 
 // ============================================================================
-// CASE 1: Bom tấn phim lẻ 4K
+// CASE 1: A blockbuster 4K single movie
 // ============================================================================
 export const mockFeaturedMovie: MovieSchema = {
   _id: 'mock-featured-1',
@@ -109,7 +109,7 @@ export const mockFeaturedMovie: MovieSchema = {
 };
 
 // ============================================================================
-// CASE 2: Phim bộ đang chiếu với tiến độ tập
+// CASE 2: A series that is still running, with the episode progress
 // ============================================================================
 export const mockOngoingSeries: MovieSchema = {
   _id: 'mock-series-ongoing-2',
@@ -150,7 +150,7 @@ export const mockOngoingSeries: MovieSchema = {
 };
 
 // ============================================================================
-// CASE 3: Phim bộ trọn bộ hoàn tất
+// CASE 3: A completed series with every episode available
 // ============================================================================
 export const mockCompletedSeries: MovieSchema = {
   _id: 'mock-series-completed-3',
@@ -188,7 +188,7 @@ export const mockCompletedSeries: MovieSchema = {
 };
 
 // ============================================================================
-// CASE 4: Phim sắp ra mắt
+// CASE 4: A movie that has not been released yet
 // ============================================================================
 export const mockUpcomingMovie: MovieSchema = {
   _id: 'mock-upcoming-4',
@@ -220,7 +220,7 @@ export const mockUpcomingMovie: MovieSchema = {
 };
 
 // ============================================================================
-// CASE 5: Phim châu Á đoạt giải
+// CASE 5: An Asian movie that won an award
 // ============================================================================
 export const mockAwardWinningMovie: MovieSchema = {
   _id: 'mock-award-5',

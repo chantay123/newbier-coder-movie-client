@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Skeleton from '@/features/shared/components/UI/Skeleton';
 
 /**
- * @file FeaturedCarousel3D.tsx
- * @description Pure CSS 3D rotating carousel showcasing top spotlight movies with hardware-accelerated depth.
- * Implemented 100% with Pure CSS 3D transforms & transitions (no external slider/carousel libraries).
+ * A rotating carousel that shows the spotlight movies of the home page.
+ * The 3D effect is built with pure CSS transforms and transitions, so no
+ * external slider or carousel library is needed.
  */
 
-/** Movie thô từ API - loose shape */
+/** A raw movie coming from the API (loose shape). */
 export type FeaturedMovie = Record<string, unknown> & {
   _id?: string;
   id?: string;
@@ -119,10 +119,10 @@ const FeaturedCarousel3D: React.FC<FeaturedCarousel3DProps> = ({ movies = [], lo
     setTouchEnd(0);
   };
 
-  // Chỉ hiển thị skeleton khi ĐANG THỰC SỰ LOAD. Trước đây điều kiện
-  // `loading && candidateMovies.length === 0` kết hợp với `return null`
-  // bên dưới khiến section biến mất im lặng nếu không có phim nào
-  // pass qua bộ lọc trailer — nay render null có chủ đích.
+  // Only show the skeleton while the data is really loading. The old
+  // condition `loading && candidateMovies.length === 0` combined with the
+  // `return null` below made the section disappear silently when no movie
+  // passed the trailer filter. Now the `return null` is intentional.
   if (loading && candidateMovies.length === 0) {
     return (
       <div className="featured-3d-wrapper mb-4">

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import styles from '@/styles/UserRatingDetails.module.css';
 import { RatingContext } from './RatingStats';
+import { getApiBaseUrl } from '@/config/apiBase';
+import { apiUrl } from '@/config/apiPaths';
 
 /** User rating entry */
 export interface UserRating {
@@ -35,9 +37,9 @@ const UserRatingDetails: React.FC<UserRatingDetailsProps> = ({ movieSlug }) => {
         setLoading(true);
         setError(null);
 
-        const baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+        const baseApiUrl = getApiBaseUrl();
 
-        const movieResponse = await fetch(`${baseApiUrl}/movies/${movieSlug}`);
+        const movieResponse = await fetch(apiUrl(`moviesDetail`, movieSlug));
         if (!movieResponse.ok) {
           throw new Error(`Failed to fetch movie info: ${movieResponse.status}`);
         }
@@ -49,7 +51,7 @@ const UserRatingDetails: React.FC<UserRatingDetailsProps> = ({ movieSlug }) => {
 
         const movieId = movieData.data._id;
 
-        const ratingsResponse = await fetch(`${baseApiUrl}/ratings/movie/${movieId}`);
+        const ratingsResponse = await fetch(apiUrl(`ratingsMovie`, movieId));
         if (!ratingsResponse.ok) {
           throw new Error(`Failed to fetch ratings: ${ratingsResponse.status}`);
         }

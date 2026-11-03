@@ -30,7 +30,8 @@ export default function TaxonomyRecalculateModal({
 
   const handleStartRecalculate = () => {
     setIsRunning(true);
-    // Giả lập quá trình chạy tái tính toán phía client (mô phỏng thao tác mượt mà)
+    // Simulates the recalculation on the client side so the modal can
+    // show a smooth progress state before reporting success.
     setTimeout(() => {
       setIsRunning(false);
       onSuccess();

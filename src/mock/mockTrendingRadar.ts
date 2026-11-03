@@ -1,12 +1,11 @@
 /**
- * @file mockTrendingRadar.ts
- * @description Mock data chuẩn hoá cho cinema analytics và trending radar.
- * Chứa dữ liệu theo tuần/tháng, chỉ số delta rank (+/-/NEW),
- * top 10 leaderboard và generator top 50 grid.
+ * Normalized mock data for the cinema analytics and the trending radar.
+ * It holds the weekly and monthly data, the rank delta index (+/-/NEW),
+ * the top 10 leaderboard and the generator of the top 50 grid.
  */
 
 /**
- * Item radar movie.
+ * A single movie of the radar.
  */
 export interface RadarMovieItem {
   _id: string;
@@ -26,7 +25,7 @@ export interface RadarMovieItem {
 }
 
 /**
- * Item radar thể loại.
+ * A genre of the radar.
  */
 export interface RadarGenreItem {
   _id: string;
@@ -49,7 +48,7 @@ export interface RadarPeriodData {
 }
 
 /**
- * Radar data chuẩn.
+ * The standard radar dataset.
  */
 export interface MockTrendingRadarData {
   week: RadarPeriodData;
@@ -66,8 +65,11 @@ export interface TopRankingsGridOptions {
 }
 
 /**
- * Tạo danh sách top rankings grid (lên đến 50 items).
- * Kết hợp dữ liệu thực và procedural data.
+ * Builds the top rankings grid (up to 50 items).
+ * It mixes the real data with procedurally generated entries.
+ *
+ * @param options - The category, the period and the maximum number of items.
+ * @returns The list of movies shown in the rankings grid.
  */
 export function getTopRankingsGrid({
   category = 'discussed',
@@ -82,7 +84,7 @@ export function getTopRankingsGrid({
 
   const result: RadarMovieItem[] = [...baseList];
 
-  // Procedural data để bổ sung lên limit
+  // Procedural data used to fill the list up to the requested limit
   const movieTitles = [
     { title: 'Interstellar', slug: 'ho-den-vu-tru-interstellar', year: 2014, rating: 8.7, genres: ['Viễn Tưởng', 'Phiêu Lưu'] },
     { title: 'Inception', slug: 'ke-danh-cap-giac-mo-inception', year: 2010, rating: 8.8, genres: ['Hành Động', 'Khoa Học'] },

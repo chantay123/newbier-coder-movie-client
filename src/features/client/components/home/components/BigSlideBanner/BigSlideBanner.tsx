@@ -18,7 +18,7 @@ import {
 } from '@/utils/imageSource';
 import { hasValidTrailer } from '@/utils/trailer';
 
-/** Movie thô từ API - loose shape */
+/** A raw movie coming from the API. The shape is loose. */
 export type SpotlightMovie = Record<string, unknown> & {
   _id?: string;
   id?: string;
@@ -103,10 +103,11 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
 }) => {
   const rawMovies: SpotlightMovie[] = Array.isArray(movies) ? movies : [];
 
-  // Defense in depth: chỉ hiển thị phim có trailer hợp lệ. Trước đó
-  // yêu cầu này chỉ filter ở `useHomeData` — nếu caller khác truyền
-  // prop `movies` chưa filter, banner vẫn để lọt phim không trailer,
-  // nút "Trailer" bấm vào mở modal trống.
+  // The defense in depth: only the movies with a valid trailer are shown.
+  // The rule used to be applied only in `useHomeData`, so another caller
+  // that passed the prop `movies` without the filter could still show a
+  // movie without a trailer, and the "Trailer" button opened an empty
+  // modal.
   const displayMovies = useMemo(
     () => rawMovies.filter((m) => hasValidTrailer(m as never)),
     [rawMovies]
@@ -119,16 +120,18 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Clamp index về khoảng hợp lệ — khi `movies` props thay đổi (filter
-  // loại phim), không để currentIndex trỏ vào phim đã biến mất.
+  // The index is clamped inside the valid range. When the prop `movies`
+  // changes and the filter removes some movies, `currentIndex` never
+  // points to a movie that disappeared.
   const safeIndex = displayMovies.length === 0
     ? 0
     : Math.min(currentIndex, displayMovies.length - 1);
   const currentMovie: SpotlightMovie | undefined = displayMovies[safeIndex] || displayMovies[0];
 
-  // Cập nhật backdropSrc mỗi khi currentMovie đổi. Đặt ở effect thay
-  // vì render để re-mount img (giữ behavior cũ của BigSlideBanner)
-  // và có thể reset về placeholder khi URL rỗng.
+  // The `backdropSrc` is updated every time the `currentMovie` changes.
+  // It is done in an effect instead of the render, so the `img` element
+  // is mounted again (which keeps the old behavior of the BigSlideBanner)
+  // and so it can fall back to the placeholder when the URL is empty.
   useEffect(() => {
     if (!currentMovie) {
       setBackdropSrc(FALLBACK_BACKDROP);
@@ -209,15 +212,17 @@ const BigSlideBanner: React.FC<BigSlideBannerProps> = ({
         onMouseLeave={() => setIsPaused(false)}
       >
         <div className={styles.slideWrapper}>
-          {/* Background Backdrop Image.
+          {/* The background backdrop image.
            *
-           * Trước đó src lấy trực tiếp từ payload (
-   `currentMovie.backdrop_url || poster_url || thumb_url`) —
-           * nếu tất cả URL đều rỗng, `<img src="">` không trigger onError
-           * → nền đen tuyền (lỗi bạn vừa báo). Nay dùng helper
-           * `pickImageSrc` để:
-           *   1. Tự fallback về FALLBACK_BACKDROP khi không có URL hợp lệ.
-           *   2. Có onError nếu CDN trả 404 hoặc content sai type.
+           * The `src` used to be taken directly from the payload
+           * (`currentMovie.backdrop_url || poster_url || thumb_url`). When
+           * every URL was empty, `<img src="">` did not trigger the
+           * `onError` handler, so the background stayed completely black.
+           * The `pickImageSrc` helper is used instead, to:
+           *   1. Fall back to `FALLBACK_BACKDROP` when there is no valid
+           *      URL.
+           *   2. Provide an `onError` handler for a CDN that answers 404
+           *      or returns the wrong content type.
            */}
           <img
             key={currentMovie._id || currentMovie.slug}

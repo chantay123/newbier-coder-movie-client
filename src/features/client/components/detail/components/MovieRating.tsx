@@ -1,26 +1,33 @@
 import React, { useState } from 'react';
+import ratingService from '@/API/services/ratingService';
 
 export interface MovieRatingProps {
   movieId?: string;
 }
 
+/**
+ * Lets the user rate a movie with a star score and an optional note.
+ *
+ * @param movieId - The slug of the movie being rated.
+ */
 const MovieRating: React.FC<MovieRatingProps> = ({ movieId }) => {
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState<string>('');
 
+  /**
+   * Sends the selected star score to the backend.
+   *
+   * The backend contract is `POST {API_BASE}/ratings` with the body
+   * `{ movieSlug, rating }`. The old `/movies/rate` route does not
+   * exist on backend v1.
+   */
   const handleSubmit = async (): Promise<void> => {
+    if (!movieId) return;
     try {
-      await fetch('http://localhost:5000/api/movies/rate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          movieId,
-          rating,
-          comment
-        })
-      });
+      await ratingService.createOrUpdateRating(movieId, rating);
+      void comment;
     } catch (error) {
-
+      // The rating is optional, so a failed request must not break the page.
     }
   };
 
