@@ -11,6 +11,8 @@ interface TagAutocompletePickerProps {
   suggestions: string[];
   placeholder?: string;
   required?: boolean;
+  onQuickCreate?: () => void;
+  quickCreateTitle?: string;
 }
 
 export const TagAutocompletePicker: React.FC<TagAutocompletePickerProps> = ({
@@ -21,7 +23,9 @@ export const TagAutocompletePicker: React.FC<TagAutocompletePickerProps> = ({
   onRemove,
   suggestions,
   placeholder = 'Nhập tên hoặc chọn gợi ý...',
-  required = false
+  required = false,
+  onQuickCreate,
+  quickCreateTitle,
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -46,19 +50,43 @@ export const TagAutocompletePicker: React.FC<TagAutocompletePickerProps> = ({
     }
   };
 
-  const filteredSuggestions = suggestions.filter(s => {
+  const filteredSuggestions = suggestions.filter((s) => {
     const matchesQuery = s.toLowerCase().includes(query.toLowerCase());
     const notAlreadyAdded = !items.includes(s);
     return matchesQuery && notAlreadyAdded;
   });
 
   return (
-    <div className={styles.formGroup} ref={wrapperRef} style={{ position: 'relative', zIndex: isOpen ? 1070 : 1 }}>
+    <div
+      className={styles.formGroup}
+      ref={wrapperRef}
+      style={{ position: 'relative', zIndex: isOpen ? 1070 : 1 }}
+    >
       <label className={styles.formLabel}>
-        <span className={styles.labelTitle}>
-          {icon} {label}
-          {required && <span className={styles.requiredAsterisk}>*</span>}
-        </span>
+        <div className="d-flex align-items-center gap-2">
+          <span className={styles.labelTitle}>
+            {icon} {label}
+            {required && <span className={styles.requiredAsterisk}>*</span>}
+          </span>
+          {onQuickCreate && (
+            <button
+              type="button"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#e50914',
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: 0,
+              }}
+              onClick={onQuickCreate}
+              title={quickCreateTitle || 'Tạo mới'}
+            >
+              + {quickCreateTitle || 'Thêm mới'}
+            </button>
+          )}
+        </div>
         <span className="text-muted small">
           Đã thêm: <strong className="text-light">{items.length}</strong>
         </span>
@@ -71,7 +99,7 @@ export const TagAutocompletePicker: React.FC<TagAutocompletePickerProps> = ({
             Chưa có mục nào được chọn
           </span>
         ) : (
-          items.map(it => (
+          items.map((it) => (
             <span key={it} className={styles.tagBadge}>
               {it}
               <button
@@ -121,7 +149,7 @@ export const TagAutocompletePicker: React.FC<TagAutocompletePickerProps> = ({
             type="button"
             className={styles.yearStepBtn}
             style={{ height: 34, minWidth: 34 }}
-            onClick={() => setIsOpen(prev => !prev)}
+            onClick={() => setIsOpen((prev) => !prev)}
             title="Xem danh sách gợi ý"
           >
             <FaChevronDown size={9} />
@@ -131,7 +159,7 @@ export const TagAutocompletePicker: React.FC<TagAutocompletePickerProps> = ({
         {/* Dropdown with filtered suggestions */}
         {isOpen && filteredSuggestions.length > 0 && (
           <div className={styles.comboboxDropdown}>
-            {filteredSuggestions.map(s => (
+            {filteredSuggestions.map((s) => (
               <button
                 key={s}
                 type="button"

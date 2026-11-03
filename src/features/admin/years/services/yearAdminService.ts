@@ -7,6 +7,9 @@ import {
   YearEntity,
   YearFilterParams,
   PaginatedYearResponse,
+  DeleteYearResult,
+  BulkDeleteResult,
+  BulkDeleteResultItem,
   createYearSchema,
   updateYearSchema,
   toggleYearStatusSchema,
@@ -19,7 +22,8 @@ export interface IYearAdminService {
   getAll(params?: YearFilterParams, signal?: AbortSignal): Promise<PaginatedYearResponse>;
   create(payload: CreateYearInput, signal?: AbortSignal): Promise<YearEntity>;
   update(id: string, payload: UpdateYearInput, signal?: AbortSignal): Promise<YearEntity>;
-  delete(id: string, signal?: AbortSignal): Promise<boolean>;
+  delete(id: string, signal?: AbortSignal): Promise<DeleteYearResult>;
+  deleteMultiple(ids: string[], signal?: AbortSignal): Promise<BulkDeleteResult>;
   toggleStatus(id: string, nextActive?: boolean, signal?: AbortSignal): Promise<YearEntity>;
 }
 
@@ -460,24 +464,155 @@ export class YearAdminService implements IYearAdminService {
 
   /**
    * Deletes a release year by ID.
+   * Conforms to banking/enterprise specifications:
+   * - Communicates via DELETE /api/v1/admin/years/:id
+   * - When 404 (already deleted by someone else): treats as UI success, purges from cache, returns alreadyDeleted: true.
+   * - When constraint error (400, 409, 422): propagates server reason, keeps item in cache.
+   * - When 401/403: propagates unauthorized / forbidden AppError.
+   * - When timeout (ECONNABORTED, 504): propagates AppError with code: 'TIMEOUT' for auto-refresh.
+   *
+   * @param id MongoDB ObjectId or entity identifier of the release year
+   * @param signal Optional AbortSignal for network cancellation
    */
-  async delete(id: string, signal?: AbortSignal): Promise<boolean> {
+  async delete(id: string, signal?: AbortSignal): Promise<DeleteYearResult> {
+    const target = this.fallbackCache.find((i) => i.id === id);
+    const targetName = target?.name || id;
+    const isMockItem = id.startsWith('yr-');
+
+    if (isMockItem) {
+      this.fallbackCache = this.fallbackCache.filter((item) => item.id !== id);
+      return {
+        id,
+        name: targetName,
+        success: true,
+      };
+    }
+
     const endpoint = this.config.years.delete(id);
     const requestTrace = generateTraceId();
 
     try {
-      await this.http.delete(endpoint, {
+      const response = await this.http.delete(endpoint, {
         signal,
         headers: {
           'Accept': 'application/json',
           'x-request-trace': requestTrace,
         },
       });
-    } catch {
-      // Allow local removal if backend delete is not yet deployed
+
+      // Check enterprise responseStatus (e.g. responseCode: "000000")
+      if (
+        response.data?.responseStatus &&
+        response.data.responseStatus.responseCode &&
+        response.data.responseStatus.responseCode !== '000000'
+      ) {
+        throw new Error(
+          response.data.responseStatus.responseMessage ||
+          ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR
+        );
+      }
+
+      this.fallbackCache = this.fallbackCache.filter((item) => item.id !== id);
+      return {
+        id,
+        name: targetName,
+        success: true,
+      };
+    } catch (error) {
+      const parsedError = parseApiError(error, ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR);
+
+      // 1. Concurrent deletion: Item was already deleted by another admin (HTTP 404)
+      if (parsedError.statusCode === 404 || parsedError.code === 'NOT_FOUND') {
+        this.fallbackCache = this.fallbackCache.filter((item) => item.id !== id);
+        return {
+          id,
+          name: targetName,
+          success: true,
+          alreadyDeleted: true,
+          message: ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ALREADY_REMOVED(targetName),
+        };
+      }
+
+      // 2. Local dev mode fallback if backend write route returns 404 Route not found
+      if (
+        process.env.NODE_ENV === 'development' &&
+        parsedError.statusCode === 404 &&
+        parsedError.message.includes('Route not found')
+      ) {
+        this.fallbackCache = this.fallbackCache.filter((item) => item.id !== id);
+        return {
+          id,
+          name: targetName,
+          success: true,
+        };
+      }
+
+      // 3. For all other errors (constraint violation, 401, 403, timeout, 500):
+      // Retain item in cache and re-throw structured AppError so the UI/Store can take appropriate action.
+      throw parsedError;
     }
-    this.fallbackCache = this.fallbackCache.filter((item) => item.id !== id);
-    return true;
+  }
+
+  /**
+   * Deletes multiple release years in batch with granular result auditing.
+   * Reports exactly how many succeeded, how many failed, and specific failure reasons for each item.
+   *
+   * @param ids Array of entity IDs to delete
+   * @param signal Optional AbortSignal
+   */
+  async deleteMultiple(ids: string[], signal?: AbortSignal): Promise<BulkDeleteResult> {
+    const results: BulkDeleteResultItem[] = [];
+
+    // Execute deletions concurrently with allSettled to ensure failure of one item doesn't abort others
+    const deletePromises = ids.map(async (id) => {
+      const target = this.fallbackCache.find((i) => i.id === id);
+      const name = target?.name || id;
+
+      try {
+        const res = await this.delete(id, signal);
+        return {
+          id,
+          name,
+          success: true,
+          alreadyDeleted: res.alreadyDeleted,
+        };
+      } catch (err) {
+        const parsed = parseApiError(err, ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR);
+        return {
+          id,
+          name,
+          success: false,
+          errorReason: parsed.message,
+        };
+      }
+    });
+
+    const settled = await Promise.allSettled(deletePromises);
+
+    settled.forEach((outcome, index) => {
+      if (outcome.status === 'fulfilled') {
+        results.push(outcome.value);
+      } else {
+        const id = ids[index];
+        const target = this.fallbackCache.find((i) => i.id === id);
+        results.push({
+          id,
+          name: target?.name || id,
+          success: false,
+          errorReason: outcome.reason?.message || ADMIN_YEAR_CONSTANTS.MESSAGES.DELETE_ERROR,
+        });
+      }
+    });
+
+    const successCount = results.filter((r) => r.success).length;
+    const failureCount = results.length - successCount;
+
+    return {
+      total: ids.length,
+      successCount,
+      failureCount,
+      results,
+    };
   }
 
   /**

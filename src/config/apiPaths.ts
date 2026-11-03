@@ -187,6 +187,8 @@ export const AP = {
   adminYearsList: '/admin/years',
   adminYearsById: '/admin/years/{0}',
   adminYearsToggleStatus: '/admin/years/{0}/status',
+  adminActorsList: '/admin/actors',
+  adminActorsById: '/admin/actors/{0}',
   formatsSeriesMovies: '/formats/series/movies',
   formatsSingleMovies: '/formats/single/movies',
   notificationsSendMaintenance: '/admin/notifications/send-maintenance',

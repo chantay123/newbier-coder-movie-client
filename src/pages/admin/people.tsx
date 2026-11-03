@@ -29,6 +29,9 @@ import CinemaDropdown from '@/features/admin/components/Common/CinemaDropdown';
 import AdminPagination from '@/features/admin/components/Common/AdminPagination';
 import { ADMIN_PEOPLE_I18N } from '@/config/i18n/admin';
 import { INITIAL_ACTORS as MOCK_ACTORS, INITIAL_DIRECTORS as MOCK_DIRECTORS } from '@/mock/admin';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { toastNotification } from '@/utils/notification/toastNotification';
 
 type PeopleTab = 'actors' | 'directors';
 
@@ -141,14 +144,24 @@ export default function PeopleAdminPage() {
         return prev.map(p => p.id === personData.id ? { ...p, ...personData } as PersonItem : p);
       } else {
         const newPerson: PersonItem = {
-          id: `${activeTab.slice(0, 3)}-${Date.now()}`,
+          id: personData.id || `${activeTab.slice(0, 3)}-${Date.now()}`,
           name: personData.name || '',
           originalName: personData.originalName || '',
+          birthName: personData.birthName || personData.originalName || personData.name || '',
           slug: personData.slug || '',
           avatarUrl: personData.avatarUrl || '',
+          profileImage: personData.avatarUrl || '',
+          gender: personData.gender,
           nationality: personData.nationality || '',
           birthYear: personData.birthYear,
+          dateOfBirth: personData.dateOfBirth,
+          placeOfBirth: personData.placeOfBirth,
+          height: personData.height,
+          debutYear: personData.debutYear,
+          knownFor: personData.knownFor,
           bio: personData.bio || '',
+          biography: personData.bio || '',
+          socialMedia: personData.socialMedia,
           isVerified: personData.isVerified ?? false,
           isActive: personData.isActive ?? true,
           movieCount: 0,
@@ -517,6 +530,7 @@ export default function PeopleAdminPage() {
           type={activeTab}
         />
 
+        <ToastContainer position="top-right" autoClose={3500} theme="dark" />
         <BackToTop />
       </AdminLayout>
     </AdminRoute>

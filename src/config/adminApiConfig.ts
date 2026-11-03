@@ -56,6 +56,19 @@ export const ADMIN_API_CONFIG_MAP = Object.freeze({
     /** PATCH /admin/years/:id/status - Toggle active/inactive status */
     toggleStatus: (id: string) => apiPath('adminYearsToggleStatus', id),
   },
+  actors: {
+    /** GET /admin/actors - List actors with optional filters */
+    list: (params?: { page?: number; limit?: number; search?: string; gender?: string; isActive?: boolean }) =>
+      buildQueryUrl(apiPath('adminActorsList'), { ...params, _t: Date.now() }),
+    /** POST /admin/actors - Create new actor */
+    create: () => apiPath('adminActorsList'),
+    /** GET /admin/actors/:id - Get actor details */
+    detail: (id: string) => apiPath('adminActorsById', id),
+    /** PUT /admin/actors/:id - Update actor */
+    update: (id: string) => apiPath('adminActorsById', id),
+    /** DELETE /admin/actors/:id - Remove actor */
+    delete: (id: string) => apiPath('adminActorsById', id),
+  },
 } as const);
 
 export type AdminApiConfigMap = typeof ADMIN_API_CONFIG_MAP;

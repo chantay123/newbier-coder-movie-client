@@ -27,6 +27,9 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
   const isLoading = useAdminYearStore((state) => state.isLoading);
   const isSubmitting = useAdminYearStore((state) => state.isSubmitting);
   const togglingId = useAdminYearStore((state) => state.togglingId);
+  const deletingId = useAdminYearStore((state) => state.deletingId);
+  const isBulkDeleting = useAdminYearStore((state) => state.isBulkDeleting);
+  const selectedIds = useAdminYearStore((state) => state.selectedIds);
   const isCreateModalOpen = useAdminYearStore((state) => state.isCreateModalOpen);
   const isEditModalOpen = useAdminYearStore((state) => state.isEditModalOpen);
   const selectedYear = useAdminYearStore((state) => state.selectedYear);
@@ -34,7 +37,11 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
   // Store actions
   const fetchYears = useAdminYearStore((state) => state.fetchYears);
   const deleteYear = useAdminYearStore((state) => state.deleteYear);
+  const deleteMultipleYears = useAdminYearStore((state) => state.deleteMultipleYears);
   const toggleStatus = useAdminYearStore((state) => state.toggleStatus);
+  const selectItem = useAdminYearStore((state) => state.selectItem);
+  const selectAll = useAdminYearStore((state) => state.selectAll);
+  const clearSelection = useAdminYearStore((state) => state.clearSelection);
   const setSearchTerm = useAdminYearStore((state) => state.setSearchTerm);
   const setStatusFilter = useAdminYearStore((state) => state.setStatusFilter);
   const setCurrentPage = useAdminYearStore((state) => state.setCurrentPage);
@@ -83,6 +90,9 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
     isLoading,
     isSubmitting,
     togglingId,
+    deletingId,
+    isBulkDeleting,
+    selectedIds,
     isCreateModalOpen,
     isEditModalOpen,
     selectedYear,
@@ -94,7 +104,11 @@ export function useAdminYears({ service, debounceMs = 300 }: UseAdminYearsOption
     closeCreateModal,
     openEditModal,
     closeEditModal,
+    selectItem,
+    selectAll,
+    clearSelection,
     deleteYear: (id: string) => deleteYear(id, service),
+    deleteMultipleYears: (ids: string[]) => deleteMultipleYears(ids, service),
     toggleStatus: async (id: string, targetState?: boolean) => {
       try {
         return await toggleStatus(id, targetState, service);
