@@ -1,25 +1,44 @@
 /**
- * The local login API route. It forwards the credentials to the
- * backend auth service.
+ * @file pages/api/auth/login.ts
+ * @description The login API route.
  *
- * Endpoint contract (verified against production on 2026-10-27):
- * - `POST {API_BASE}/auth/login` returns a 401 "Missing Bearer token"
- *   style validation error when the body is wrong; this route exists.
- * - `POST {API_BASE}/api/auth/login` returns 404 "Route not found";
- *   that is the old path.
+ * SECURITY MODEL
+ * The route is the only place where the refresh token is received from the
+ * backend, and it never sends it to the browser:
+ *   1. the credentials are forwarded to the backend (the API contract is
+ *      unchanged: the backend still answers with the tokens in the body);
+ *   2. the refresh token is stored, together with the access token and the
+ *      user profile, in an AES-256-GCM ENCRYPTED cookie;
+ *   3. the cookie is `HttpOnly`, so the JavaScript of the page cannot read
+ *      the refresh token (or the access token);
+ *   4. only the access token and the token-free user profile are returned
+ *      in the body, so the client can keep them in memory.
  *
- * Because of that, this route forwards to `${API_BASE}/auth/login`, where
- * `API_BASE` comes from `getApiBaseUrl()` (it already includes `/api/v1`).
- * The old code built `${NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/login`,
- * which added `/api` a second time to a base that already had `/api/v1`
- * and produced the URL `.../api/v1/api/auth/login` → 404.
+ * The `SameSite` and `Secure` attributes of the cookie are set according to
+ * the environment (see `sessionCookieOptions`).
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getApiBaseUrl } from '@/config/apiBase';
-import { apiUrl } from '@/config/apiPaths';
+
+import {
+  backendLogin,
+  ensureCsrfToken,
+  sessionCookieOptions,
+  verifyCsrfToken,
+  writeCsrfCookie,
+  writeSession,
+  readTokenExpiry,
+  stripTokensFromUser,
+} from '@/utils/serverAuthSession';
 
 interface ErrorResponse {
   message: string;
+}
+
+interface LoginBody {
+  email?: string;
+  username?: string;
+  password?: string;
+  rememberMe?: boolean;
 }
 
 export default async function handler(
@@ -27,46 +46,73 @@ export default async function handler(
   res: NextApiResponse<ErrorResponse | Record<string, unknown>>
 ): Promise<void> {
   if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    const { email, username, password } = req.body as {
-      email?: string;
-      username?: string;
-      password?: string;
-    };
+    // The CSRF nonce is checked before the credentials are forwarded, so a
+    // cross-site request cannot start a session.
+    if (!verifyCsrfToken(req)) {
+      return res.status(403).json({ message: 'Invalid CSRF token' });
+    }
 
-    // Backend v1 requires `username` (see the real validation error:
+    const { email, username, password, rememberMe } = req.body as LoginBody;
+
+    // Backend v1 requires `username` (the real validation error is
     // "body must have required property 'username'"). The UI form can send
-    // `email` or `username`, so normalize it to `username` before forwarding.
+    // `email` or `username`, so the value is normalized before forwarding.
     const identifier = (username || email || '').trim();
 
     if (!identifier || !password) {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    const response = await fetch(apiUrl(`authLogin`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: identifier, password })
+    const result = await backendLogin(identifier, password);
+
+    if (!result.ok || !result.tokens) {
+      const status = result.status >= 400 && result.status < 600 ? result.status : 401;
+      return res.status(status).json({ message: result.message });
+    }
+
+    const { accessToken, refreshToken, user } = result.tokens;
+    const persist = rememberMe === true;
+
+    // The session is written to the encrypted cookie. The refresh token
+    // stays on this side of the wire, forever.
+    writeSession(res, {
+      accessToken,
+      refreshToken,
+      user: stripTokensFromUser(user),
+      accessTokenExpiresAt: readTokenExpiry(accessToken),
+      rememberMe: persist,
     });
 
-    const data = (await response.json()) as Record<string, unknown>;
-
-    if (!response.ok) {
-      const message = (data.error || data.message || 'Login failed') as string;
-      throw new Error(message);
-    }
-
-    return res.status(200).json(data);
-  } catch (error) {
-    const axiosLike = error as { response?: { status: number; data: { error?: string; message?: string } } };
-    if (axiosLike.response) {
-      return res.status(axiosLike.response.status).json({
-        message: axiosLike.response.data.error || axiosLike.response.data.message || 'Authentication failed'
-      });
-    }
-    return res.status(500).json({ message: (error as Error).message || 'Server error. Please try again later.' });
+    // Only the access token and the token-free profile leave the server.
+    // The refresh token is NOT part of the answer.
+    return res.status(200).json({
+      success: true,
+      token: accessToken,
+      user: stripTokensFromUser(user) ?? null,
+      rememberMe: persist,
+    });
+  } catch {
+    // The message never contains a token.
+    return res.status(500).json({ message: 'Server error. Please try again later.' });
   }
 }
+
+/**
+ * The cookie is written by the route itself, so the body parser of Next.js
+ * is enough.
+ */
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '16kb',
+    },
+  },
+};
+
+// The helper is re-exported for the tests and for the other auth routes.
+export { sessionCookieOptions };
