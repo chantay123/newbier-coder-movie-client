@@ -136,6 +136,13 @@ const TOP_COMMENTS_TTL_MS = 2 * 60 * 1000;
 const LIVE_BUZZ_TTL_MS = 30 * 1000;
 
 /**
+ * The maximum number of movies kept in the comment cache. The cache is
+ * written on every comment fetch, so without a limit it would keep one
+ * entry per movie the user ever opened.
+ */
+const MAX_MOVIE_COMMENT_ENTRIES = 30;
+
+/**
  * Tells whether a cache entry is too old to be used.
  *
  * @param timestamp - The moment the entry was written.
@@ -181,12 +188,26 @@ export const useCommentStore = create<CommentStoreState & CommentStoreActions>()
       },
 
       setCachedMovieComments: (slug: string, comments: CommentItem[]): void => {
-        set((state) => ({
-          movieComments: {
+        set((state) => {
+          const movieComments = {
             ...state.movieComments,
             [slug]: { data: comments, timestamp: Date.now() }
+          };
+
+          // The cache must not grow forever: the oldest entries are dropped
+          // as soon as there are too many of them.
+          const keys = Object.keys(movieComments);
+          if (keys.length > MAX_MOVIE_COMMENT_ENTRIES) {
+            keys
+              .sort((a, b) => movieComments[a].timestamp - movieComments[b].timestamp)
+              .slice(0, keys.length - MAX_MOVIE_COMMENT_ENTRIES)
+              .forEach((key) => {
+                delete movieComments[key];
+              });
           }
-        }));
+
+          return { movieComments };
+        });
       },
 
       clearMovieComments: (slug: string): void => {
@@ -311,18 +332,43 @@ export const useCommentStore = create<CommentStoreState & CommentStoreActions>()
 
       // Only the comment data is persisted. The loading states are not,
       // because a page that is reloaded must show the loading state again.
+      // The live buzz is NOT persisted: it is a continuous feed with a 30
+      // second TTL, so keeping it in `localStorage` only produced writes
+      // that were outdated a few seconds later.
       partialize: (state) => ({
         movieComments: state.movieComments,
         topCommentsWeek: state.topCommentsWeek,
         topCommentsMonth: state.topCommentsMonth,
-        topCommentsAll: state.topCommentsAll,
-        liveBuzz: state.liveBuzz
+        topCommentsAll: state.topCommentsAll
       }),
 
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.clearExpiredCache();
         }
+      },
+
+      // The persisted format changed: the live buzz is not stored anymore.
+      // The old value is dropped when the store is read. The `merge` hook is
+      // used (and not only `migrate`) because the data written by the
+      // previous version has no version number, so `migrate` would never run
+      // for it.
+      version: 2,
+      migrate: (persistedState: unknown): unknown => {
+        if (!persistedState || typeof persistedState !== 'object') return persistedState;
+        const state = { ...(persistedState as Record<string, unknown>) };
+        delete state.liveBuzz;
+        return state;
+      },
+      merge: (persistedState: unknown, currentState: CommentStoreState & CommentStoreActions) => {
+        const base = currentState as unknown as Record<string, unknown>;
+        if (!persistedState || typeof persistedState !== 'object') {
+          return currentState;
+        }
+        const persisted = { ...(persistedState as Record<string, unknown>) };
+        // The live buzz is an in-memory cache only.
+        delete persisted.liveBuzz;
+        return { ...base, ...persisted } as unknown as CommentStoreState & CommentStoreActions;
       }
     }
   )
