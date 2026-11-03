@@ -31,6 +31,36 @@ import { getServerApiBaseUrl } from '@/config/apiBase';
 const PREFIX = '/api/backend';
 
 /**
+ * The cookies that belong to the LOCAL session of this application.
+ *
+ * They must never be forwarded to the backend: `mv_session` holds the
+ * encrypted refresh token.
+ */
+const LOCAL_SESSION_COOKIES = ['mv_session', 'mv_csrf'];
+
+/**
+ * Removes the local session cookies from a `Cookie` header.
+ *
+ * Every other cookie is kept, so a backend that relies on its own cookies
+ * keeps working.
+ *
+ * @param raw - The value of the `Cookie` header.
+ * @returns The header without the local session cookies, or an empty string.
+ */
+const stripSessionCookies = (raw: string | undefined): string => {
+  if (!raw) return '';
+  return raw
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      const name = part.split('=')[0]?.trim() ?? '';
+      return !LOCAL_SESSION_COOKIES.includes(name);
+    })
+    .join('; ');
+};
+
+/**
  * Reads the optional server-only route map.
  *
  * `API_ROUTE_MAP` is a JSON object: `{ "/old/path": "/new/path", ... }`.
@@ -131,7 +161,17 @@ const proxy = async (req: NextApiRequest, res: NextApiResponse): Promise<void> =
 
   const headers: Record<string, string> = {};
   if (req.headers.authorization) headers.Authorization = req.headers.authorization;
-  if (req.headers.cookie) headers.cookie = req.headers.cookie;
+  // The cookies of the SESSION are NOT forwarded to the backend.
+  //
+  // The `mv_session` cookie holds the encrypted access token AND the
+  // refresh token. It belongs to this Next.js application only: the
+  // backend authenticates the calls with the `Authorization: Bearer` header
+  // and has its own (not implemented) cookie support. Forwarding it would
+  // hand the refresh token to the backend on EVERY call, which widens the
+  // exposure for no benefit. The `mv_csrf` cookie is dropped for the same
+  // reason.
+  const forwardedCookie = stripSessionCookies(req.headers.cookie);
+  if (forwardedCookie) headers.cookie = forwardedCookie;
   if (req.headers['user-agent']) headers['user-agent'] = req.headers['user-agent'];
   if (!isMultipart && body) headers['content-type'] = contentType;
   if (isMultipart) headers['content-type'] = contentType;
