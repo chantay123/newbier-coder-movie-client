@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import styles from './CastCrewSection.module.css';
 
 /**
  * @file CastCrewSection.tsx
- * @description Compact, high-density Cast & Crew showcase.
+ * @description Cinema Cast & Crew showcase rail with circular avatars,
+ * glowing accent rings, role filtering, and smooth horizontal navigation.
  */
 
 export interface CastCrewPerson {
@@ -13,6 +14,8 @@ export interface CastCrewPerson {
   avatar_url?: string;
   image?: string;
   slug?: string;
+  id?: string;
+  _id?: string;
 }
 
 export interface CastCrewSectionProps {
@@ -20,57 +23,160 @@ export interface CastCrewSectionProps {
   directors?: CastCrewPerson[];
 }
 
-const CastCrewSection: React.FC<CastCrewSectionProps> = ({
+/** Generates a consistent pleasant cinema gradient for missing avatars */
+const getAvatarGradient = (name: string): string => {
+  const gradients = [
+    'linear-gradient(135deg, #e50914 0%, #8a2387 100%)',
+    'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+    'linear-gradient(135deg, #f12711 0%, #f5af19 100%)',
+    'linear-gradient(135deg, #0ba360 0%, #3cba92 100%)',
+    'linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%)',
+    'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+};
+
+export const CastCrewSection: React.FC<CastCrewSectionProps> = ({
   actors = [],
   directors = []
 }) => {
-  const combined: Array<CastCrewPerson & { role: string }> = [
-    ...directors
-      .filter((d) => d.name && !d.name.includes('Đang cập nhật'))
-      .map((d) => ({ ...d, role: d.role || 'Đạo diễn' })),
-    ...actors
-      .filter((a) => a.name && !a.name.includes('Đang cập nhật'))
-      .map((a) => ({ ...a, role: a.role || 'Diễn viên' }))
-  ];
+  const [filterType, setFilterType] = useState<'all' | 'actor' | 'director'>('all');
+  const railRef = useRef<HTMLDivElement>(null);
+
+  const cleanDirectors = useMemo(
+    () =>
+      directors
+        .filter((d) => d.name && !d.name.includes('Đang cập nhật'))
+        .map((d) => ({ ...d, role: d.role || 'Đạo diễn', kind: 'director' as const })),
+    [directors]
+  );
+
+  const cleanActors = useMemo(
+    () =>
+      actors
+        .filter((a) => a.name && !a.name.includes('Đang cập nhật'))
+        .map((a) => ({ ...a, role: a.role || 'Diễn viên', kind: 'actor' as const })),
+    [actors]
+  );
+
+  const combined = useMemo(
+    () => [...cleanDirectors, ...cleanActors],
+    [cleanDirectors, cleanActors]
+  );
+
+  const displayedList = useMemo(() => {
+    if (filterType === 'director') return cleanDirectors;
+    if (filterType === 'actor') return cleanActors;
+    return combined;
+  }, [filterType, cleanDirectors, cleanActors, combined]);
+
+  const handleScroll = (direction: 'left' | 'right'): void => {
+    if (railRef.current) {
+      const scrollAmount = direction === 'left' ? -340 : 340;
+      railRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   if (combined.length === 0) {
     return (
-      <section className={styles.castCrewContainer} aria-label="Diễn viên & đoàn làm phim">
+      <section className={styles.castCrewContainer} aria-label="Diễn viên và đoàn làm phim">
         <div className={styles.headerRow}>
           <div className={styles.titleGroup}>
-            <i className="fas fa-users text-danger me-2" />
             <h3 className={styles.sectionTitle}>Diễn Viên & Đoàn Làm Phim</h3>
           </div>
-          <span className={styles.countBadge}>Dàn diễn viên</span>
         </div>
         <div className={styles.emptyNotice}>
-          <i className="fas fa-clapperboard text-secondary me-2" />
-          <span>Danh sách nghệ sĩ và diễn viên lồng tiếng đang được đồng bộ hóa từ hệ thống dữ liệu.</span>
+          <span>Danh sách nghệ sĩ và đoàn làm phim đang được cập nhật từ cơ sở dữ liệu.</span>
         </div>
       </section>
     );
   }
 
   return (
-    <section className={styles.castCrewContainer} aria-label="Diễn viên & đoàn làm phim">
+    <section className={styles.castCrewContainer} aria-label="Diễn viên và đoàn làm phim">
       <div className={styles.headerRow}>
         <div className={styles.titleGroup}>
-          <i className="fas fa-users text-danger me-2" />
           <h3 className={styles.sectionTitle}>Diễn Viên & Đoàn Làm Phim</h3>
+          <span className={styles.countBadge}>{combined.length}</span>
         </div>
-        <span className={styles.countBadge}>{combined.length} nghệ sĩ</span>
+
+        <div className={styles.headerActions}>
+          {/* Filter Tabs */}
+          <div className={styles.filterTabs}>
+            <button
+              type="button"
+              className={`${styles.filterBtn} ${filterType === 'all' ? styles.filterBtnActive : ''}`}
+              onClick={() => setFilterType('all')}
+            >
+              Tất cả ({combined.length})
+            </button>
+            {cleanActors.length > 0 && (
+              <button
+                type="button"
+                className={`${styles.filterBtn} ${filterType === 'actor' ? styles.filterBtnActive : ''}`}
+                onClick={() => setFilterType('actor')}
+              >
+                Diễn viên ({cleanActors.length})
+              </button>
+            )}
+            {cleanDirectors.length > 0 && (
+              <button
+                type="button"
+                className={`${styles.filterBtn} ${filterType === 'director' ? styles.filterBtnActive : ''}`}
+                onClick={() => setFilterType('director')}
+              >
+                Đạo diễn ({cleanDirectors.length})
+              </button>
+            )}
+          </div>
+
+          {/* Scroll Nav Controls */}
+          <div className={styles.navControls}>
+            <button
+              type="button"
+              className={styles.scrollBtn}
+              onClick={() => handleScroll('left')}
+              title="Cuộn sang trái"
+              aria-label="Cuộn sang trái"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className={styles.scrollBtn}
+              onClick={() => handleScroll('right')}
+              title="Cuộn sang phải"
+              aria-label="Cuộn sang phải"
+            >
+              ›
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className={styles.castRail}>
-        {combined.map((person, idx) => {
+      {/* Horizontal Cast & Crew Rail with Circular Avatars */}
+      <div ref={railRef} className={styles.castRail}>
+        {displayedList.map((person, idx) => {
           const name = person.name || 'Nghệ Sĩ';
-          const role = person.role || 'Diễn viên';
+          const role = person.role || (person.kind === 'director' ? 'Đạo diễn' : 'Diễn viên');
           const avatar = person.avatar_url || person.image || '';
           const initial = name.charAt(0).toUpperCase();
-          const slug = person.slug || '';
+          const targetId = person.id || person._id || person.slug;
+          const href = targetId ? `/performer/${targetId}` : `/search?keyword=${encodeURIComponent(name)}`;
+          const gradientStyle = getAvatarGradient(name);
 
-          const cardContent = (
-            <div className={styles.actorCard} title={`${name} (${role})`}>
+          return (
+            <Link
+              key={`${person.kind}-${name}-${idx}`}
+              href={href}
+              className={styles.actorCard}
+              title={`${name} (${role})`}
+            >
               <div className={styles.avatarWrapper}>
                 {avatar ? (
                   <img
@@ -87,32 +193,20 @@ const CastCrewSection: React.FC<CastCrewSectionProps> = ({
                 ) : null}
                 <div
                   className={styles.avatarPlaceholder}
-                  style={{ display: avatar ? 'none' : 'flex' }}
+                  style={{
+                    display: avatar ? 'none' : 'flex',
+                    background: gradientStyle
+                  }}
                 >
                   <span>{initial}</span>
                 </div>
               </div>
-              <span className={styles.actorName}>{name}</span>
-              <span className={styles.actorRole}>{role}</span>
-            </div>
-          );
 
-          if (slug) {
-            return (
-              <Link
-                key={slug || String(idx)}
-                href={`/performer/${encodeURIComponent(slug)}`}
-                className={styles.castLink}
-              >
-                {cardContent}
-              </Link>
-            );
-          }
-
-          return (
-            <div key={String(idx)} className={styles.castLink}>
-              {cardContent}
-            </div>
+              <div className={styles.actorInfo}>
+                <span className={styles.actorName}>{name}</span>
+                <span className={styles.actorRole}>{role}</span>
+              </div>
+            </Link>
           );
         })}
       </div>
