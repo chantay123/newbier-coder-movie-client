@@ -180,9 +180,27 @@ export const AP = {
   crawlMovies: '/crawl/movies',
   crawlMoviesAll: '/crawl/moviesall',
   taxonomyGenres: '/genres',
+  taxonomyCategories: '/categories',
   taxonomyCountries: '/countries',
   taxonomyFormats: '/formats',
   taxonomyYears: '/years',
+  // ── Admin taxonomy (write) routes ───────────────────────────────────────
+  // These routes exist on the backend and require the ADMIN role.
+  //   POST   /admin/categories      → create
+  //   PUT    /admin/categories/:id  → update
+  //   PATCH  /admin/categories/:id/status → toggle active
+  //   DELETE /admin/categories/:id  → delete
+  // The same shape exists for `/admin/countries` and `/admin/formats`.
+  // NOTE: the backend has NO `/genres` route — the genre taxonomy of the
+  // website IS the category taxonomy, so the client uses `/categories`.
+  adminCategoriesList: '/admin/categories',
+  adminCategoriesById: '/admin/categories/{0}',
+  adminCategoriesStatus: '/admin/categories/{0}/status',
+  adminCountriesList: '/admin/countries',
+  adminCountriesById: '/admin/countries/{0}',
+  adminCountriesStatus: '/admin/countries/{0}/status',
+  adminFormatsList: '/admin/formats',
+  adminFormatsById: '/admin/formats/{0}',
   moviesYears: '/movies/years',
   adminYearsList: '/admin/years',
   adminYearsById: '/admin/years/{0}',

@@ -1,7 +1,10 @@
 /**
  * @file TaxonomyTableView.tsx
- * @description Enterprise-grade, reusable UI component for managing taxonomy entities
- * (Genres, Countries, Formats, Years). Follows WCAG accessibility standards and Cinema Dark design.
+ * @description Reusable UI component for the admin taxonomy pages.
+ *
+ * The component only renders: every request and every mutation is handled
+ * by the `useTaxonomyManager` hook, so the categories, the countries, the
+ * formats and the years behave the same way.
  */
 import React, { useState } from 'react';
 import Head from 'next/head';
@@ -28,20 +31,38 @@ import CountryFlag from '@/components/Admin/Countries/CountryFlag';
 import TaxonomyTableSkeleton from '@/features/admin/components/Loading/TaxonomyTableSkeleton';
 
 import { TaxonomyType } from '@/features/admin/types/taxonomy';
+import { taxonomySupportsStatus } from '@/features/admin/services/taxonomyAdminService';
 import { useTaxonomyManager } from '@/features/admin/hooks/useTaxonomyManager';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
 
+/**
+ * The props of the `TaxonomyTableView` component.
+ */
 export interface TaxonomyTableViewProps {
+  /** The taxonomy shown by the table, such as "categories" or "countries". */
   type: TaxonomyType;
+  /** The title of the page. */
   title: string;
+  /** The subtitle shown under the title. */
   subtitle: string;
+  /** The Vietnamese label of the taxonomy, used in the alert messages. */
   typeNameVi: string;
+  /** The icon of the header. */
   icon: React.ElementType;
+  /** The title of the browser tab. */
   metaTitle: string;
+  /** The description of the page for the search engines. */
   metaDescription: string;
+  /** Whether the button that recalculates the movie counters is shown. */
   showRecalculate?: boolean;
 }
 
+/**
+ * Renders the table of an admin taxonomy.
+ *
+ * @param props - The props of the component.
+ * @returns The admin taxonomy page.
+ */
 export default function TaxonomyTableView({
   type,
   title,
@@ -54,6 +75,12 @@ export default function TaxonomyTableView({
 }: TaxonomyTableViewProps) {
   const modalType: 'categories' | 'countries' | 'formats' | 'years' =
     type === 'genres' ? 'categories' : (type as 'countries' | 'formats' | 'years');
+
+  /**
+   * The backend has no `isActive` on a format, so the status column and
+   * the status toggle are hidden for that taxonomy.
+   */
+  const supportsStatus = taxonomySupportsStatus(type);
 
   const {
     loading,
@@ -98,6 +125,9 @@ export default function TaxonomyTableView({
     yearsCount: type === 'years' ? totalItems : 9
   }), [type, totalItems]);
 
+  /**
+   * Recalculates the movie counters of the taxonomy and refreshes the list.
+   */
   const handleRecalculateComplete = () => {
     refresh();
     showCinemaAlert(`Đã tái tính toán & đồng bộ toàn bộ ${typeNameVi} thành công!`, 'cinema');
@@ -236,7 +266,9 @@ export default function TaxonomyTableView({
                       </th>
                     )}
                     <th style={{ width: '16%' }}>SỐ PHIM LIÊN KẾT</th>
-                    <th style={{ width: '14%' }}>TRẠNG THÁI</th>
+                    {supportsStatus && (
+                      <th style={{ width: '14%' }}>TRẠNG THÁI</th>
+                    )}
                     <th style={{ width: '8%', textAlign: 'right' }}>THAO TÁC</th>
                   </tr>
                 </thead>
@@ -245,7 +277,7 @@ export default function TaxonomyTableView({
                     <TaxonomyTableSkeleton type={type} rowCount={pageSize} />
                   ) : filteredList.length === 0 ? (
                     <tr>
-                      <td colSpan={type === 'years' ? 4 : 5}>
+                      <td colSpan={(type === 'years' ? 0 : 1) + (supportsStatus ? 1 : 0) + 3}>
                         <div className={styles.emptyState}>
                           <div className={styles.emptyIcon} aria-hidden="true">
                             <IconComponent />
@@ -310,26 +342,28 @@ export default function TaxonomyTableView({
                         </td>
 
                         {/* Status Toggle */}
-                        <td>
-                          <div className={styles.statusCell}>
-                            <label className={styles.toggleSwitch}>
-                              <input
-                                type="checkbox"
-                                checked={item.isActive}
-                                onChange={() => handleToggleStatus(item)}
-                                aria-label={`Thay đổi trạng thái ${item.name}`}
-                              />
-                              <span className={styles.toggleSlider}></span>
-                            </label>
-                            <span
-                              className={`${styles.statusText} ${
-                                item.isActive ? styles.statusActive : styles.statusInactive
-                              }`}
-                            >
-                              {item.isActive ? 'Kích hoạt' : 'Tạm ẩn'}
-                            </span>
-                          </div>
-                        </td>
+                        {supportsStatus && (
+                          <td>
+                            <div className={styles.statusCell}>
+                              <label className={styles.toggleSwitch}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.isActive}
+                                  onChange={() => handleToggleStatus(item)}
+                                  aria-label={`Thay đổi trạng thái ${item.name}`}
+                                />
+                                <span className={styles.toggleSlider}></span>
+                              </label>
+                              <span
+                                className={`${styles.statusText} ${
+                                  item.isActive ? styles.statusActive : styles.statusInactive
+                                }`}
+                              >
+                                {item.isActive ? 'Kích hoạt' : 'Tạm ẩn'}
+                              </span>
+                            </div>
+                          </td>
+                        )}
 
                         {/* Actions */}
                         <td>

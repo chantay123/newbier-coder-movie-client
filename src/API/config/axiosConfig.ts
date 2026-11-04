@@ -99,6 +99,14 @@ const AUTH_REQUIRED_PATHS = new Set<string>([
   AP.adminUsersUnban,
   AP.adminUsersToggleStatus,
   AP.adminUsersAvatar,
+  AP.adminCategoriesList,
+  AP.adminCategoriesById,
+  AP.adminCategoriesStatus,
+  AP.adminCountriesList,
+  AP.adminCountriesById,
+  AP.adminCountriesStatus,
+  AP.adminFormatsList,
+  AP.adminFormatsById,
 ]);
 
 /**
