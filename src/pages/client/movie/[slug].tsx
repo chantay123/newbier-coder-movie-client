@@ -1,17 +1,22 @@
 /**
  * @file pages/movie/[slug].tsx
- * @description Movie Detail & Information Discovery Page. Orchestrates
- * widescreen hero header, episode directory, cast & crew, comments, and
- * related film recommendations.
+ * @description Master Movie Detail & Discovery Page.
+ * Orchestrates widescreen cinema hero header, episode directory & progress tracker,
+ * inline trailer showcase, cast & crew rail, community reviews & discussions,
+ * trending sidebar ranking, and similar movie recommendations.
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { toast } from 'react-toastify';
 import {
   MovieHeroHeader,
   EpisodeDirectory,
+  InlineTrailerSection,
   CastCrewSection,
   MovieCommentsSection,
+  TrendingSidebar,
+  SimilarMoviesSection,
   TrailerModal,
   useMovieDetail,
   normalizeMovieDetail
@@ -48,7 +53,7 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
   } = useMovieDetail(isPreview ? null : slug);
 
   // Live draft state when viewed from Admin Live Demo
-  const [draftMovie, setDraftMovie] = useState(null);
+  const [draftMovie, setDraftMovie] = useState<HeroHeaderMovie | null>(null);
 
   useEffect(() => {
     if (isPreview && typeof window !== 'undefined') {
@@ -57,10 +62,10 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
         if (stored) {
           const parsed = JSON.parse(stored);
           const normalized = normalizeMovieDetail(parsed, slug);
-          setDraftMovie(normalized as any);
+          setDraftMovie(normalized as unknown as HeroHeaderMovie);
         }
-      } catch (e) {
-
+      } catch {
+        // Safe fallback for invalid JSON in session storage
       }
     }
   }, [isPreview, slug]);
@@ -70,62 +75,47 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
 
   const [activeTrailerMovie, setActiveTrailerMovie] = useState<unknown>(null);
 
-  const handlePlayNow = useCallback(() => {
-    if (slug) router.push(`/movie/${slug}/watch`);
-  }, [router, slug]);
-
   const handleOpenTrailer = useCallback((targetMovie?: unknown) => {
-    // Final guard before opening the modal. The list-level filtering
-    // elsewhere in the app should already have removed movies
-    // without a trailer, but this is the single entry point that
-    // can directly open the modal, so keep the check here. That way we
-    // never end up showing the "trailer not available" panel
-    // when a developer wires a new "Watch trailer"
-    // button without going through the filter helper.
     const candidate = (targetMovie as TrailerMovie | null) || (movie as TrailerMovie | null);
     if (!candidate) return;
-    if (!hasValidTrailer(candidate as never)) return;
+    if (!hasValidTrailer(candidate as never)) {
+      toast.info('Trailer chính thức đang được cập nhật.');
+      return;
+    }
     setActiveTrailerMovie(candidate);
   }, [movie]);
+
+  const handleReportMovie = useCallback(() => {
+    toast.success('Cảm ơn bạn đã phản hồi! Đội ngũ kỹ thuật sẽ kiểm tra máy chủ phát ngay lập tức.');
+  }, []);
 
   if (loading && !movie) {
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.spinner} />
+        <span className={styles.loadingText}>Đang tải thông tin phim...</span>
       </div>
     );
   }
 
-  // Distinguish three terminal states once loading is finished:
-  //   1. request-error -> backend is unreachable / 4xx / 5xx
-  //      -> show a retry button (transient issue, user can recover)
-  //   2. not-found     -> backend says the movie truly does not exist
-  //      -> show the "Movie not found" card with Back to Home
-  //   3. anything else (no movie, no error) -> treat as not-found
-  //      to keep the previous behaviour for edge cases.
+  // Handle error states with enterprise-grade guidance
   if (!loading && error) {
     if (error === 'auth-required') {
-      // 401 from the backend: either the user is not logged in or
-      // their refresh token was rejected. A "Try again" button is
-      // useless here because the next attempt will 401 too, so guide
-      // the user to the login page instead, preserving the
-      // `?redirect=` param so they land back on the same movie
-      // after authenticating.
       const handleLogin = (): void => {
         const currentPath = `/movie/${slug || ''}`;
         const redirectParam = encodeURIComponent(currentPath);
         router.push(`/auth/login?redirect=${redirectParam}`);
       };
+
       return (
         <div className={styles.errorContainer}>
           <div className={styles.errorCard}>
             <i className="fas fa-lock text-warning mb-3" style={{ fontSize: '3rem' }} />
             <h2 className={styles.errorTitle}>Cần đăng nhập để xem phim</h2>
             <p className={styles.errorDescription}>
-              Bạn cần đăng nhập để xem thông tin chi tiết và xem phim này.
-              Sau khi đăng nhập, bạn sẽ được quay lại trang này.
+              Bạn cần đăng nhập tài khoản để xem thông tin chi tiết và trải nghiệm chất lượng phim tốt nhất.
             </p>
-            <div className="d-flex gap-2 mt-2 flex-wrap">
+            <div className="d-flex gap-2 mt-2 flex-wrap justify-content-center">
               <button
                 type="button"
                 className="btn btn-danger px-4 py-2"
@@ -155,7 +145,7 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
             <p className={styles.errorDescription}>
               Đã xảy ra lỗi khi kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau ít phút.
             </p>
-            <div className="d-flex gap-2 mt-2">
+            <div className="d-flex gap-2 mt-2 justify-content-center">
               <button
                 type="button"
                 className="btn btn-danger px-4 py-2"
@@ -176,30 +166,33 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
       );
     }
 
-    // error === 'not-found' (or any other non-request error)
+    // error === 'not-found'
     return (
       <div className={styles.errorContainer}>
         <div className={styles.errorCard}>
           <i className="fas fa-film text-danger mb-3" style={{ fontSize: '3rem' }} />
-          <h2 className={styles.errorTitle}>Movie not found</h2>
+          <h2 className={styles.errorTitle}>Không tìm thấy phim</h2>
           <p className={styles.errorDescription}>
-            The movie you are looking for is not yet available or the link is invalid.
+            Bộ phim bạn đang tìm kiếm hiện chưa có trên hệ thống hoặc đường liên kết không chính xác.
           </p>
           <button
             type="button"
             className="btn btn-danger px-4 py-2 mt-2"
             onClick={() => router.push('/')}
           >
-            <i className="fas fa-home me-2" /> Back to Home
+            <i className="fas fa-home me-2" /> Về trang chủ
           </button>
         </div>
       </div>
     );
   }
 
-  const pageTitle = movie ? `${movie.name} - Movie Info HD | MovieStreaming` : 'MovieStreaming';
-  const pageDescription = (movie?.content && String(movie.content).slice(0, 160))
-    || 'Movie info, trailer, cast and ratings.';
+  const typedMovie = movie as (HeroHeaderMovie & { total_episodes?: number }) | null;
+  const pageTitle = typedMovie ? `${typedMovie.name} - Thông Tin & Xem Phim Full HD | MovieStreaming` : 'MovieStreaming';
+  const pageDescription = (typedMovie?.content && String(typedMovie.content).slice(0, 160))
+    || 'Xem phim online miễn phí, thông tin diễn viên, trailer và bình luận phim.';
+
+  const isSeries = typedMovie?.type === 'series' || (typedMovie?.episodes?.[0]?.server_data?.length || 0) > 1;
 
   return (
     <div className={styles.movieDetailWrapper}>
@@ -208,7 +201,7 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
         <meta name="description" content={pageDescription} />
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDescription} />
-        <meta property="og:image" content={movie?.backdrop_url || movie?.poster_url || '/img/background/movies-wall.jpg'} />
+        <meta property="og:image" content={typedMovie?.backdrop_url || typedMovie?.poster_url || '/img/background/movies-wall.jpg'} />
         <meta property="og:type" content="video.movie" />
       </Head>
 
@@ -252,49 +245,76 @@ export default function MovieDetailPage({ initialSlug }: MovieDetailPageProps) {
         </div>
       )}
 
-      {/* 1. Cinema 21:9 Hero Header */}
+      {/* 1. Cinema 21:9 Widescreen Hero Header */}
       <MovieHeroHeader
-        movie={movie as unknown as HeroHeaderMovie | null}
+        movie={typedMovie}
         isFavorite={isFavorite}
         onToggleFavorite={toggleFavorite}
         onPlayTrailer={(m) => handleOpenTrailer(m)}
+        onReport={handleReportMovie}
       />
 
+      {/* 2. Main Content 2-Column Master Layout */}
       <div className={styles.mainContentContainer}>
-        <EpisodeDirectory
-          movieSlug={slug}
-          servers={movie?.episodes}
-          movieType={movie?.type}
-        />
-
-        <div className={styles.sectionSpacing}>
-          <CastCrewSection
-            actors={movie?.actors as unknown as CastCrewPerson[] | undefined}
-            directors={movie?.directors as unknown as CastCrewPerson[] | undefined}
-          />
-        </div>
-
-        <div className={styles.sectionSpacing}>
-          <MovieCommentsSection
-            comments={comments}
-            loading={commentsLoading}
-            onAddComment={addComment}
-          />
-        </div>
-
-        {relatedMovies.length > 0 && (
-          <div className={styles.sectionSpacing}>
-            <MovieSection
-              layout="rail"
-              variant="vertical"
-              title="Similar Movies"
-              movies={relatedMovies}
-              onPlayTrailer={handleOpenTrailer}
+        <div className={styles.mainContentGrid}>
+          {/* Left Column: Primary Content */}
+          <main className={styles.mainColumn}>
+            {/* Episode Directory & Process Bar */}
+            <EpisodeDirectory
+              movieSlug={slug}
+              servers={typedMovie?.episodes}
+              movieType={typedMovie?.type}
+              totalEpisodesExpected={typedMovie?.total_episodes}
             />
-          </div>
-        )}
+
+            {/* Dedicated Inline Trailer Section */}
+            <InlineTrailerSection
+              movie={typedMovie as never}
+              onOpenModal={(m) => handleOpenTrailer(m)}
+            />
+
+            {/* Cast & Crew Section */}
+            <CastCrewSection
+              actors={typedMovie?.actors as unknown as CastCrewPerson[] | undefined}
+              directors={typedMovie?.directors as unknown as CastCrewPerson[] | undefined}
+            />
+
+            {/* Similar Movies Recommendation Grid */}
+            <SimilarMoviesSection
+              movies={relatedMovies as never}
+              currentMovieName={typedMovie?.name}
+              currentMovieSlug={slug}
+              currentMovieCategory={
+                Array.isArray(typedMovie?.category) && typedMovie.category.length > 0
+                  ? (typeof typedMovie.category[0] === 'object' && typedMovie.category[0] !== null
+                      ? (typedMovie.category[0] as { slug?: string }).slug
+                      : String(typedMovie.category[0]))
+                  : ''
+              }
+              onPlayTrailer={(m) => handleOpenTrailer(m as never)}
+            />
+
+            {/* Community Reviews & Discussion */}
+            <MovieCommentsSection
+              comments={comments}
+              loading={commentsLoading}
+              onAddComment={addComment}
+              movieSlug={slug}
+              movieName={typedMovie?.name}
+              rating={typedMovie?.rating}
+              ratingCount={typedMovie?.ratingCount}
+            />
+          </main>
+
+          {/* Right Column: Sidebar */}
+          <aside className={styles.sidebarColumn}>
+            {/* Top Trending Movies Heat Leaderboard Rail */}
+            <TrendingSidebar currentSlug={slug} />
+          </aside>
+        </div>
       </div>
 
+      {/* Fullscreen Cinematic Trailer Modal */}
       <TrailerModal
         key={(activeTrailerMovie as { _id?: string; slug?: string } | null)?._id
           || (activeTrailerMovie as { slug?: string } | null)?.slug

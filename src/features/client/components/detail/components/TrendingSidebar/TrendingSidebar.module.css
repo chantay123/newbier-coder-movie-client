@@ -1,15 +1,17 @@
 /**
  * @file TrendingSidebar.module.css
- * @description Minimalist Cinema Recommended Movies Sidebar Widget ("Phim Đề Xuất").
+ * @description Revolutionary "Cinema Heat Index" leaderboard UI styling.
+ * Minimalist, high-impact aesthetic free from redundant clutter icons.
+ * Features top-aligned thumbnail positioning to prevent center crop and pixelation.
  */
 
-.sidebarCard {
-  background: rgba(18, 22, 30, 0.82);
+.leaderboardContainer {
+  background: rgba(18, 22, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   padding: 18px 16px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -19,91 +21,343 @@
 /* Header */
 .headerBlock {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.sidebarTitle {
-  font-size: 1.05rem;
+.headerTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.titleWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.liveIndicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #ff2442;
+  box-shadow: 0 0 10px #ff2442;
+  animation: liveBlink 1.6s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+@keyframes liveBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+.leaderboardTitle {
+  font-size: 0.88rem;
   font-weight: 800;
   color: #ffffff;
   margin: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap; /* Tuyệt đối không rớt dòng */
+}
+
+.liveBadgeText {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #ff2442;
+  background: rgba(229, 9, 20, 0.12);
+  border: 1px solid rgba(229, 9, 20, 0.3);
+  padding: 1px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* Timeframe Tabs (Full-width segmented control) */
+.timeframeTabs {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  letter-spacing: -0.01em;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 4px;
 }
 
-.titleIcon {
-  color: #e50914;
-  font-size: 1rem;
+.timeBtn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
 }
 
-/* Movies List */
-.movieList {
+.timeBtn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.timeBtnActive {
+  background: rgba(229, 9, 20, 0.25);
+  color: #ff4d5a;
+  border: 1px solid rgba(229, 9, 20, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.contentWrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.movieItem {
+/* 1. Champion Spotlight Card (Top 1) */
+.championCard {
+  text-decoration: none;
+  border-radius: 12px;
+  overflow: hidden;
+  display: block;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.championCard:hover {
+  transform: translateY(-2px);
+}
+
+.championCoverWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0d1117;
+  border: 1.5px solid rgba(255, 215, 0, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Dual-layer background blur to fill canvas smoothly */
+.championBlurBg {
+  position: absolute;
+  inset: -15px;
+  width: calc(100% + 30px);
+  height: calc(100% + 30px);
+  object-fit: cover;
+  filter: blur(20px) brightness(0.32);
+  transform: scale(1.15);
+  pointer-events: none;
+}
+
+/* Sharp foreground image: aligned top center to prevent cut-off heads/distortion */
+.championImg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  transition: transform 0.4s ease;
+  z-index: 1;
+}
+
+.championCard:hover .championImg {
+  transform: scale(1.05);
+}
+
+.championOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 15, 22, 0.1) 0%,
+    rgba(12, 15, 22, 0.55) 45%,
+    rgba(12, 15, 22, 0.95) 100%
+  );
+  z-index: 2;
+}
+
+/* Massive 01 Typography Watermark */
+.watermarkRank {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  font-size: 4rem;
+  font-weight: 900;
+  color: rgba(255, 215, 0, 0.16);
+  letter-spacing: -0.05em;
+  line-height: 1;
+  pointer-events: none;
+  font-family: inherit;
+  user-select: none;
+  z-index: 3;
+}
+
+.championBadgeRow {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 3;
+}
+
+.championPill {
+  background: linear-gradient(135deg, #ffd700, #ff8a00);
+  color: #000000;
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.heatBadge {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  color: #ff4d5a;
+  border: 1px solid rgba(255, 77, 90, 0.3);
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.championDetails {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.championTitle {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.championMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #8b949e;
+}
+
+.championEpHighlight {
+  color: #ffd700;
+  font-weight: 700;
+  background: rgba(255, 215, 0, 0.12);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* 2. Top #2 - #10 Holographic Ranked Strips */
+.rankedStripsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stripCard {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid transparent;
   text-decoration: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.movieItem:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
-  transform: translateX(3px);
+.stripCard:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(229, 9, 20, 0.4);
+  transform: translateX(5px);
 }
 
-/* Poster Thumbnail */
-.posterWrap {
-  position: relative;
-  width: 48px;
-  height: 66px;
+/* Numeric Rank Typography */
+.rankNumber {
+  font-size: 1.15rem;
+  font-weight: 900;
+  font-style: italic;
+  width: 24px;
+  text-align: center;
   flex-shrink: 0;
-  border-radius: 6px;
+  letter-spacing: -0.05em;
+  font-family: inherit;
+}
+
+.rankSilver {
+  color: #e2e8f0;
+  text-shadow: 0 0 8px rgba(226, 232, 240, 0.4);
+}
+
+.rankBronze {
+  color: #d97706;
+  text-shadow: 0 0 8px rgba(217, 119, 6, 0.4);
+}
+
+.rankNormal {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.stripCard:hover .rankNormal {
+  color: #ff4d5a;
+}
+
+/* Thumbnail Poster: Aligned top center */
+.stripPosterWrap {
+  width: 40px;
+  height: 56px;
+  border-radius: 5px;
   overflow: hidden;
+  flex-shrink: 0;
   background: #0d1117;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.posterImg {
+.stripPosterImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
   transition: transform 0.25s ease;
 }
 
-.movieItem:hover .posterImg {
-  transform: scale(1.05);
+.stripCard:hover .stripPosterImg {
+  transform: scale(1.08);
 }
 
-.qualityBadge {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  background: rgba(0, 0, 0, 0.82);
-  color: #ffffff;
-  font-size: 0.58rem;
-  font-weight: 700;
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-/* Info Section */
-.infoCol {
+/* Strip Info & Episode Progress */
+.stripInfo {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -111,94 +365,98 @@
   gap: 3px;
 }
 
-.movieName {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #e2e8f0;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-  transition: color 0.16s ease;
-}
-
-.movieItem:hover .movieName {
-  color: #ff4757;
-}
-
-.originName {
-  font-size: 0.72rem;
-  color: #8b949e;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-}
-
-.metaRow {
+.stripTitleRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-  font-size: 0.7rem;
-  color: #64748b;
+  justify-content: space-between;
 }
 
-.metaItem {
-  display: inline-flex;
+.stripTitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s ease;
+}
+
+.stripCard:hover .stripTitle {
+  color: #ff4d5a;
+}
+
+.stripBottomRow {
+  display: flex;
   align-items: center;
-  gap: 3px;
+  justify-content: space-between;
+  font-size: 0.68rem;
+}
+
+.stripMetaLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stripEpisodeBadge {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.stripYear {
+  color: #8b949e;
+}
+
+.stripHeatScore {
+  color: #ff7582;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+/* Dynamic Thermal Meter Bar */
+.heatMeterTrack {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.heatMeterFill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff2442 0%, #ff8a00 100%);
+  border-radius: 2px;
 }
 
 /* Skeletons */
-.skeletonList {
+.skeletonContainer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.skeletonItem {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+.skeletonChampion {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.skeletonPoster {
-  width: 48px;
-  height: 66px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  animation: pulse 1.5s infinite;
-}
-
-.skeletonInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.skeletonLine {
-  height: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-  100% { opacity: 0.4; }
+.skeletonStrip {
+  height: 48px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .emptyFallback {
+  padding: 24px;
   text-align: center;
-  padding: 24px 12px;
-  color: #64748b;
-  font-size: 0.8rem;
+  color: #8b949e;
+  font-size: 0.82rem;
 }

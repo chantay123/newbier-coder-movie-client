@@ -1,47 +1,103 @@
 /**
  * @file MovieDetailPage.module.css
- * @description Layout and canvas styles for the modern Movie Detail & Watch page.
+ * @description Layout and canvas styles for the modern 2-column Movie Detail page.
+ * Aligned with the dark cinema aesthetics of the home page.
  */
 
 .movieDetailWrapper {
   background-color: #0c0f16;
   color: #e6edf3;
   min-height: 100vh;
-  padding-bottom: 48px;
+  padding-bottom: 60px;
   overflow-x: hidden;
 }
 
 .mainContentContainer {
-  max-width: 1240px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 0 20px;
   box-sizing: border-box;
 }
 
-.sectionSpacing {
-  margin-top: 24px;
+/* 2-Column Master Layout */
+.mainContentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 32px;
+  margin-top: 28px;
+  align-items: flex-start;
 }
 
+@media (max-width: 1080px) {
+  .mainContentGrid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+@media (max-width: 576px) {
+  .mainContentContainer {
+    padding: 0 12px;
+  }
+  .mainContentGrid {
+    margin-top: 16px;
+    gap: 20px;
+  }
+  .mainColumn {
+    gap: 20px;
+  }
+}
+
+.mainColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+
+.sidebarColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  position: sticky;
+  top: 80px;
+}
+
+@media (max-width: 1080px) {
+  .sidebarColumn {
+    position: static;
+  }
+}
+
+.bottomFullWidthSection {
+  margin-top: 40px;
+  width: 100%;
+}
+
+.sectionSpacing {
+  margin-top: 28px;
+}
 
 /* Loading Canvas */
 .loadingContainer {
-  min-height: 80vh;
+  min-height: 85vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 20px;
-  background-color: #0b0e14;
+  background-color: #0c0f16;
   padding-top: 80px;
 }
 
 .spinner {
-  width: 46px;
-  height: 46px;
+  width: 50px;
+  height: 50px;
   border: 3px solid rgba(229, 9, 20, 0.2);
   border-top-color: #e50914;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  box-shadow: 0 0 15px rgba(229, 9, 20, 0.3);
 }
 
 @keyframes spin {
@@ -52,8 +108,8 @@
 
 .loadingText {
   color: #8b949e;
-  font-size: 1rem;
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 600;
   letter-spacing: 0.3px;
 }
 
@@ -64,7 +120,7 @@
   align-items: center;
   justify-content: center;
   padding: 80px 20px 40px;
-  background-color: #0b0e14;
+  background-color: #0c0f16;
 }
 
 .errorCard {
@@ -81,7 +137,7 @@
 
 .errorTitle {
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #ffffff;
   margin-bottom: 12px;
 }
@@ -94,26 +150,21 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 992px) {
+@media (max-width: 768px) {
   .mainContentContainer {
-    padding: 24px 20px 0;
+    padding: 0 14px;
   }
 
-  .sectionSpacing {
-    margin-top: 36px;
-  }
-}
-
-@media (max-width: 576px) {
-  .mainContentContainer {
-    padding: 16px 14px 0;
+  .mainContentGrid {
+    margin-top: 20px;
+    gap: 20px;
   }
 
-  .sectionSpacing {
+  .mainColumn {
+    gap: 20px;
+  }
+
+  .bottomFullWidthSection {
     margin-top: 28px;
-  }
-
-  .errorCard {
-    padding: 36px 20px;
   }
 }

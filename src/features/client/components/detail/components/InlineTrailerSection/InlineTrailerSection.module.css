@@ -1,0 +1,345 @@
+/**
+ * @file InlineTrailerSection.module.css
+ * @description Cinema styling for the inline trailer showcase card.
+ */
+
+.sectionWrapper {
+  margin-top: 28px;
+  width: 100%;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.titleWrap {
+  display: flex;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.btnLaunchModal {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e6edf3;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btnLaunchModal:hover {
+  background: rgba(229, 9, 20, 0.15);
+  border-color: rgba(229, 9, 20, 0.4);
+  color: #ff4d5a;
+}
+
+/* Player Card Container */
+.playerCard {
+  position: relative;
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* 16:9 Aspect Ratio Container for iFrame */
+.responsiveIframeWrap {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%; /* 16:9 */
+  background: #000;
+}
+
+.trailerIframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Poster Cover / Preview mode */
+.posterCover {
+  position: relative;
+  width: 100%;
+  padding-top: 52%;
+  min-height: 280px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.backdropCoverImg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: brightness(0.85);
+}
+
+.posterCover:hover .backdropCoverImg {
+  transform: scale(1.04);
+  filter: brightness(0.95);
+}
+
+.coverOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(13, 17, 23, 0.25) 0%,
+    rgba(13, 17, 23, 0.4) 50%,
+    rgba(13, 17, 23, 0.92) 100%
+  );
+  transition: opacity 0.3s ease;
+}
+
+.floatingBadges {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.badgeOfficial {
+  background: #e50914;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 8px rgba(229, 9, 20, 0.4);
+}
+
+.badgeQuality {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  color: #ffd700;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+/* Play Action Center */
+.playActionCenter {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  z-index: 2;
+}
+
+.playButtonPulse {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff2442 0%, #e50914 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.6);
+  animation: pulseRipple 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  transition: transform 0.25s ease;
+}
+
+.playButtonPulse i {
+  margin-left: 4px;
+}
+
+.posterCover:hover .playButtonPulse {
+  transform: scale(1.12);
+}
+
+@keyframes pulseRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 22px rgba(229, 9, 20, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(229, 9, 20, 0);
+  }
+}
+
+.playPromptText {
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.02em;
+}
+
+/* Bottom Bar */
+.bottomInfoBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.movieNames {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trailerMovieTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+.trailerOriginTitle {
+  font-size: 0.82rem;
+  color: #a0aec0;
+}
+
+.btnWatchTrailerNow {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.btnWatchTrailerNow:hover {
+  background: #e50914;
+  border-color: #e50914;
+  transform: translateY(-1px);
+}
+
+/* Fallback Card */
+.noTrailerFallback {
+  padding: 36px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: rgba(22, 27, 34, 0.6);
+}
+
+.fallbackIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.fallbackContent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fallbackTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0;
+}
+
+.fallbackDesc {
+  font-size: 0.85rem;
+  color: #8b949e;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 600px;
+}
+
+.btnSearchYoutube {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #58a6ff;
+  text-decoration: none;
+  width: fit-content;
+  transition: color 0.2s ease;
+}
+
+.btnSearchYoutube:hover {
+  color: #79c0ff;
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .posterCover {
+    min-height: 220px;
+    padding-top: 56.25%;
+  }
+
+  .playButtonPulse {
+    width: 52px;
+    height: 52px;
+    font-size: 1.15rem;
+  }
+
+  .bottomInfoBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .btnWatchTrailerNow {
+    display: none;
+  }
+
+  .noTrailerFallback {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+}

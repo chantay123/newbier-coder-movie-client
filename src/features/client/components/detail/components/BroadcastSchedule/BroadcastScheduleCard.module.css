@@ -1,0 +1,142 @@
+/**
+ * @file BroadcastScheduleCard.module.css
+ * @description Glassmorphism styles for broadcast schedule information box.
+ */
+
+.scheduleCard {
+  background: linear-gradient(145deg, rgba(20, 24, 33, 0.9) 0%, rgba(13, 17, 23, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px 20px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+
+.scheduleCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, #e50914, #ff5e62);
+  border-radius: 4px 0 0 4px;
+}
+
+.scheduleCard:hover {
+  border-color: rgba(229, 9, 20, 0.35);
+  transform: translateY(-2px);
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.badgeWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 1.8s infinite;
+}
+
+.pulseGreen {
+  background-color: #10b981;
+  box-shadow: 0 0 10px #10b981;
+}
+
+.pulseAmber {
+  background-color: #f59e0b;
+  box-shadow: 0 0 10px #f59e0b;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.statusLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #e6edf3;
+}
+
+.scheduleTag {
+  font-size: 0.72rem;
+  color: #ff4d5a;
+  background: rgba(229, 9, 20, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.contentBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduleTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.scheduleDescription {
+  font-size: 0.82rem;
+  color: #8b949e;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.highlightText {
+  color: #ff7582;
+  font-weight: 600;
+}
+
+.metaFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #c9d1d9;
+}
