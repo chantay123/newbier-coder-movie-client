@@ -1,28 +1,30 @@
+
 /**
- * Zustand store for the movie data.
+ * @file useMovieStore.ts
+ * @description The Zustand store that caches the movie data of the client.
  *
- * The store keeps the data in memory and in `localStorage` so that:
- * 1. The API is not called again when the user comes back to a page
- *    that was already visited.
- * 2. Every component (MovieCard, MovieDetail, HomeRails...) reads the same
- *    data instead of asking the backend for its own copy.
+ * WHY THE CACHE EXISTS
+ * The API is called again every time the user comes back to a page, and
+ * every component (MovieCard, MovieDetail, the home rails...) would ask for
+ * its own copy of the same data. The store keeps one copy in memory, so:
+ * 1. the backend is called less often;
+ * 2. every component reads the same data.
  *
- * Cache strategy: `localStorage` plus an in-memory map.
- * - The data is read from `localStorage` when the store is created
- *   (the hydration step).
- * - The data is written to `localStorage` every time it changes.
- * - TTL: 5 minutes for a movie detail, because a movie changes often.
- * - TTL: 2 minutes for the home page movies, because the ranking changes
- *   often.
+ * THE CACHE IS IN MEMORY ONLY
+ * The entries are NOT written to `localStorage`, because reading the Web
+ * Storage is synchronous and it blocks the first render of the page.
+ *
+ * THE LIFETIME OF AN ENTRY
+ * - A movie detail lives 5 minutes, because a movie changes often.
+ * - The movies of the home page live 2 minutes, because the ranking of the
+ *   home page changes often.
  */
 
 import { create } from 'zustand';
 
-// ============================================================
-// TYPES
-// ============================================================
-
-/** A movie that was already normalized by `useMovieDetail.normalizeMovieDetail`. */
+/**
+ * A movie that was already normalized by `useMovieDetail.normalizeMovieDetail`.
+ */
 export interface CachedMovieDetail {
   _id: string;
   slug: string;
@@ -177,6 +179,12 @@ const isExpired = (timestamp: number, ttlMs: number): boolean => {
 // 3. When the user comes back to the page, the data is still cached in the
 //    component state.
 
+/**
+ * The store of the movie cache.
+ *
+ * It exposes the cache of the movie details, of the related movies and of
+ * the home page sections, together with their loading and error states.
+ */
 export const useMovieStore = create<MovieStoreState & MovieStoreActions>()(
   (set, get) => ({
       // ---- Initial State ----
