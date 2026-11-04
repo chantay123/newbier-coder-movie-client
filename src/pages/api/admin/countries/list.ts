@@ -12,6 +12,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { POPULAR_COUNTRIES } from '@/constants/adminActorConstants';
 
+// The TLS limit is applied as soon as this module is loaded (see
+// `src/utils/serverTls.ts`).
+import '@/utils/serverTls';
+
 export interface CountryListItem {
   code: string;
   nameVi: string;

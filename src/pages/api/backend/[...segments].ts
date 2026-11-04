@@ -27,6 +27,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { getServerApiBaseUrl } from '@/config/apiBase';
 
+// The TLS limit is applied as soon as this module is loaded, so every
+// forwarded request uses it (see `src/utils/serverTls.ts`).
+import '@/utils/serverTls';
+
 /** The prefix of the proxy. */
 const PREFIX = '/api/backend';
 

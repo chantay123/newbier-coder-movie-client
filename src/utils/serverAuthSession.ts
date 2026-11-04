@@ -42,6 +42,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiUrl } from '@/config/apiPaths';
 
+// The TLS limit is applied as soon as this module is loaded, so every call
+// to the backend uses it (see `src/utils/serverTls.ts`).
+import '@/utils/serverTls';
+
 /** The name of the session cookie. */
 export const AUTH_SESSION_COOKIE_NAME = 'mv_session';
 
