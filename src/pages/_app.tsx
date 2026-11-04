@@ -12,7 +12,7 @@ import '../styles/subscription-details.css';
 import '../styles/feedbackAdmin.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { SessionProvider } from 'next-auth/react';
-import { AuthProvider, withAccountStatus, withAuth } from '@/utils/auth';
+import { AuthProvider, withAccountStatus, withAuth } from '@/context/AuthContext';
 import { useEffect, useState, useCallback } from 'react';
 
 /** Obfuscation helpers — they hide the user info in DevTools */

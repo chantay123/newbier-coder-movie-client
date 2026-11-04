@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 import movieService from '@/API/services/movieService';
 import searchHistoryService from '@/API/services/searchHistoryService';
 import searchSuggestionService from '@/API/services/searchSuggestionService';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import MovieFilter, { INITIAL_MOVIE_FILTER_STATE, MovieFilterState } from '@/components/Movie/MovieFilter';
 import { filterStateToQueryParams } from '@/components/Movie/MovieFilter';

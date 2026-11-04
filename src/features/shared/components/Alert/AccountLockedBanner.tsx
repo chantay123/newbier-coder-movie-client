@@ -5,7 +5,7 @@
 
 import React, { MouseEvent } from 'react';
 import { FaLock, FaEnvelope, FaSignOutAlt } from 'react-icons/fa';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/router';
 
 const AccountLockedBanner: React.FC = () => {

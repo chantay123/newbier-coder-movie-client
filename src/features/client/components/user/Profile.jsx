@@ -1,7 +1,7 @@
 // @ts-nocheck — legacy feature component, pending incremental conversion.
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';

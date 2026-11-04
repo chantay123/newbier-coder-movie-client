@@ -5,7 +5,7 @@
  */
 import React, { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth, isAdminUser } from '@/utils/auth';
+import { useAuth, isAdminUser } from '@/context/AuthContext';
 
 interface AdminRouteProps {
   children: ReactNode;

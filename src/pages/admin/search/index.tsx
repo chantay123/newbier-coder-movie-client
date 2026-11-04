@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import movieService from '@/API/services/movieService';
 import searchSuggestionService from '@/API/services/searchSuggestionService';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import AdminLayout from '@/layouts/AdminLayout';
 import Swal from 'sweetalert2';
 

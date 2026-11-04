@@ -5,7 +5,7 @@
 
 import React, { useState, forwardRef, ChangeEvent, FormEvent, ForwardedRef, Ref } from 'react';
 import { FaTimes, FaLightbulb } from 'react-icons/fa';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import type { User } from '@/types/user';
 import axios, { AxiosError } from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';

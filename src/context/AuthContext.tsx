@@ -1,5 +1,5 @@
 /**
- * auth.tsx
+ * AuthContext.tsx
  *
  * The authentication context. It exposes the current user, the login,
  * register and logout actions, the account-lock detection through a periodic
@@ -7,7 +7,7 @@
  */
 import React, {
   createContext,
-  ReactNode,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,

@@ -23,7 +23,7 @@ import { getStoredAccessToken } from '@/API/services/authService';
 import { useUserStore } from '@/stores/useUserStore';
 
 // .js deps - cast for strict TS
-import { useAuth as useAuthRaw, isAdminUser } from '@/utils/auth';
+import { useAuth as useAuthRaw, isAdminUser } from '@/context/AuthContext';
 const { useAuth } = { useAuth: useAuthRaw as unknown as () => AuthApi };
 import searchHistoryServiceRaw from '@/API/services/searchHistoryService';
 const searchHistoryService = searchHistoryServiceRaw as unknown as {

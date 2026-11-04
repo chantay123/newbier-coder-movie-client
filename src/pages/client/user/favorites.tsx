@@ -30,7 +30,7 @@ import favoritesService, {
   FavoritesServiceError,
   type FavoriteMovie
 } from '@/API/services/favoritesService';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import styles from '@/styles/Favorites.module.css';

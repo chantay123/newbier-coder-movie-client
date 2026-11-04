@@ -10,7 +10,7 @@ import {
   FaInfoCircle, FaQrcode, FaCheckDouble
 } from 'react-icons/fa';
 import subscriptionService from '@/API/services/subscriptionService';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import styles from '@/styles/Premium.module.css';
 
 interface PackageFeature {

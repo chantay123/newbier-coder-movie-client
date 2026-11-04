@@ -3,7 +3,7 @@ import Navbar from '@/features/shared/components/Layout/Navbar';
 import Footer from '@/features/shared/components/Layout/Footer';
 import { useRouter } from 'next/router';
 // .js deps - cast for strict TS
-import { useAuth as useAuthRaw } from '@/utils/auth';
+import { useAuth as useAuthRaw } from '@/context/AuthContext';
 const { useAuth } = { useAuth: useAuthRaw as unknown as () => AuthApi };
 import AccountLockedBanner from '@/features/shared/components/Alert/AccountLockedBanner';
 import { BannerAd } from '@/features/shared/components/Ad';
