@@ -66,3 +66,7 @@ DESIGN.md
 AGENTS.md
 CLAUDE.md
 public/data/dashboard-snapshot.json
+
+# local dev logs
+dev-log.txt
+*.log
