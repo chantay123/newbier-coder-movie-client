@@ -7,7 +7,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import watchlistService from '@/API/services/watchlistService';
 import styles from '@/styles/Favorites.module.css';
 

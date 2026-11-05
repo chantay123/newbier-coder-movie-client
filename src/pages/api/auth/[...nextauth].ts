@@ -9,6 +9,11 @@ import GoogleProvider from 'next-auth/providers/google';
 import FacebookProvider from 'next-auth/providers/facebook';
 import axios from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
+import { stripTokensFromUser } from '@/utils/serverAuthSession';
+
+// The TLS limit is applied as soon as this module is loaded (see
+// `src/utils/serverTls.ts`).
+import '@/utils/serverTls';
 
 interface BackendUser {
   _id?: string;
@@ -143,21 +148,27 @@ const authOptions: NextAuthOptions = {
     async session({ session, token }): Promise<Session> {
       const tk = token as typeof token & AugmentedToken;
       const ses = session as AugmentedSession;
-      if (tk.backendToken) {
-        ses.backendToken = tk.backendToken;
-        if (tk.backendUser) {
-          const id = tk.backendUser._id || tk.backendUser.id;
-          const merged = {
-            ...ses.user,
-            ...(tk.backendUser as Record<string, unknown>),
-            id,
-            _id: id,
-            role: tk.backendUser.role || 'user'
-          } as Record<string, unknown> & { avatar?: string; image?: string };
-          if (!merged.avatar && merged.image) merged.avatar = merged.image;
-          if (!merged.avatar && tk.picture) merged.avatar = tk.picture;
-          ses.user = merged as Session['user'];
-        }
+      // The backend token is NOT added to the session any more: the session
+      // is sent to the browser as plain JSON, so a token in it would be
+      // readable by any script on the page. The route
+      // `/api/auth/oauth-session` reads the token on the server and moves
+      // it into the encrypted `HttpOnly` session cookie.
+      if (tk.backendUser) {
+        const id = tk.backendUser._id || tk.backendUser.id;
+        // The profile of the backend can carry a token of its own, so it is
+        // stripped before it goes into the session that is sent to the
+        // browser.
+        const safeUser = stripTokensFromUser(tk.backendUser) ?? {};
+        const merged = {
+          ...ses.user,
+          ...(safeUser as Record<string, unknown>),
+          id,
+          _id: id,
+          role: safeUser.role || 'user'
+        } as Record<string, unknown> & { avatar?: string; image?: string };
+        if (!merged.avatar && merged.image) merged.avatar = merged.image;
+        if (!merged.avatar && tk.picture) merged.avatar = tk.picture;
+        ses.user = merged as Session['user'];
       }
       return ses;
     }

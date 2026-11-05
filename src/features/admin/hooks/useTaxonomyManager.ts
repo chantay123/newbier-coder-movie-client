@@ -1,7 +1,13 @@
 /**
  * @file useTaxonomyManager.ts
- * @description Enterprise-grade custom hook managing taxonomy state, filtering,
- * pagination, and CRUD modal operations with dependency injection.
+ * @description Custom hook that owns the state of an admin taxonomy panel.
+ *
+ * THE DATA FLOW
+ * Page → this hook → `taxonomyAdminService` → backend → the `TaxonomyItem`
+ * list the page renders.
+ *
+ * The hook is the only place that knows how to load, filter, paginate and
+ * mutate a taxonomy, so every admin page behaves the same way.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
@@ -14,19 +20,60 @@ import {
   taxonomyAdminService
 } from '@/features/admin/services/taxonomyAdminService';
 import { showCinemaAlert } from '@/features/shared/components/UI/CinemaAlert';
+import {
+  ADMIN_TAXONOMY_MESSAGES,
+  ADMIN_TAXONOMY_TABLE_PAGE_SIZE
+} from '@/config/taxonomyAdminConfig';
 
+/**
+ * Turns an error of the API layer into a message the admin can read.
+ *
+ * The backend puts the real reason in `responseStatus.responseMessage`
+ * (for example "Category with slug 'hanh-dong' already exists" or
+ * "Category still has movies referencing it"), and `parseApiError` already
+ * extracts it into the `message` of the error.
+ *
+ * @param error - The error thrown by the service.
+ * @returns The message to show in the alert.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return ADMIN_TAXONOMY_MESSAGES.loadFailed;
+}
+
+/**
+ * The options of the `useTaxonomyManager` hook.
+ */
 export interface UseTaxonomyManagerOptions {
+  /** The taxonomy to manage, such as "categories" or "countries". */
   type: TaxonomyType;
+  /** The Vietnamese label of the taxonomy, used in the alert messages. */
   typeNameVi: string;
+  /** The service used to talk to the backend. It is replaced in the tests. */
   service?: ITaxonomyAdminService;
+  /** The number of rows of one page. */
   defaultPageSize?: number;
 }
 
+/**
+ * Manages the list, the filters and the CRUD actions of an admin taxonomy.
+ *
+ * The hook loads the items from the backend, keeps the search, the status
+ * filter and the pagination, and exposes the handlers the modal and the
+ * table need.
+ *
+ * @param options - The options of the hook.
+ * @param options.type - The taxonomy to manage.
+ * @param options.typeNameVi - The Vietnamese label of the taxonomy.
+ * @param options.service - The service used to talk to the backend.
+ * @param options.defaultPageSize - The number of rows of one page.
+ * @returns The state, the derived lists and the handlers of the panel.
+ */
 export function useTaxonomyManager({
   type,
   typeNameVi,
   service = taxonomyAdminService,
-  defaultPageSize = 10
+  defaultPageSize = ADMIN_TAXONOMY_TABLE_PAGE_SIZE
 }: UseTaxonomyManagerOptions) {
   const [items, setItems] = useState<TaxonomyItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -46,14 +93,22 @@ export function useTaxonomyManager({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<TaxonomyItem | null>(null);
 
-  // Initial Data Fetching
+  /**
+   * Loads the items of the taxonomy from the backend.
+   *
+   * The load runs again when the taxonomy changes, because the list of the
+   * categories is not the list of the countries.
+   */
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const data = await service.getAll(type);
       setItems(data);
-    } catch {
-      showCinemaAlert(`Không thể tải danh sách ${typeNameVi}. Vui lòng thử lại.`, 'warning');
+    } catch (error) {
+      showCinemaAlert(
+        `Không thể tải danh sách ${typeNameVi}: ${describeError(error)}`,
+        'warning'
+      );
     } finally {
       setLoading(false);
     }
@@ -97,7 +152,7 @@ export function useTaxonomyManager({
     return filteredList.slice(startIndex, startIndex + pageSize);
   }, [filteredList, currentPage, pageSize]);
 
-  // Counters
+  // Counters shown above the table.
   const activeCount = useMemo(() => items.filter((i) => i.isActive).length, [items]);
   const inactiveCount = useMemo(() => items.length - activeCount, [items, activeCount]);
 
@@ -128,22 +183,36 @@ export function useTaxonomyManager({
   }, []);
 
   // CRUD Actions
+
+  /**
+   * Toggles the active state of an item and updates the list.
+   *
+   * @param item - The item to toggle.
+   */
   const handleToggleStatus = useCallback(
     async (item: TaxonomyItem) => {
       try {
-        const updated = await service.toggleStatus(type, item.id);
+        const updated = await service.toggleStatus(type, item.id, !item.isActive);
         setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
         showCinemaAlert(
           `Đã ${updated.isActive ? 'kích hoạt' : 'tạm ẩn'} ${typeNameVi} "${updated.name}" thành công!`,
           updated.isActive ? 'cinema' : 'warning'
         );
-      } catch {
-        showCinemaAlert(`Không thể thay đổi trạng thái ${typeNameVi}.`, 'warning');
+      } catch (error) {
+        showCinemaAlert(
+          `Không thể thay đổi trạng thái ${typeNameVi}: ${describeError(error)}`,
+          'warning'
+        );
       }
     },
     [service, type, typeNameVi]
   );
 
+  /**
+   * Creates or updates an item, depending on whether it has an id.
+   *
+   * @param itemData - The values of the form.
+   */
   const handleSaveItem = useCallback(
     async (itemData: Partial<TaxonomyItem>) => {
       const isEdit = Boolean(itemData.id);
@@ -175,13 +244,15 @@ export function useTaxonomyManager({
         }
         handleCloseFormModal();
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Dữ liệu không hợp lệ';
-        showCinemaAlert(`Lỗi lưu ${typeNameVi}: ${message}`, 'warning');
+        showCinemaAlert(`Lỗi lưu ${typeNameVi}: ${describeError(err)}`, 'warning');
       }
     },
     [service, type, typeNameVi, handleCloseFormModal]
   );
 
+  /**
+   * Deletes the item the admin confirmed in the delete modal.
+   */
   const handleConfirmDelete = useCallback(async () => {
     if (!itemToDelete) return;
     const target = itemToDelete;
@@ -190,11 +261,14 @@ export function useTaxonomyManager({
       setItems((prev) => prev.filter((i) => i.id !== target.id));
       showCinemaAlert(`Đã xóa ${typeNameVi} "${target.name}"`, 'warning');
       handleCloseDeleteModal();
-    } catch {
-      showCinemaAlert(`Không thể xóa ${typeNameVi}.`, 'warning');
+    } catch (err) {
+      showCinemaAlert(`Không thể xóa ${typeNameVi}: ${describeError(err)}`, 'warning');
     }
   }, [itemToDelete, service, type, typeNameVi, handleCloseDeleteModal]);
 
+  /**
+   * Clears the search term and the status filter.
+   */
   const handleResetFilters = useCallback(() => {
     setSearchTerm('');
     setStatusFilter('all');

@@ -9,6 +9,7 @@
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { AP } from '@/config/apiPaths';
+import { ensureSessionReady, getMemoryAccessToken } from '@/utils/accessTokenStore';
 
 export type { AxiosError };
 
@@ -35,29 +36,19 @@ const axiosInstance = axios.create({
 });
 
 /**
- * Reads the Bearer token from localStorage or sessionStorage, following the
- * remember-me mechanism implemented in authService.
+ * Reads the Bearer token of the current tab.
  *
- * WHY EVERY LOCATION IS READ
- * `authService.login()` writes the token to:
- *   - localStorage  -> when the user ticks "Remember me"
- *   - sessionStorage -> when the user does not tick it, so the token only
- *     lives inside the tab
- * If only localStorage was read, every session login would send a request
- * without the `Authorization` header and the backend would answer 401. In
- * the UI that shows up as "You need to sign in" even though the user is
- * signed in.
+ * WHERE THE TOKEN LIVES
+ * The access token is kept in the MEMORY of the tab
+ * (`src/utils/accessTokenStore.ts`). It is NOT read from `localStorage` or
+ * `sessionStorage`: a token in the Web Storage can be read by any script
+ * running on the page, so an XSS was enough to steal the session.
  *
- * That is why sessionStorage is read FIRST (the token of the current
- * session), and localStorage is only the fallback. The `remember_me` flag
- * decides whether the token PERSISTS across new tabs, not where it is read.
- */
-const ACCESS_KEYS = ['auth_token', 'token'];
-
-/**
- * Reads the access token from the browser storage.
+ * The refresh token never reaches the browser at all: it lives in an
+ * encrypted `HttpOnly` cookie, on the server side. The renewal is done by
+ * the local route `/api/auth/refresh`.
  *
- * @returns The token, or null when no usable token is stored.
+ * @returns The token, or null when no usable token is available.
  */
 const readAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -65,24 +56,8 @@ const readAuthToken = (): string | null => {
   const isUsable = (value: string | null): value is string =>
     Boolean(value) && value !== 'undefined' && value !== 'null';
 
-  // 1. sessionStorage - the token of the current login session.
-  if (window.sessionStorage) {
-    for (const key of ACCESS_KEYS) {
-      const value = window.sessionStorage.getItem(key);
-      if (isUsable(value)) return value;
-    }
-    // The token granted by the NextAuth session (the AuthProvider stores it
-    // in sessionStorage).
-    const backendToken = window.sessionStorage.getItem('backendToken');
-    if (isUsable(backendToken)) return backendToken;
-  }
-
-  // 2. localStorage - the token that persists across tabs (remember me), or
-  //    one left over from an earlier session in the same tab.
-  for (const key of ACCESS_KEYS) {
-    const value = localStorage.getItem(key);
-    if (isUsable(value)) return value;
-  }
+  const memoryToken = getMemoryAccessToken();
+  if (isUsable(memoryToken)) return memoryToken;
 
   return null;
 };
@@ -124,6 +99,14 @@ const AUTH_REQUIRED_PATHS = new Set<string>([
   AP.adminUsersUnban,
   AP.adminUsersToggleStatus,
   AP.adminUsersAvatar,
+  AP.adminCategoriesList,
+  AP.adminCategoriesById,
+  AP.adminCategoriesStatus,
+  AP.adminCountriesList,
+  AP.adminCountriesById,
+  AP.adminCountriesStatus,
+  AP.adminFormatsList,
+  AP.adminFormatsById,
 ]);
 
 /**
@@ -191,17 +174,18 @@ const matchesAnyEndpoint = (
   return false;
 };
 
-axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+axiosInstance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  // The session is restored before the first request of the tab. The
+  // restore asks the server for the access token, using only the encrypted
+  // `HttpOnly` cookie, so the token is never read from the Web Storage.
+  await ensureSessionReady();
+
   const token = readAuthToken();
 
   // The Bearer token is attached to EVERY request, so the backend can
   // answer 401 on the endpoints that need it.
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-  } else if (matchesAnyEndpoint(config.url, AUTH_REQUIRED_PATHS)) {
-    // The endpoint needs a token but none is stored: the backend will
-    // answer 401 and the response interceptor handles it. A silent
-    // diagnostic helps to spot a broken session early.
   }
 
   if (config.method === 'patch' || config.method === 'PATCH') {
@@ -330,16 +314,27 @@ axiosInstance.interceptors.response.use(
     // 401 on auth endpoints, or refresh already failed: hard logout.
     if (status === 401) {
       if (typeof window !== 'undefined') {
-        try { localStorage.removeItem('auth_token'); } catch { /* noop */ }
-        try { localStorage.removeItem('token'); } catch { /* noop */ }
-        try { localStorage.removeItem('refresh_token'); } catch { /* noop */ }
-        try { localStorage.removeItem('user'); } catch { /* noop */ }
-        try { localStorage.removeItem('remember_me'); } catch { /* noop */ }
-        if (window.sessionStorage) {
-          try { window.sessionStorage.removeItem('auth_token'); } catch { /* noop */ }
-          try { window.sessionStorage.removeItem('token'); } catch { /* noop */ }
-          try { window.sessionStorage.removeItem('user'); } catch { /* noop */ }
-          try { window.sessionStorage.removeItem('backendToken'); } catch { /* noop */ }
+        // The cleanup is centralized in `authService._clearLocalSession`, so
+        // every logout path removes exactly the same keys (including the
+        // persisted user store and the legacy token keys).
+        try {
+          const { default: authService } = await import('../services/authService');
+          authService._clearLocalSession();
+        } catch {
+          // Fallback: the keys are removed one by one.
+          try { localStorage.removeItem('auth_token'); } catch { /* noop */ }
+          try { localStorage.removeItem('token'); } catch { /* noop */ }
+          try { localStorage.removeItem('refresh_token'); } catch { /* noop */ }
+          try { localStorage.removeItem('user'); } catch { /* noop */ }
+          try { localStorage.removeItem('remember_me'); } catch { /* noop */ }
+          try { localStorage.removeItem('authToken'); } catch { /* noop */ }
+          try { localStorage.removeItem('user-store'); } catch { /* noop */ }
+          if (window.sessionStorage) {
+            try { window.sessionStorage.removeItem('auth_token'); } catch { /* noop */ }
+            try { window.sessionStorage.removeItem('token'); } catch { /* noop */ }
+            try { window.sessionStorage.removeItem('user'); } catch { /* noop */ }
+            try { window.sessionStorage.removeItem('backendToken'); } catch { /* noop */ }
+          }
         }
         window.location.href = '/auth/login';
       }

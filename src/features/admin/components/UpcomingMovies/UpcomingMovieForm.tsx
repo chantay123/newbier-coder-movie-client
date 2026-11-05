@@ -7,6 +7,7 @@ import BackToTopButton from '@/features/admin/components/Common/BackToTopButton'
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import styles from './UpcomingMovieForm.module.css';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 interface UpcomingMovieFormProps {
   movie?: Partial<UpcomingMovie>;
@@ -93,7 +94,7 @@ const UpcomingMovieForm: React.FC<UpcomingMovieFormProps> = ({
     }
 
     // Check for authentication token
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+    const token = getStoredAccessToken();
     if (!token) {
       setErrorMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.');
 

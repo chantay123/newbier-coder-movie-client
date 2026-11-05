@@ -12,6 +12,10 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+// The TLS limit is applied as soon as this module is loaded (see
+// `src/utils/serverTls.ts`).
+import '@/utils/serverTls';
+
 // ─── Response types ────────────────────────────────────────────────────────────
 
 /** Normalised country metadata returned to the client. */

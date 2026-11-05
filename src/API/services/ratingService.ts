@@ -5,15 +5,50 @@
  */
 import { API_URL } from '@/config/API';
 import { apiUrl } from '@/config/apiPaths';
+import authService, { getStoredAccessToken } from './authService';
 
+/**
+ * Reads the access token from the browser storage.
+ *
+ * The session storage is checked first, because a session-only login keeps
+ * the token there. The local storage is the fallback for the "remember me"
+ * mode.
+ *
+ * @returns The token, or null when the user is not signed in.
+ */
 const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token');
+  return getStoredAccessToken();
 };
 
+/**
+ * Reads the id of the signed-in user.
+ *
+ * The `userId` key was read before, but it was never written anywhere, so
+ * every rating call failed with "Authentication info not found". The id is
+ * now taken from the stored user payload, with the legacy key as a fallback.
+ *
+ * @returns The user id, or null when it cannot be resolved.
+ */
 const getUserId = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('userId');
+
+  try {
+    const legacy = localStorage.getItem('userId');
+    if (legacy) return legacy;
+  } catch {
+    /* localStorage can be disabled */
+  }
+
+  try {
+    const user = authService.getCurrentUser();
+    const id = user?._id || user?.id || user?.sub;
+    if (id) return String(id);
+  } catch {
+    /* the payload cannot be decoded */
+  }
+
+  return null;
 };
 
 const authHeader = (token: string): HeadersInit => ({

@@ -35,6 +35,7 @@ import {
 import { pickImageSrc, POSTER_FIELDS, THUMB_FIELDS } from '@/utils/imageSource';
 import { resolveImageUrl } from '@/utils/movieNormalizer';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 const API_BASE = MOVIE_CONFIG.apiBaseUrl;
 
@@ -732,7 +733,7 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
   const addComment = useCallback(async (content: string, parentId: string | null = null): Promise<boolean> => {
     if (!slug || !content || !content.trim()) return false;
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = typeof window !== 'undefined' ? getStoredAccessToken() : null;
       const res = await fetch(apiUrl(`moviesComments`, slug), {
         method: 'POST',
         headers: {

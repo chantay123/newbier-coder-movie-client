@@ -5,6 +5,7 @@
 import axiosInstance from '@/API/config/axiosConfig';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiPath, apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from './authService';
 
 interface WatchLaterMovieRecord {
   _id?: string;
@@ -100,7 +101,7 @@ const mapWatchLater = (movie: WatchLaterMovieInput): WatchLaterMovie => {
 
 const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token') || localStorage.getItem('token');
+  return getStoredAccessToken();
 };
 
 const watchLaterService = {

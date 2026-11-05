@@ -9,7 +9,7 @@ import { useRouter } from 'next/router';
 import movieService from '@/API/services/movieService';
 import searchHistoryService from '@/API/services/searchHistoryService';
 import searchSuggestionService from '@/API/services/searchSuggestionService';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
 import MovieFilter, { INITIAL_MOVIE_FILTER_STATE, MovieFilterState } from '@/components/Movie/MovieFilter';
 import { filterStateToQueryParams } from '@/components/Movie/MovieFilter';
@@ -179,7 +179,7 @@ export default function SearchPage() {
     if (isAuthenticated) {
       searchHistoryService.saveSearchHistory(suggestion, filterState as unknown as Record<string, unknown>).catch(() => {});
     }
-    localStorage.setItem('lastSearchQuery', suggestion.trim());
+    localStorage.removeItem('lastSearchQuery');
     fetchMovies(suggestion, filterState, 1, false);
     updateUrlWithQueryAndFilters(suggestion);
   };
@@ -264,7 +264,9 @@ export default function SearchPage() {
   };
 
   const handleImageLoaded = (movieId: string): void => {
-    if (typeof window !== 'undefined') localStorage.setItem(`img_loaded_${movieId}`, 'true');
+    // The "already loaded" flag is kept in the component state only. It was
+    // written to `localStorage` before, which created one key per movie
+    // (never read again) and grew the storage without any benefit.
     setImageLoading((prev) => ({ ...prev, [movieId]: false }));
   };
 

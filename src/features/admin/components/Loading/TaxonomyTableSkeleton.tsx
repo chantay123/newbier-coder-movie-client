@@ -6,15 +6,27 @@
 import React from 'react';
 import styles from '@/styles/AdminLoading.module.css';
 import { TaxonomyType } from '@/features/admin/types/taxonomy';
+import { ADMIN_TAXONOMY_SKELETON_ROWS } from '@/config/taxonomyAdminConfig';
 
+/**
+ * The props of the `TaxonomyTableSkeleton` component.
+ */
 interface TaxonomyTableSkeletonProps {
+  /** The taxonomy the skeleton stands for, used to shape the columns. */
   type: TaxonomyType;
+  /** The number of skeleton rows to render. */
   rowCount?: number;
 }
 
+/**
+ * Renders the placeholder rows shown while a taxonomy list is loading.
+ *
+ * @param props - The props of the component.
+ * @returns The skeleton rows of the table.
+ */
 export default function TaxonomyTableSkeleton({
   type,
-  rowCount = 6
+  rowCount = ADMIN_TAXONOMY_SKELETON_ROWS
 }: TaxonomyTableSkeletonProps) {
   const isYearType = type === 'years';
   const isCountryType = type === 'countries';

@@ -1,12 +1,6 @@
 // src/pages/admin/movies.tsx
 'use client';
 
-declare global {
-  interface Window {
-    searchTimeout?: NodeJS.Timeout;
-  }
-}
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import AdminRoute from '@/features/shared/components/ProtectedRoute/AdminRoute';
 import {
@@ -56,7 +50,7 @@ import BackToTop from '@/features/shared/components/UI/BackToTop';
 import CinemaDropdown from '@/features/admin/components/Common/CinemaDropdown';
 import AdminPagination from '@/features/admin/components/Common/AdminPagination';
 import { ADMIN_MOVIES_I18N, ADMIN_COMMON_I18N } from '@/config/i18n/admin';
-import { MOCK_ADMIN_MOVIES, INITIAL_CATEGORIES } from '@/mock/admin';
+import { INITIAL_CATEGORIES } from '@/mock/admin';
 import axiosInstance from '@/API/config/axiosConfig';
 import { apiPath } from '@/config/apiPaths';
 
@@ -136,6 +130,15 @@ interface Movie {
   vote_count: number;
   slug: string;
   isHidden?: boolean;
+  /**
+   * Whether the visibility of the movie is KNOWN.
+   *
+   * The list DTO of the backend does not carry the `isHidden` field, so the
+   * admin list cannot tell a hidden movie from a visible one. The flag comes
+   * from the service and prevents the UI from claiming a state it does not
+   * really know.
+   */
+  visibilityKnown?: boolean;
   userRating?: number;
 }
 
@@ -187,6 +190,15 @@ const DeleteModal: React.FC<DeleteModalProps> = ({ isOpen, movie, onClose, onCon
 
 const MoviesAdmin = () => {
   const topRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * The sequence number of the last started request.
+   *
+   * It protects the state against a RACE CONDITION: when the user changes
+   * the page quickly, the answer of the older request arrives last and
+   * would overwrite the list of the newer page.
+   */
+  const requestSeqRef = useRef<number>(0);
 
   const router = useRouter();
   const { theme } = useTheme();
@@ -241,232 +253,150 @@ const MoviesAdmin = () => {
     checkESStatus();
   }, []);
 
-  const searchMovies = async (query: string, page: number) => {
+  /**
+   * Loads ONE page of the movie list.
+   *
+   * The request is guarded by a sequence number: when the user changes the
+   * page or the filters quickly, the answer of the OLDER request must not
+   * overwrite the answer of the NEWER one.
+   */
+  const fetchMovies = useCallback(async (page: number) => {
+    const requestId = ++requestSeqRef.current;
+    const isStale = (): boolean => requestId !== requestSeqRef.current;
+
     try {
       setLoading(true);
-      const currentPageToUse = page || currentPage;
 
-      try {
-        let response;
-        if (query && query.trim() !== '' && elasticsearchStatus?.status === 'active') {
-          if (!isSearching) setIsSearching(true);
-          response = await searchMoviesWithElasticsearch(
-            currentPageToUse,
+      const query = searchQuery.trim();
+      // The search ALWAYS goes to the search route of the backend
+      // (`/movies/search`), even when the Elasticsearch probe failed: the
+      // list route does not know the `search` parameter, so it answered
+      // with the WHOLE list and the search box looked like it worked.
+      const response = query
+        ? await searchMoviesWithElasticsearch(
+            page,
             moviesPerPage,
             query,
             selectedCategory || undefined,
             filterStatus !== 'all' ? filterStatus : undefined,
             filterYear,
             filterType || undefined
-          );
-        } else {
-          if (!query || query.trim() === '') setIsSearching(false);
-          response = await getMoviesForAdmin(
-            currentPageToUse,
+          )
+        : await getMoviesForAdmin(
+            page,
             moviesPerPage,
             sortField,
             sortDirection,
             selectedCategory || undefined,
             filterStatus !== 'all' ? filterStatus : undefined,
-            query,
+            '',
             filterYear,
             filterType || undefined
           );
-        }
 
-        if (response && response.movies && Array.isArray(response.movies) && response.movies.length > 0) {
-          // AdminMovie (the service layer) uses optional for a few fields
-          // that the UI declares as required, so the cast is explicit
-          // instead of loosening the UI type.
-          setMovies(response.movies as unknown as Movie[]);
-          setIsOfflineMock(false);
-          const pagination = response.pagination || {};
-          setTotalMovies(pagination.totalItems || response.movies.length);
-          setTotalPages(pagination.totalPages || 1);
-          setLoading(false);
-          return;
-        }
-      } catch (apiError) {
+      if (isStale()) return;
 
-      }
+      // An EMPTY list coming from the API is a VALID answer: it must not
+      // be replaced by the mock dataset. The `source` flag of the service
+      // tells the two cases apart.
+      setMovies(response.movies as unknown as Movie[]);
+      setIsOfflineMock(response.source === 'mock');
 
-      // Fallback search in mock dataset
-      setIsOfflineMock(true);
-      const q = (query || '').toLowerCase().trim();
-      let filtered = MOCK_ADMIN_MOVIES.filter(m =>
-        !q ||
-        m.name.toLowerCase().includes(q) ||
-        m.origin_name.toLowerCase().includes(q) ||
-        m.slug.toLowerCase().includes(q)
-      );
-
-      if (selectedCategory) {
-        filtered = filtered.filter(m => m.category.some(c => c.id === selectedCategory));
-      }
-      if (filterStatus !== 'all') {
-        filtered = filtered.filter(m => m.status === filterStatus);
-      }
-      if (filterYear) {
-        filtered = filtered.filter(m => m.year === filterYear);
-      }
-      if (filterType) {
-        filtered = filtered.filter(m => m.type === filterType);
-      }
-
-      setMovies(filtered as any);
-      setTotalMovies(filtered.length);
-      setTotalPages(Math.max(1, Math.ceil(filtered.length / moviesPerPage)));
-      setLoading(false);
+      const pagination = response.pagination || {};
+      setTotalMovies(pagination.totalItems ?? 0);
+      setTotalPages(Math.max(1, pagination.totalPages ?? 1));
     } catch (error) {
-
-      setLoading(false);
-    }
-  };
-
-  const fetchMovies = useCallback(async (page: number) => {
-    try {
-      if (searchQuery && searchQuery.trim() !== '') {
-        await searchMovies(searchQuery, page);
-        return;
-      }
-
-      setLoading(true);
-
-      try {
-        const response = await getMoviesForAdmin(
-          page,
-          moviesPerPage,
-          sortField,
-          sortDirection,
-          selectedCategory || undefined,
-          filterStatus !== 'all' ? filterStatus : undefined,
-          '',
-          filterYear,
-          filterType || undefined
-        );
-
-        if (response && response.movies && Array.isArray(response.movies) && response.movies.length > 0) {
-          setMovies(response.movies as unknown as Movie[]);
-          setIsOfflineMock(false);
-          const pagination = response.pagination || {};
-          setTotalMovies(pagination.totalItems || response.movies.length);
-          setTotalPages(pagination.totalPages || 1);
-          setLoading(false);
-          return;
-        }
-      } catch (apiError) {
-
-      }
-
-      // Fallback to rich mock dataset
-      setIsOfflineMock(true);
-      let filtered = [...MOCK_ADMIN_MOVIES];
-
-      if (selectedCategory) {
-        filtered = filtered.filter(m => m.category.some(c => c.id === selectedCategory));
-      }
-      if (filterStatus !== 'all') {
-        filtered = filtered.filter(m => m.status === filterStatus);
-      }
-      if (filterYear) {
-        filtered = filtered.filter(m => m.year === filterYear);
-      }
-      if (filterType) {
-        filtered = filtered.filter(m => m.type === filterType);
-      }
-
-      setMovies(filtered as any);
-      setTotalMovies(filtered.length);
-      setTotalPages(Math.max(1, Math.ceil(filtered.length / moviesPerPage)));
-      setLoading(false);
-    } catch (error) {
-
-      setLoading(false);
+      if (isStale()) return;
+      console.warn('[AdminMovies] The movie list could not be loaded:', error);
+      toast.error('Không thể tải danh sách phim');
+      setMovies([]);
+      setTotalMovies(0);
+      setTotalPages(1);
+    } finally {
+      if (!isStale()) setLoading(false);
     }
   }, [searchQuery, moviesPerPage, sortField, sortDirection, selectedCategory,
-      filterStatus, filterYear, filterType, elasticsearchStatus]);
+      filterStatus, filterYear, filterType]);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
 
-    // Set the new search query value
     setSearchQuery(newValue);
+    setIsSearching(newValue.trim() !== '');
 
-    // Reset to page 1 when search query changes
+    // The list restarts on the page 1 when the term changes.
     setCurrentPage(1);
+  }, []);
 
-    // Clear any existing search timeout
-    if (window.searchTimeout) {
-      clearTimeout(window.searchTimeout);
-    }
+  /**
+   * Loads the list when the page or one of the filters changes.
+   *
+   * There is exactly ONE request per change: the old code called
+   * `fetchMovies(p)` AND set the page, and the effect above called
+   * `fetchMovies(currentPage)` again, so every page change fired TWO
+   * parallel requests for the same page.
+   *
+   * The search is debounced, so the list is not reloaded on every keystroke.
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchMovies(currentPage);
+    }, searchQuery.trim() ? 300 : 0);
 
-    if (!newValue || newValue.trim() === '') {
-      setIsSearching(false);
-
-      // Directly call getMoviesForAdmin instead of fetchMovies to avoid circular dependency issues
-      setLoading(true);
-      getMoviesForAdmin(
-        1,
-        moviesPerPage,
-        sortField,
-        sortDirection,
-        selectedCategory || undefined,
-        filterStatus !== 'all' ? filterStatus : undefined,
-        '',
-        filterYear,
-        filterType || undefined
-      ).then(response => {
-
-        if (response && response.movies && Array.isArray(response.movies)) {
-          setMovies(response.movies as unknown as Movie[]);
-
-          const pagination = response.pagination || {};
-          setTotalMovies(pagination.totalItems || 0);
-          setTotalPages(pagination.totalPages || 1);
-        } else {
-
-          setMovies([]);
-          setTotalMovies(0);
-          setTotalPages(1);
-        }
-
-        setLoading(false);
-      }).catch(error => {
-
-        toast.error('Không thể tải danh sách phim');
-        setLoading(false);
-        setMovies([]);
-        setTotalMovies(0);
-        setTotalPages(1);
-      });
-    } else {
-      // Set a timeout for search to avoid too many API calls while typing
-      window.searchTimeout = setTimeout(() => {
-        searchMovies(newValue, 1);
-      }, 300);
-    }
-  }, [moviesPerPage, sortField, sortDirection, selectedCategory, filterStatus, filterYear, filterType]);
+    return () => clearTimeout(timer);
+  }, [currentPage, moviesPerPage, sortField, sortDirection, selectedCategory,
+      filterStatus, filterYear, filterType, searchQuery, fetchMovies]);
 
   useEffect(() => {
-    if (searchQuery === '') {
-      fetchMovies(currentPage);
-    }
-  }, [currentPage, moviesPerPage, sortField, sortDirection, selectedCategory, filterStatus, filterYear, filterType, isSearching]);  useEffect(() => {
     const fetchCategories = async () => {
+      // The categories of the API are read from `/categories`, so the
+      // filter uses the REAL slugs (`hanh-dong`, `hai`, ...). The route
+      // `/admin/movies/categories` does not exist on the backend and it was
+      // answered with an empty list, which left the filter with the local
+      // mock ids (`cat-1`), and those ids mean nothing to the API.
       try {
-        const response = await axiosInstance.get(apiPath(`adminMoviesCategories`));
-        if (response.data && response.data.categories && response.data.categories.length > 0) {
-          setCategories(response.data.categories);
+        // The limit is raised, because the route of the backend is
+        // paginated and answers 20 items per page by default.
+        const response = await axiosInstance.get(apiPath(`taxonomyCategories`), {
+          params: { page: 1, limit: 100 }
+        });
+        const payload = (response.data?.responseData ?? response.data) as
+          | Record<string, unknown>
+          | undefined;
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload?.categories)
+              ? payload.categories
+              : [];
+
+        if (list.length > 0) {
+          setCategories(
+            list
+              .map((item) => {
+                const entry = item as Record<string, unknown>;
+                return {
+                  id: String(entry.id ?? entry._id ?? entry.slug ?? ''),
+                  name: String(entry.name ?? entry.slug ?? ''),
+                  slug: String(entry.slug ?? entry.name ?? '')
+                };
+              })
+              .filter((item) => item.slug !== '')
+          );
           return;
         }
       } catch (error) {
-
+        // The route is not available: the local categories are used.
       }
       setCategories(INITIAL_CATEGORIES as any);
     };
 
+    // The categories are read ONCE. The old code reloaded them after every
+    // change of the movie list, which produced one extra request per
+    // page change.
     fetchCategories();
-  }, [movies]); // Add movies as a dependency to update categories when movies list changes
+  }, []);
 
   const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const yearValue = e.target.value ? parseInt(e.target.value) : undefined;
@@ -496,8 +426,8 @@ const MoviesAdmin = () => {
       try {
         await deleteMovieByAdmin(deleteModal.movie._id);
         toast.success('Xóa phim thành công');
-        fetchMovies(currentPage);
         setDeleteModal({ isOpen: false, movie: null });
+        fetchMovies(currentPage);
       } catch (error) {
 
         toast.error('Không thể xóa phim');
@@ -523,18 +453,35 @@ const MoviesAdmin = () => {
 
       const loadingToast = toast.loading('Đang cập nhật trạng thái phim...');
 
-      const response = await toggleMovieVisibility(movieId);
+      // The current state is sent to the backend, so the service knows
+      // which state the movie has to switch to.
+      const response = await toggleMovieVisibility(movieId, Boolean(movie.isHidden));
 
       toast.dismiss(loadingToast);
 
-      const newIsHidden = !movie.isHidden;
+      const newIsHidden = response.isHidden;
       toast.success(`Đã ${newIsHidden ? 'ẩn' : 'hiện'} phim thành công`);
 
-      setMovies(prevMovies =>
-        prevMovies.map(m =>
-          m._id === movieId ? { ...m, isHidden: newIsHidden } : m
-        )
-      );
+      setMovies(prevMovies => {
+        const updated = prevMovies.map(m =>
+          m._id === movieId ? { ...m, isHidden: newIsHidden, visibilityKnown: true } : m
+        );
+
+        // The list route of the backend only returns the VISIBLE movies, so
+        // a movie that has just been hidden does not belong to the list
+        // anymore. When the "visible" filter is active, the row is
+        // removed right away instead of staying on the table until the next
+        // reload.
+        if (newIsHidden && filterStatus === 'active') {
+          return updated.filter(m => m._id !== movieId);
+        }
+        return updated;
+      });
+
+      // The total is corrected as well, so the footer agrees with the table.
+      if (newIsHidden && filterStatus === 'active') {
+        setTotalMovies(prev => Math.max(0, prev - 1));
+      }
     } catch (error) {
 
       toast.error('Không thể cập nhật trạng thái hiển thị phim');
@@ -674,7 +621,9 @@ const MoviesAdmin = () => {
           <CinemaDropdown
             options={[
               { value: '', label: ADMIN_MOVIES_I18N.filters.allCategories },
-              ...categories.map((c) => ({ value: c.id, label: c.name }))
+              // The SLUG is the value of the filter: the API filters on the
+              // slug of the category (`hanh-dong`), not on its id.
+              ...categories.map((c) => ({ value: c.slug || c.id, label: c.name }))
             ]}
             value={selectedCategory}
             onChange={(val) => {
@@ -953,8 +902,10 @@ const MoviesAdmin = () => {
             totalItems={totalMovies}
             pageSize={moviesPerPage}
             onPageChange={(p) => {
+              // ONLY the state is changed here: the effect above loads the
+              // page. Calling `fetchMovies(p)` as well fired TWO requests
+              // for the SAME page, and the slower one won.
               setCurrentPage(p);
-              fetchMovies(p);
             }}
             onPageSizeChange={(newSize) => {
               setMoviesPerPage(newSize);

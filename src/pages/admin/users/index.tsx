@@ -21,6 +21,7 @@ import { FaSync, FaExclamationTriangle } from 'react-icons/fa';
 import { ADMIN_USERS_I18N, ADMIN_COMMON_I18N } from '@/config/i18n/admin';
 import { MOCK_ADMIN_USERS, MOCK_USER_STATS } from '@/mock/admin';
 import { resolveWebSocketUrl } from '@/config/apiBase';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 // Basic type definitions for this component
 interface UserForAdmin {
@@ -283,7 +284,7 @@ const AdminUsersPage = () => {
       ws.onopen = () => {
         // Successful connection — reset the backoff counter.
         wsReconnectAttemptsRef.current = 0;
-        const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+        const token = getStoredAccessToken();
         if (token) {
           try {
             ws.send(JSON.stringify({

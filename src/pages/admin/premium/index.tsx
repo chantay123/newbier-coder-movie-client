@@ -15,6 +15,7 @@ import 'dayjs/locale/vi';
 import AdminLayout from '@/layouts/AdminLayout';
 import Head from 'next/head';
 import { apiUrl } from '@/config/apiPaths';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 // Set Vietnamese locale for dayjs
 dayjs.locale('vi');
@@ -283,6 +284,15 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('remember_me');
+    localStorage.removeItem('user-store');
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.removeItem('auth_token');
+      window.sessionStorage.removeItem('token');
+      window.sessionStorage.removeItem('backendToken');
+      window.sessionStorage.removeItem('user');
+    }
 
     // Redirect to login page
     router.push('/auth/login?redirect=/admin/premium');
@@ -290,21 +300,16 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
 
   // Debug function to check token
   useEffect(() => {
-    // Check for token in localStorage
-    const authToken = localStorage.getItem('authToken');
-    const token = localStorage.getItem('token');
-    const auth_token = localStorage.getItem('auth_token');
-
-    // Auto copy token from authToken to auth_token to ensure Axios can use it
-    if (authToken && !auth_token) {
-      localStorage.setItem('auth_token', authToken);
-    }
+    // The token is read through the shared helper, which reads it from the
+    // MEMORY of the tab. It is not stored in the Web Storage any more, so
+    // there is no legacy key to migrate.
+    const storedToken = getStoredAccessToken();
 
     // Create test request
     const testAPI = async () => {
       try {
         // Add token directly to header for testing
-        const testToken = authToken || token || auth_token;
+        const testToken = storedToken;
         if (testToken) {
           // Save token info for display
           setTokenInfo({
@@ -361,7 +366,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
         }
       }
 
-      const testToken = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+      const testToken = getStoredAccessToken();
       if (!testToken) {
         setSubscriptions([]);
         setLoading(false);
@@ -536,7 +541,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
       });
 
       // Direct fetch for debugging
-      const testToken = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+      const testToken = getStoredAccessToken();
       if (!testToken) {
         toast.dismiss(toastId);
         toast.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
@@ -618,7 +623,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
       });
 
       // Direct fetch for debugging
-      const testToken = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+      const testToken = getStoredAccessToken();
       if (!testToken) {
         toast.dismiss(toastId);
         toast.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
@@ -698,7 +703,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
       });
 
       // Direct fetch for debugging
-      const testToken = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+      const testToken = getStoredAccessToken();
       if (!testToken) {
         toast.dismiss(toastId);
         toast.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại.');
@@ -756,7 +761,7 @@ const AdminPremiumPage: NextPageWithLayout<AdminPremiumPageProps> = () => {
   // Handle viewing user details
   const handleViewUserDetails = async (userId: string) => {
     try {
-      const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+      const token = getStoredAccessToken();
       if (!token) {
         toast.error('Không tìm thấy token xác thực!');
         return;

@@ -6,6 +6,7 @@
  */
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { resolveWebSocketUrl } from '@/config/apiBase';
+import { getStoredAccessToken } from '@/API/services/authService';
 
 interface WebSocketContextValue {
   socket: WebSocket | null;
@@ -69,7 +70,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     ws.onopen = (): void => {
       setIsConnected(true);
-      const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token');
+      const token = getStoredAccessToken();
       if (token) {
         ws.send(JSON.stringify({ type: 'authenticate', token }));
       }

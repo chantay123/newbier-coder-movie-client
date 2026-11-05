@@ -9,6 +9,18 @@
 import { AUTH_CONFIG } from '@/config/authConfig';
 import { getApiBaseUrl } from '@/config/apiBase';
 import { apiUrl } from '@/config/apiPaths';
+import {
+  clearMemorySession,
+  ensureCsrfToken,
+  ensureSessionReady,
+  getMemoryAccessToken,
+  getMemoryRememberMe,
+  getMemoryUser,
+  resetSessionRestore,
+  setMemoryAccessToken,
+  setMemoryRememberMe,
+  setMemoryUser,
+} from '@/utils/accessTokenStore';
 
 /** Obfuscation key. It is an environment variable so it can be changed when needed. */
 const OBFUSCATION_KEY = process.env.NEXT_PUBLIC_SESSION_OBFUSCATE || 'xK9mP2vL';
@@ -67,51 +79,103 @@ const obfDecode = (encoded: string): string | null => {
  */
 const API_URL = getApiBaseUrl();
 
-/** Storage key constants — kept in sync between `login`, `refreshToken`,
- * `isLoggedIn`, `getAuthHeader`, and `_clearLocalSession`. */
+/** Storage key constants.
+ *
+ * ONLY the non-sensitive keys are listed here.
+ *
+ * The access token and the refresh token are NOT stored in the Web Storage
+ * any more:
+ *   - the refresh token lives in an encrypted `HttpOnly` cookie, on the
+ *     server side, so the JavaScript of the page cannot read it;
+ *   - the access token lives in the memory of the tab
+ *     (`src/utils/accessTokenStore.ts`).
+ *
+ * The keys below are the legacy ones, so the leftovers of a previous
+ * version can be removed on the first run. */
 const STORAGE_KEYS = {
-  accessToken: 'auth_token',
-  accessTokenAlt: 'token',
-  refreshToken: 'refresh_token',
+  /** The legacy access token keys. They are only removed, never written. */
+  legacyAccessTokens: ['auth_token', 'token', 'authToken'] as const,
+  /** The legacy refresh token key. It is only removed, never written. */
+  legacyRefreshToken: 'refresh_token',
+  /** The user payload. It never contains a token. */
   user: 'user',
   isAccountLocked: 'isAccountLocked',
-  sessionBackendToken: 'backendToken',
-  sessionUser: 'user'
+  /** The legacy NextAuth bridge token. It is only removed, never written. */
+  legacySessionBackendToken: 'backendToken',
+  /** The Zustand persist key of the user store. It is wiped on logout so
+   * the store cannot keep a stale "authenticated" state. */
+  userStore: 'user-store'
 } as const;
 
 /** Persisted remember-me flag stored in localStorage so subsequent page
  * loads can re-hydrate the checkbox state. The flag itself is not
- * security-sensitive (it does not grant access on its own). */
+ * security-sensitive (it does not grant access on its own): the session
+ * itself lives in the `HttpOnly` cookie. */
 const REMEMBER_ME_KEY = 'remember_me';
 
-/** Read the access token from the right storage depending on the
- * remember-me flag set during login. */
-const readAccessToken = (): string | null => {
+/**
+ * Reads the access token of the current tab.
+ *
+ * The token is read from the MEMORY of the tab. It is never read from the
+ * Web Storage, because a token in the Web Storage can be read by any
+ * script running on the page.
+ *
+ * @returns The token, or null when there is no session.
+ */
+const readAccessToken = (): string | null => getMemoryAccessToken();
+
+/**
+ * Reads the access token from the LEGACY storage locations.
+ *
+ * It is only used to detect (and then remove) the leftovers of a previous
+ * version. It never returns a token that is used for a request.
+ *
+ * @returns The legacy token, or null.
+ */
+const readLegacyAccessToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
-  if (remembered) {
-    return (
-      localStorage.getItem(STORAGE_KEYS.accessToken) ||
-      localStorage.getItem(STORAGE_KEYS.accessTokenAlt) ||
-      null
-    );
+  const isUsable = (value: string | null): value is string =>
+    Boolean(value) && value !== 'undefined' && value !== 'null';
+  try {
+    for (const key of STORAGE_KEYS.legacyAccessTokens) {
+      const value = localStorage.getItem(key);
+      if (isUsable(value)) return value;
+    }
+  } catch {
+    /* the storage is disabled */
   }
-  // Session-only: prefer sessionStorage; fall back to localStorage so
-  // the active tab stays logged in during reloads within the same tab.
-  return (
-    (window.sessionStorage && window.sessionStorage.getItem(STORAGE_KEYS.accessToken)) ||
-    localStorage.getItem(STORAGE_KEYS.accessToken) ||
-    localStorage.getItem(STORAGE_KEYS.accessTokenAlt) ||
-    null
-  );
+  try {
+    for (const key of STORAGE_KEYS.legacyAccessTokens) {
+      const value = window.sessionStorage?.getItem(key);
+      if (isUsable(value)) return value;
+    }
+  } catch {
+    /* the storage is disabled */
+  }
+  return null;
 };
 
-const readRefreshToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
-  if (!remembered) return null; // session-only login does not keep refresh token
-  return localStorage.getItem(STORAGE_KEYS.refreshToken);
-};
+/**
+ * Reads the access token of the current tab.
+ *
+ * It is the single helper every service uses, so the token is always read
+ * from the same place.
+ *
+ * @returns The token, or null when the user is not signed in.
+ */
+export const getStoredAccessToken = (): string | null => readAccessToken();
+
+/**
+ * Reads the refresh token of the current tab.
+ *
+ * The refresh token is NEVER available on the client side: it lives in the
+ * encrypted `HttpOnly` cookie, on the server side. The renewal is done by
+ * the server (`/api/auth/refresh`).
+ *
+ * @returns Always null. The function only exists to keep the old call
+ *          sites working.
+ */
+const readRefreshToken = (): string | null => null;
 
 /** The login information coming from the form. */
 export interface LoginCredentials {
@@ -137,10 +201,14 @@ export interface UserPayload {
   [key: string]: unknown;
 }
 
-/** The token and the user returned after a successful login. */
+/** The token and the user returned after a successful login.
+ *
+ * The `user` payload NEVER contains a token: it is stored in the browser,
+ * so it must stay free of secrets. The access token is returned separately
+ * and is kept in the memory of the tab. */
 export interface LoginResult {
   success: true;
-  user: UserPayload & { token: string };
+  user: UserPayload;
   token: string;
   data?: unknown;
   rememberMe?: boolean;
@@ -161,6 +229,37 @@ export interface RegisterResult {
   message: string;
   data: unknown;
 }
+
+/**
+ * Stores the user payload.
+ *
+ * The payload is always written to `sessionStorage` (the tab session). It is
+ * ALSO written to `localStorage` when the "remember me" flag is set, so a
+ * new tab can restore the session. The previous implementation always removed
+ * the `localStorage` copy, which lost the user on the next visit even though
+ * the token was still valid.
+ *
+ * @param user - The user payload to store.
+ * @returns Nothing. Storage failures are swallowed on purpose.
+ */
+const persistUser = (user: UserPayload): void => {
+  if (typeof window === 'undefined') return;
+  const encoded = obfEncode(JSON.stringify(user));
+  try {
+    window.sessionStorage.setItem(STORAGE_KEYS.user, encoded);
+  } catch {
+    /* sessionStorage can be disabled */
+  }
+  try {
+    if (localStorage.getItem(REMEMBER_ME_KEY) === '1') {
+      localStorage.setItem(STORAGE_KEYS.user, encoded);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.user);
+    }
+  } catch {
+    /* localStorage can be disabled */
+  }
+};
 
 /** The authorization header used with fetch. */
 export interface AuthHeader {
@@ -214,33 +313,113 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
 };
 
 /**
+ * Builds the user payload of the app.
+ *
+ * The token is NOT part of the returned object: it would end up in the
+ * storage of the user payload.
+ *
+ * @param profile - The profile returned by the backend.
+ * @param accessToken - The access token, used to rebuild the profile when
+ *                      the backend did not send one.
+ * @param fallbackUsername - The username of the form, used as a fallback.
+ * @returns The user payload.
+ */
+const resolveUserFromProfile = (
+  profile: Record<string, unknown> | null | undefined,
+  accessToken: string,
+  fallbackUsername: string
+): UserPayload => {
+  const source = (profile ?? {}) as Record<string, unknown>;
+
+  if (Object.keys(source).length > 0) {
+    return {
+      ...source,
+      _id: (source._id as string) || (source.id as string) || (source.sub as string),
+      id: (source._id as string) || (source.id as string) || (source.sub as string),
+      fullname: (source.fullname as string) || (source.username as string) || '',
+      username: (source.username as string) || (source.email as string) || fallbackUsername,
+      role: (source.role as string) || 'USER'
+    } as UserPayload;
+  }
+
+  const decoded = decodeJwtPayload(accessToken) || {};
+  return {
+    _id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
+    id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
+    username: (decoded.username as string) || fallbackUsername,
+    fullname: (decoded.fullname as string) || (decoded.username as string) || '',
+    role: (decoded.role as string) || 'USER',
+    permissions: (decoded.permissions as string[]) || [],
+    sessionId: (decoded.sessionId as string) || '',
+    accountType: (decoded.accountType as string) || 'Normal'
+  };
+};
+
+/**
  * Removes every authentication artifact from the client side.
+ *
+ * The tokens are not in the Web Storage any more, so this only wipes:
+ *   - the MEMORY of the tab (the access token and the user profile);
+ *   - the LEGACY keys of the previous versions, so a token written by an
+ *     older build can never be used again;
+ *   - the remember-me flag and the persisted user store.
+ *
+ * The server-side session (the encrypted `HttpOnly` cookie) is cleared by
+ * the `/api/auth/logout` route, not from here.
  *
  * @returns Nothing. Storage failures are swallowed on purpose.
  */
 const clearLocalSession = (): void => {
   if (typeof window === 'undefined') return;
+
+  // The tokens of the tab are gone.
+  clearMemorySession();
+  resetSessionRestore();
+
   try {
-    localStorage.removeItem(STORAGE_KEYS.accessToken);
-    localStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
-    localStorage.removeItem(STORAGE_KEYS.refreshToken);
+    // The legacy token keys are removed, so a token written by a previous
+    // version of the app can never be sent again.
+    STORAGE_KEYS.legacyAccessTokens.forEach((key) => localStorage.removeItem(key));
+    localStorage.removeItem(STORAGE_KEYS.legacyRefreshToken);
     localStorage.removeItem(STORAGE_KEYS.user);
     localStorage.removeItem(STORAGE_KEYS.isAccountLocked);
     localStorage.removeItem(REMEMBER_ME_KEY);
+    // The persisted user store is wiped: it holds the favorite cache and
+    // the auth state of the previous session.
+    localStorage.removeItem(STORAGE_KEYS.userStore);
   } catch {
     /* localStorage can be disabled (private mode) */
   }
   try {
-    window.sessionStorage.removeItem(STORAGE_KEYS.sessionBackendToken);
-    window.sessionStorage.removeItem(STORAGE_KEYS.sessionUser);
-    window.sessionStorage.removeItem(STORAGE_KEYS.accessToken);
-    window.sessionStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
+    window.sessionStorage.removeItem(STORAGE_KEYS.legacySessionBackendToken);
+    window.sessionStorage.removeItem(STORAGE_KEYS.user);
+    STORAGE_KEYS.legacyAccessTokens.forEach((key) => window.sessionStorage.removeItem(key));
   } catch {
     /* sessionStorage can be disabled */
+  }
+
+  // The components that keep the auth state in React (the AuthProvider and
+  // the ad context) are notified, so the UI leaves the "signed in" state
+  // right away instead of after the next reload.
+  try {
+    window.dispatchEvent(new Event('storage'));
+  } catch {
+    /* the event is not supported */
   }
 };
 
 const authService = {
+  /**
+   * Signs the user in.
+   *
+   * The call goes to the LOCAL route `/api/auth/login`, which forwards the
+   * credentials to the backend and stores the refresh token in an
+   * encrypted `HttpOnly` cookie (server side).
+   *
+   * The answer only carries the access token and the token-free user
+   * profile. The access token is kept in the MEMORY of the tab; it is
+   * never written to the Web Storage.
+   */
   login: async (credentials: LoginCredentials): Promise<LoginResult> => {
     const username = credentials.username || credentials.email || '';
     const rememberMe = credentials.rememberMe === true;
@@ -249,57 +428,50 @@ const authService = {
       password: credentials.password
     };
 
-    const loginEndpoint = AUTH_CONFIG?.api?.endpoint || apiUrl(`authLogin`);
+    // The CSRF nonce is required by the route. The cookie is not `HttpOnly`,
+    // so the client can read it and copy it into the header.
+    const csrfToken = await ensureCsrfToken();
 
-    const response = await fetch(loginEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    let responseText = '';
-    let data: any = null;
-
+    let response: Response;
     try {
-      responseText = await response.text();
-      if (responseText) {
-        data = JSON.parse(responseText);
-
-      }
+      response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {})
+        },
+        body: JSON.stringify({ ...payload, rememberMe })
+      });
     } catch {
-      // silent parse handling
+      throw new Error('Cannot reach the server. Please check your connection.');
+    }
+
+    let data: Record<string, unknown> | null = null;
+    try {
+      data = (await response.json()) as Record<string, unknown>;
+    } catch {
+      data = null;
     }
 
     if (!response.ok) {
-
+      const message = (data?.message as string) || 'Authentication failed';
+      throw new Error(
+        response.status === 401 || response.status === 403
+          ? 'Invalid username or password'
+          : message
+      );
     }
 
-    // Diagnostic helper: deep-search for an access token anywhere in the
-    // response object so we handle every shape the backend may return.
-    const findAccessToken = (obj: unknown, depth = 0): string | null => {
-      if (depth > 4 || !obj || typeof obj !== 'object') return null;
-      const o = obj as Record<string, unknown>;
-      for (const key of Object.keys(o)) {
-        const v = o[key];
-        // Stop recursion at non-object leaf values (we only want to descend
-        // into plain objects/arrays).
-        if (typeof v === 'string' && v.split('.').length === 3) {
-          // Likely a JWT: three dot-separated base64 segments.
-          return v;
-        }
-        if (typeof v === 'object' && v !== null) {
-          const found = findAccessToken(v, depth + 1);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
+    const rawAccessToken = (data?.token as string) || null;
+    if (!rawAccessToken) {
+      throw new Error('Không nhận được token từ máy chủ.');
+    }
 
-    // Persist the remember-me flag BEFORE storing tokens so the storage
-    // helpers in this module can read the right location.
+    // The remember-me flag is persisted, so the checkbox of the login form
+    // can be restored. The flag itself grants nothing: the session lives in
+    // the `HttpOnly` cookie.
     try {
       if (rememberMe) localStorage.setItem(REMEMBER_ME_KEY, '1');
       else localStorage.removeItem(REMEMBER_ME_KEY);
@@ -307,166 +479,37 @@ const authService = {
       /* localStorage may be disabled */
     }
 
-    // Helper: write access token to the right storage based on rememberMe
-    const persistAccessToken = (token: string): void => {
-      if (rememberMe) {
-        localStorage.setItem(STORAGE_KEYS.accessToken, token);
-        localStorage.setItem(STORAGE_KEYS.accessTokenAlt, token);
-      } else {
-        // Session-only: clear any leftover persisted tokens first so a
-        // previous "remember me" login does not leak across sessions.
-        localStorage.removeItem(STORAGE_KEYS.accessToken);
-        localStorage.removeItem(STORAGE_KEYS.accessTokenAlt);
-        localStorage.removeItem(STORAGE_KEYS.refreshToken);
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-          window.sessionStorage.setItem(STORAGE_KEYS.accessToken, token);
-          window.sessionStorage.setItem(STORAGE_KEYS.accessTokenAlt, token);
-        }
-      }
-    };
-
-    // Extract access token from any plausible response shape.
-    // Priority: explicit responseData paths first, then deep-search fallback.
-    const rawAccessToken: string | null =
-      data?.responseData?.access_token ||
-      data?.responseData?.accessToken ||
-      data?.data?.access_token ||
-      data?.data?.accessToken ||
-      data?.access_token ||
-      data?.accessToken ||
-      data?.token ||
-      (typeof data === 'object' ? findAccessToken(data) : null) ||
-      null;
-
-    const rawRefreshToken: string | null =
-      data?.responseData?.refresh_token ||
-      data?.responseData?.refreshToken ||
-      data?.data?.refresh_token ||
-      data?.data?.refreshToken ||
-      data?.refresh_token ||
-      data?.refreshToken ||
-      data?.refreshToken ||
-      null;
-
-    // Resolve user payload from explicit path, JWT decode fallback, or null.
-    const resolveUser = (accessToken: string): UserPayload & { token: string } => {
-      const userPayload: UserPayload | null =
-        data?.responseData?.user ||
-        data?.data?.user ||
-        null;
-
-      if (userPayload && typeof userPayload === 'object') {
-        return {
-          ...userPayload,
-          _id: userPayload._id || userPayload.id || userPayload.sub,
-          id: userPayload._id || userPayload.id || userPayload.sub,
-          fullname: userPayload.fullname || userPayload.username || '',
-          username: userPayload.username || userPayload.email || payload.username,
-          role: userPayload.role || 'USER',
-          token: accessToken
-        };
-      }
-
-      const decoded = decodeJwtPayload(accessToken) || {};
-      return {
-        _id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
-        id: (decoded.sub as string) || (decoded.userId as string) || (decoded.id as string),
-        username: (decoded.username as string) || payload.username,
-        fullname: (decoded.fullname as string) || (decoded.username as string) || '',
-        role: (decoded.role as string) || 'USER',
-        permissions: (decoded.permissions as string[]) || [],
-        sessionId: (decoded.sessionId as string) || '',
-        accountType: (decoded.accountType as string) || 'Normal',
-        token: accessToken
-      };
-    };
-
-    // Case 1: Backend returns responseStatus + responseData (v1 contract).
-    if (data?.responseStatus) {
-      const code = data.responseStatus.responseCode;
-      const message = data.responseStatus.responseMessage || '';
-      const isSuccess =
-        code === AUTH_CONFIG.api.successCode ||
-        // Accept any 2xx-like code the backend may return.
-        (typeof code === 'string' && code.startsWith('00000'));
-
-      if (isSuccess && rawAccessToken) {
-        persistAccessToken(rawAccessToken);
-        if (rawRefreshToken && rememberMe) {
-          localStorage.setItem(STORAGE_KEYS.refreshToken, rawRefreshToken);
-        } else if (!rememberMe) {
-          localStorage.removeItem(STORAGE_KEYS.refreshToken);
-        }
-        const user = resolveUser(rawAccessToken);
-        if (rememberMe) {
-          // Legacy localStorage key. It is still obfuscated to hide the
-          // information from the DevTools.
-          localStorage.setItem(STORAGE_KEYS.user, obfEncode(JSON.stringify(user)));
-        } else if (typeof window !== 'undefined' && window.sessionStorage) {
-          window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, obfEncode(JSON.stringify(user)));
-        }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('storage'));
-        }
-        return { success: true, user, token: rawAccessToken, data, rememberMe };
-      }
-
-      // Non-success responseStatus (e.g. 00000204 Invalid credentials,
-      // 00000500 Internal server error). Use the backend's responseCode
-      // whitelist to decide which messages are "invalid credentials"
-      // specifically. Anything else is passed through verbatim so that
-      // server errors (5xx) are not mis-reported as a user typo.
-
-      const isInvalidCreds =
-        code === AUTH_CONFIG.api.invalidCredentialsCode ||
-        response.status === 401 ||
-        response.status === 403;
-      throw new Error(isInvalidCreds
-        ? 'Invalid username or password'
-        : (message || 'Authentication failed'));
+    // The access token goes to the MEMORY of the tab. The legacy keys of
+    // the previous versions are removed, so a token written by an older
+    // build can never be used again.
+    try {
+      STORAGE_KEYS.legacyAccessTokens.forEach((key) => localStorage.removeItem(key));
+      STORAGE_KEYS.legacyAccessTokens.forEach((key) => window.sessionStorage.removeItem(key));
+      localStorage.removeItem(STORAGE_KEYS.legacyRefreshToken);
+    } catch {
+      /* the storage may be disabled */
     }
 
-    // Case 2: Legacy flat shape — HTTP ok + raw token at the top level.
-    if (!response.ok) {
-      // Use the server's HTTP status to decide the user-facing message.
-      // 4xx (except 401/403) → not necessarily "invalid credentials".
-      // 5xx → server-side failure, surface that to the user.
-      let errorMessage = `HTTP ${response.status}`;
-      if (response.status === 401 || response.status === 403) {
-        errorMessage = 'Invalid username or password';
-      } else if (response.status >= 500) {
-        errorMessage = 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau ít phút.';
-      } else if (data && (data.error || data.message)) {
-        errorMessage = data.error || data.message;
-      } else if (responseText.includes('<!DOCTYPE')) {
-        errorMessage = 'Cannot reach the server. Please check the API URL.';
-      }
-      throw new Error(errorMessage);
+    setMemoryAccessToken(rawAccessToken);
+    setMemoryRememberMe(rememberMe);
+    setMemoryUser((data?.user as Record<string, unknown>) ?? null);
+    resetSessionRestore();
+
+    const user = resolveUserFromProfile(
+      data?.user as Record<string, unknown> | null | undefined,
+      rawAccessToken,
+      payload.username
+    );
+
+    // The user payload (without any token) is kept, so the UI can show it
+    // right away.
+    persistUser(user);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('storage'));
     }
 
-    // Case 3: response.ok && no responseStatus — legacy token-at-root.
-    if (rawAccessToken) {
-      persistAccessToken(rawAccessToken);
-      if (rawRefreshToken && rememberMe) {
-        localStorage.setItem(STORAGE_KEYS.refreshToken, rawRefreshToken);
-      } else if (!rememberMe) {
-        localStorage.removeItem(STORAGE_KEYS.refreshToken);
-      }
-      const user = resolveUser(rawAccessToken);
-      if (rememberMe) {
-        localStorage.setItem(STORAGE_KEYS.user, obfEncode(JSON.stringify(user)));
-      } else if (typeof window !== 'undefined' && window.sessionStorage) {
-        window.sessionStorage.setItem(STORAGE_KEYS.sessionUser, obfEncode(JSON.stringify(user)));
-      }
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('storage'));
-      }
-      return { success: true, user, token: rawAccessToken, data, rememberMe };
-    }
-
-    // Case 4: 200 but token not found anywhere — unexpected server response.
-
-    throw new Error('Không nhận được token từ máy chủ.');
+    return { success: true, user, token: rawAccessToken, data, rememberMe };
   },
 
   register: async (userData: RegisterData): Promise<RegisterResult> => {
@@ -515,39 +558,38 @@ const authService = {
     };
   },
 
+  /**
+   * Signs the user out.
+   *
+   * The call goes to the LOCAL route `/api/auth/logout`, which terminates
+   * the session on the backend and clears the encrypted `HttpOnly` cookie.
+   * The browser never handles the refresh token.
+   *
+   * The local session is cleared even when the server does not answer.
+   */
   logout: async (): Promise<void> => {
-    // Best effort: the local session is cleared even when the server does not
-    // answer.
     try {
       if (typeof window === 'undefined') {
         clearLocalSession();
         return;
       }
 
-      const accessToken = readAccessToken();
-      const refreshToken = readRefreshToken();
+      const csrfToken = await ensureCsrfToken();
 
-      // Build URL the same way as login
-      const endpoint = apiUrl(`authLogout`);
-
-      if (accessToken || refreshToken) {
-        const headers: Record<string, string> = { 'Accept': 'application/json' };
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-        const body = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
-
-        try {
-          await fetch(endpoint, {
-            method: 'POST',
-            headers,
-            body,
-            // A slow backend must not block the local cleanup.
-            keepalive: true
-          });
-        } catch (networkError) {
-
-        }
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {})
+          },
+          // A slow backend must not block the local cleanup.
+          keepalive: true
+        });
+      } catch {
+        /* the local session is cleared anyway */
       }
     } finally {
       clearLocalSession();
@@ -563,6 +605,10 @@ const authService = {
 
   // ---------------------------------------------------------------------
   // Refresh token - single-flight pattern
+  //
+  // The refresh token NEVER travels through the browser: the route
+  // `/api/auth/refresh` reads it from the encrypted `HttpOnly` cookie and
+  // calls the backend itself. Only the fresh access token comes back.
   // ---------------------------------------------------------------------
   _refreshInFlight: null as Promise<string> | null,
 
@@ -571,26 +617,23 @@ const authService = {
       return authService._refreshInFlight;
     }
 
-    const refreshToken = readRefreshToken();
-
-    if (!refreshToken) {
-      const err: ServiceError = new Error('No refresh token available');
-      err.code = 'NO_REFRESH_TOKEN';
-      throw err;
-    }
-
-    const endpoint = apiUrl(`authRefreshToken`);
-
     const promise = (async (): Promise<string> => {
+      // The session has to be restored first, otherwise the route cannot
+      // know which session to renew.
+      await ensureSessionReady();
+
+      const csrfToken = await ensureCsrfToken();
+
       let response: Response;
       try {
-        response = await fetch(endpoint, {
+        response = await fetch('/api/auth/refresh', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ refreshToken })
+            'Accept': 'application/json',
+            ...(csrfToken ? { 'x-csrf-token': csrfToken } : {})
+          }
         });
       } catch (networkError) {
         const err: ServiceError = new Error('Network error while refreshing token');
@@ -614,27 +657,16 @@ const authService = {
         throw err;
       }
 
-      let data: any = null;
+      let data: { token?: string; user?: Record<string, unknown> } | null = null;
       try {
-        data = await response.json();
+        data = (await response.json()) as { token?: string; user?: Record<string, unknown> };
       } catch {
         const err: ServiceError = new Error('Invalid refresh response');
         err.code = 'INVALID_RESPONSE';
         throw err;
       }
 
-      // Accept v1 contract first, then fall back to legacy shapes
-      const payload = data?.responseData || data || {};
-      const newAccessToken: string | null =
-        payload.access_token ||
-        payload.accessToken ||
-        data?.token ||
-        null;
-      const newRefreshToken: string | null =
-        payload.refresh_token ||
-        payload.refreshToken ||
-        data?.refreshToken ||
-        null;
+      const newAccessToken = data?.token || null;
 
       if (!newAccessToken) {
         const err: ServiceError = new Error('No access token in refresh response');
@@ -642,19 +674,9 @@ const authService = {
         throw err;
       }
 
-      if (typeof window !== 'undefined') {
-        const remembered = localStorage.getItem(REMEMBER_ME_KEY) === '1';
-        if (remembered) {
-          localStorage.setItem(STORAGE_KEYS.accessToken, newAccessToken);
-          localStorage.setItem(STORAGE_KEYS.accessTokenAlt, newAccessToken);
-        } else if (window.sessionStorage) {
-          window.sessionStorage.setItem(STORAGE_KEYS.accessToken, newAccessToken);
-          window.sessionStorage.setItem(STORAGE_KEYS.accessTokenAlt, newAccessToken);
-        }
-        if (newRefreshToken && remembered) {
-          localStorage.setItem(STORAGE_KEYS.refreshToken, newRefreshToken);
-        }
-      }
+      // The fresh token is kept in the MEMORY of the tab.
+      setMemoryAccessToken(newAccessToken);
+      if (data?.user) setMemoryUser(data.user);
 
       return newAccessToken;
     })();
@@ -668,28 +690,11 @@ const authService = {
 
   getAuthHeader: async (): Promise<Record<string, string>> => {
     try {
+      // The session is restored first, so the token is never missing
+      // because the restore was still in flight.
+      await ensureSessionReady();
+
       let token: string | null = readAccessToken();
-
-      if (!token && typeof window !== 'undefined' && window.sessionStorage) {
-        token = window.sessionStorage.getItem(STORAGE_KEYS.sessionBackendToken);
-      }
-
-      if (!token) {
-        const userStr =
-          (typeof window !== 'undefined' && window.sessionStorage
-            ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
-            : null) || localStorage.getItem(STORAGE_KEYS.user);
-        if (userStr) {
-          try {
-            const user = JSON.parse(userStr) as { backendToken?: string };
-            if (user && user.backendToken) {
-              token = user.backendToken;
-            }
-          } catch (e) {
-
-          }
-        }
-      }
 
       if (token) {
         const tokenParts = token.split('.');
@@ -724,29 +729,33 @@ const authService = {
   },
 
   isLoggedIn: (): boolean => {
+    // The token is in the memory of the tab.
     if (readAccessToken()) return true;
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      if (window.sessionStorage.getItem(STORAGE_KEYS.sessionBackendToken)) return true;
-    }
+    // The user payload is a fallback, for the moment between the restore
+    // of the session and the arrival of the token.
     try {
       const userJson =
         (typeof window !== 'undefined' && window.sessionStorage
-          ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
+          ? window.sessionStorage.getItem(STORAGE_KEYS.user)
           : null) || localStorage.getItem(STORAGE_KEYS.user);
       if (!userJson) return false;
       const decoded = obfDecode(userJson) || userJson;
-      const user = JSON.parse(decoded) as { backendToken?: string };
-      return !!user?.backendToken;
+      const user = JSON.parse(decoded) as { _id?: string };
+      return !!user?._id;
     } catch {
       return false;
     }
   },
 
   getCurrentUser: (): UserPayload | null => {
+    // The profile of the memory is the freshest one.
+    const fromMemory = getMemoryUser();
+    if (fromMemory) return fromMemory as UserPayload;
+
     try {
       const userJson =
         (typeof window !== 'undefined' && window.sessionStorage
-          ? window.sessionStorage.getItem(STORAGE_KEYS.sessionUser)
+          ? window.sessionStorage.getItem(STORAGE_KEYS.user)
           : null) || localStorage.getItem(STORAGE_KEYS.user);
       if (!userJson) return null;
       const decoded = obfDecode(userJson) || userJson;
@@ -807,6 +816,14 @@ const authService = {
           const decoded = obfDecode(fromSS) || fromSS;
           return JSON.parse(decoded) as UserPayload;
         }
+        // The "remember me" mode also keeps the user in the local storage.
+        const fromLS = (typeof window !== 'undefined' && localStorage.getItem(REMEMBER_ME_KEY) === '1')
+          ? localStorage.getItem('user')
+          : null;
+        if (fromLS) {
+          const decoded = obfDecode(fromLS) || fromLS;
+          return JSON.parse(decoded) as UserPayload;
+        }
       } catch { /* ignore */ }
       return {} as UserPayload;
     })();
@@ -824,10 +841,9 @@ const authService = {
       dateOfBirth: data.user.date_of_birth
     };
 
-    localStorage.removeItem('user'); // clean up legacy key
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem('user', obfEncode(JSON.stringify(updatedUser)));
-    }
+    // The updated user is written to the session storage, and also to the
+    // local storage when the "remember me" flag is set.
+    persistUser(updatedUser);
 
     return {
       success: true,
@@ -874,6 +890,14 @@ const authService = {
           const decoded = obfDecode(fromSS) || fromSS;
           return JSON.parse(decoded) as UserPayload;
         }
+        // The "remember me" mode also keeps the user in the local storage.
+        const fromLS = (typeof window !== 'undefined' && localStorage.getItem(REMEMBER_ME_KEY) === '1')
+          ? localStorage.getItem('user')
+          : null;
+        if (fromLS) {
+          const decoded = obfDecode(fromLS) || fromLS;
+          return JSON.parse(decoded) as UserPayload;
+        }
       } catch { /* ignore */ }
       return {} as UserPayload;
     })();
@@ -882,10 +906,9 @@ const authService = {
       avatar: data.avatarUrl || data.user?.avatar
     };
 
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem('user', obfEncode(JSON.stringify(updatedUser)));
-    }
-    localStorage.removeItem('user'); // clean up legacy key
+    // The updated user is written to the session storage, and also to the
+    // local storage when the "remember me" flag is set.
+    persistUser(updatedUser);
 
     return {
       success: true,
@@ -906,10 +929,9 @@ const authService = {
       throw new Error(data.error || data.message || 'Không thể lấy thông tin người dùng');
     }
 
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem('user', obfEncode(JSON.stringify(data.user)));
-    }
-    localStorage.removeItem('user'); // clean up legacy key
+    // The profile is written to the session storage, and also to the local
+    // storage when the "remember me" flag is set.
+    persistUser(data.user as UserPayload);
     return data.user as UserPayload;
   },
 
@@ -971,9 +993,8 @@ const authService = {
       throw new Error(data.error || data.message || 'Xóa tài khoản thất bại');
     }
 
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+    // The whole client-side session is wiped, exactly like a logout.
+    clearLocalSession();
 
     return {
       success: true,

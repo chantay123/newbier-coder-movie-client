@@ -9,6 +9,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getApiBaseUrl } from '@/config/apiBase';
 
+// The TLS limit is applied as soon as this module is loaded (see
+// `src/utils/serverTls.ts`).
+import '@/utils/serverTls';
+
 interface ErrorResponse {
   message: string;
 }

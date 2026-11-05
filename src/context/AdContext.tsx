@@ -7,6 +7,8 @@
 import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import subscriptionService from '@/API/services/subscriptionService';
+import { getStoredAccessToken } from '@/API/services/authService';
+import { ensureSessionReady } from '@/utils/accessTokenStore';
 
 /** The default ad settings. */
 export interface AdSettings {
@@ -61,27 +63,12 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
   const isNoAccessPage = router.pathname === '/noaccess';
 
   useEffect(() => {
-    const checkAuth = (): void => {
-      // The token is read from `localStorage` when the user ticked
-      // "Remember me", and from `sessionStorage` for a session-only login.
-      const token = (() => {
-        if (typeof window === 'undefined') return null;
-        const remembered = localStorage.getItem('remember_me') === '1';
-        if (remembered) {
-          return localStorage.getItem('auth_token')
-            || localStorage.getItem('token')
-            || localStorage.getItem('authToken');
-        }
-        if (window.sessionStorage) {
-          const fromSession = window.sessionStorage.getItem('auth_token')
-            || window.sessionStorage.getItem('token')
-            || window.sessionStorage.getItem('authToken');
-          if (fromSession) return fromSession;
-        }
-        return localStorage.getItem('auth_token')
-          || localStorage.getItem('token')
-          || localStorage.getItem('authToken');
-      })();
+    const checkAuth = async (): Promise<void> => {
+      // The token is read through the shared helper, which reads it from
+      // the MEMORY of the tab. The session is restored first, so the state
+      // is correct even right after a reload.
+      await ensureSessionReady();
+      const token = typeof window === 'undefined' ? null : getStoredAccessToken();
       const isNowAuthenticated = !!token;
 
       setIsAuthenticated((prevState) => {
@@ -93,13 +80,13 @@ export const AdContextProvider: React.FC<AdContextProviderProps> = ({ children }
       setAuthResolved(true);
     };
 
-    checkAuth();
+    void checkAuth();
 
     const handleStorageChange = (e: StorageEvent): void => {
-      // The auth state is checked again when a token is added or removed
-      // in another tab of the browser.
-      if (e.key === 'auth_token' || e.key === 'token' || e.key === 'authToken' || e.key === 'remember_me') {
-        checkAuth();
+      // The auth state is checked again when the user payload changes, or
+      // when the remember-me flag is toggled in another tab.
+      if (e.key === 'remember_me' || e.key === 'user') {
+        void checkAuth();
       }
     };
     window.addEventListener('storage', handleStorageChange);

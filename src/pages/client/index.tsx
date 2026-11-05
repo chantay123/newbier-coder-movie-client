@@ -24,7 +24,7 @@ import { TrailerModal } from '@/features/movie-detail';
 import type { TrailerMovie as DetailTrailerMovie } from '@/features/client/components/detail/components/TrailerModal';
 import { hasValidTrailer } from '@/utils/trailer';
 import BackToTop from '@/features/shared/components/UI/BackToTop';
-import { useAuth } from '@/utils/auth';
+import { useAuth } from '@/context/AuthContext';
 import {
   HOME_SECTION_ORDER,
   HOME_SECTIONS,
