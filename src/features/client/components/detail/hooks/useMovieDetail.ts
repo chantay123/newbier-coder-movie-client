@@ -595,17 +595,12 @@ export const useMovieDetail = (slug: string | undefined | null): UseMovieDetailR
           || (json.movies as unknown[])
           || [];
         if (Array.isArray(list) && list.length > 0 && isMountedRef.current) {
-          // The related rail of the detail page shows a "watch trailer"
-          // button on each item. Every movie without a real trailer is
-          // filtered out, so the user is never sent to a modal that
-          // immediately shows "the trailer is not available".
-          const filtered = filterMoviesWithValidTrailer(list);
-          const normalized = filtered
+          const normalized = list
             .map((m, idx) => normalizeMovieDetail(m as RawMovie, ((m as RawMovie).slug as string) || `rel-${idx}`))
             .filter((m): m is NormalizedMovieDetail => m !== null);
           setRelatedMovies(normalized);
           // The list is written to the Zustand cache.
-          setCachedRelated(slug, filtered as unknown as import('@/stores/useMovieStore').CachedMovieItem[]);
+          setCachedRelated(slug, list as unknown as import('@/stores/useMovieStore').CachedMovieItem[]);
           return;
         }
       }

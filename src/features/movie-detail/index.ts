@@ -20,5 +20,9 @@ export { default as TrendingSidebar } from '@/features/client/components/detail/
 export { default as CastCrewSection, type CastCrewPerson } from '@/features/client/components/detail/components/CastCrewSection/CastCrewSection';
 export { default as MovieMetaBento } from '@/features/client/components/detail/components/MovieMetaBento/MovieMetaBento';
 export { default as MovieCommentsSection } from '@/features/client/components/detail/components/MovieCommentsSection/MovieCommentsSection';
+export { default as InlineTrailerSection } from '@/features/client/components/detail/components/InlineTrailerSection/InlineTrailerSection';
+export { default as BroadcastScheduleCard } from '@/features/client/components/detail/components/BroadcastSchedule/BroadcastScheduleCard';
+export { default as CuratorRecommendation } from '@/features/client/components/detail/components/CuratorRecommendation/CuratorRecommendation';
+export { default as SimilarMoviesSection, type SimilarMovieItem } from '@/features/client/components/detail/components/SimilarMoviesSection/SimilarMoviesSection';
 
 export { useMovieDetail, normalizeMovieDetail, type MovieDetailError } from '@/features/client/components/detail/hooks/useMovieDetail';

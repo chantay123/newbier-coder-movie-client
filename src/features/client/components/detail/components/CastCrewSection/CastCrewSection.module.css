@@ -1,21 +1,32 @@
 /**
  * @file CastCrewSection.module.css
- * @description Styling for Cast & Crew artist rail.
+ * @description Cinema styling for Cast & Crew showcase rail with circular avatars.
  */
 
 .castCrewContainer {
-  background: rgba(18, 22, 30, 0.6);
+  background: rgba(18, 22, 30, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 18px 20px;
-  margin-top: 20px;
+  border-radius: 16px;
+  padding: 22px 24px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+@media (max-width: 576px) {
+  .castCrewContainer {
+    padding: 16px;
+  }
 }
 
 .headerRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -23,31 +34,102 @@
 .titleGroup {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
 .sectionTitle {
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
   color: #ffffff;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .countBadge {
   font-size: 0.78rem;
   color: #8b949e;
   background: rgba(255, 255, 255, 0.06);
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: 12px;
+  font-weight: 600;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.filterTabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #8b949e;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.filterBtnActive {
+  background: rgba(229, 9, 20, 0.18);
+  border-color: rgba(229, 9, 20, 0.45);
+  color: #ff4d5a;
+  font-weight: 700;
+}
+
+.navControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scrollBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c9d1d9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.scrollBtn:hover {
+  background: #e50914;
+  border-color: #e50914;
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+/* Cast Rail */
 .castRail {
   display: flex;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 20px;
   overflow-x: auto;
-  padding-top: 8px;
-  padding-bottom: 10px;
-  margin-top: -4px;
+  scroll-behavior: smooth;
+  padding: 8px 4px 12px;
   scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 .castRail::-webkit-scrollbar {
@@ -59,79 +141,95 @@
   border-radius: 4px;
 }
 
-.castLink {
-  text-decoration: none;
-  flex: 0 0 110px;
-  max-width: 110px;
-}
-
+/* Actor Card */
 .actorCard {
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
-  padding: 8px 6px;
-  border-radius: 8px;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid transparent;
-  will-change: transform;
+  width: 100px;
+  flex-shrink: 0;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
 }
 
 .actorCard:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
   transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
+/* Perfect Circular Avatar Frame */
 .avatarWrapper {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
+  position: relative;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%; /* Hoàn toàn bo tròn viền */
   overflow: hidden;
-  margin-bottom: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.12);
   background: #161b22;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  border: 2.5px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.25s ease;
 }
 
 .actorCard:hover .avatarWrapper {
   border-color: #e50914;
+  box-shadow: 0 0 18px rgba(229, 9, 20, 0.65);
+  transform: scale(1.05);
 }
 
 .avatarImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 50%;
+  transition: transform 0.35s ease;
+}
+
+.actorCard:hover .avatarImg {
+  transform: scale(1.08);
 }
 
 .avatarPlaceholder {
   width: 100%;
   height: 100%;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1f2430 0%, #161b22 100%);
-  color: #e50914;
-  font-size: 1.1rem;
-  font-weight: 700;
+  color: #ffffff;
+  font-size: 1.6rem;
+  font-weight: 800;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.actorInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-top: 10px;
+  width: 100%;
 }
 
 .actorName {
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #e6edf3;
   width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 2px;
+  transition: color 0.15s ease;
+}
+
+.actorCard:hover .actorName {
+  color: #ff4d5a;
 }
 
 .actorRole {
   font-size: 0.72rem;
   color: #8b949e;
+  margin-top: 2px;
   width: 100%;
   white-space: nowrap;
   overflow: hidden;
@@ -139,11 +237,8 @@
 }
 
 .emptyNotice {
-  display: flex;
-  align-items: center;
-  padding: 14px 16px;
+  padding: 24px;
+  text-align: center;
   color: #8b949e;
-  font-size: 0.84rem;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 6px;
+  font-size: 0.85rem;
 }

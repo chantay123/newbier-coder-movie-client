@@ -104,10 +104,14 @@ export const pickImageSrc = (
 export const BACKDROP_FIELDS: readonly string[] = [
   'backdrop_url',
   'backdropUrl',
-  'poster_url',
-  'posterUrl',
   'thumb_url',
   'thumbUrl',
+  'poster_horizontal',
+  'horizontal_poster',
+  'backdrop_path',
+  'backdropPath',
+  'poster_url',
+  'posterUrl',
   'imagePoster',
   'poster_path',
   'posterPath'
