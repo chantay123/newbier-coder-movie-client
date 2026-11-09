@@ -61,6 +61,7 @@ import {
   ADMIN_TAXONOMY_PAGE_SIZE
 } from '@/config/taxonomyAdminConfig';
 import { parseApiError } from '@/utils/errors/appError';
+import { resolveCountryMeta } from '@/features/admin/services/countryFlagResolver';
 import {
   TaxonomyItem,
   TaxonomyType,
@@ -419,8 +420,67 @@ function toUpdatePayload(input: {
  * `description`, `isActive` and `movieCount`. The form still collects them,
  * so they are kept here, keyed by the id of the item, and merged back into
  * the list that is shown in the admin panel.
+ *
+ * WHY THEY ARE ALSO PERSISTED
+ * The in-memory map alone is lost on every reload, so the flags of the
+ * countries disappeared as soon as the page was refreshed. The extras are
+ * therefore ALSO written to the Web Storage, keyed by the id of the item,
+ * and read back when the panel loads.
  */
 const EXTRA_FIELDS = new Map<string, { code?: string; flag?: string }>();
+
+/** The key of the persisted extras in the Web Storage. */
+const EXTRA_FIELDS_STORAGE_KEY = 'cine_admin_taxonomy_extras_v1';
+
+/**
+ * Reads the persisted extras from the Web Storage.
+ *
+ * The storage is not available on the server, and a corrupted value is
+ * simply ignored — the flags are then resolved from RestCountries.
+ *
+ * @returns The persisted extras, keyed by the id of the item.
+ */
+function readPersistedExtras(): Map<string, { code?: string; flag?: string }> {
+  const stored = new Map<string, { code?: string; flag?: string }>();
+  if (typeof window === 'undefined') return stored;
+
+  try {
+    const raw = window.localStorage.getItem(EXTRA_FIELDS_STORAGE_KEY);
+    if (!raw) return stored;
+
+    const parsed = JSON.parse(raw) as Record<string, { code?: string; flag?: string }>;
+    for (const [id, value] of Object.entries(parsed ?? {})) {
+      if (!id || !value || typeof value !== 'object') continue;
+      stored.set(id, {
+        code: typeof value.code === 'string' ? value.code : '',
+        flag: typeof value.flag === 'string' ? value.flag : ''
+      });
+    }
+  } catch {
+    // A corrupted entry must never break the admin panel.
+  }
+
+  return stored;
+}
+
+/**
+ * Writes the remembered extras to the Web Storage.
+ *
+ * A failure (a full storage, a private mode) is ignored: the flags are
+ * then only known during the current session.
+ */
+function persistExtras(extras: Map<string, { code?: string; flag?: string }>): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(
+      EXTRA_FIELDS_STORAGE_KEY,
+      JSON.stringify(Object.fromEntries(extras.entries()))
+    );
+  } catch {
+    // The storage is not available — the in-memory map still works.
+  }
+}
 
 /**
  * Remembers the frontend-only fields of an item.
@@ -439,16 +499,20 @@ function rememberExtras(id: string, code?: string, flag?: string): void {
     code: trimmedCode || previous.code || '',
     flag: trimmedFlag || previous.flag || ''
   });
+  persistExtras(EXTRA_FIELDS);
 }
 
 /**
  * Merges the remembered frontend-only fields into an item.
  *
+ * The extras of the item win over the persisted ones, and the persisted
+ * ones win over the empty strings the backend sends.
+ *
  * @param item - The item as the backend sent it.
  * @returns The item with its code and flag, when they are known.
  */
 function applyExtras(item: TaxonomyItem): TaxonomyItem {
-  const extras = EXTRA_FIELDS.get(item.id);
+  const extras = EXTRA_FIELDS.get(item.id) ?? PERSISTED_EXTRAS.get(item.id);
   if (!extras) return item;
   return {
     ...item,
@@ -456,6 +520,17 @@ function applyExtras(item: TaxonomyItem): TaxonomyItem {
     flag: item.flag || extras.flag || ''
   };
 }
+
+/**
+ * The extras that were read from the Web Storage.
+ *
+ * They are read once, when the module loads in the browser, so the flags
+ * are known even after a reload of the page.
+ */
+const PERSISTED_EXTRAS: Map<string, { code?: string; flag?: string }> =
+  typeof window === 'undefined'
+    ? new Map<string, { code?: string; flag?: string }>()
+    : readPersistedExtras();
 
 /**
  * Reads and writes the admin taxonomies of the backend.
@@ -514,7 +589,38 @@ export class TaxonomyAdminService implements ITaxonomyAdminService {
       } while (page <= totalPages && page <= ADMIN_TAXONOMY_MAX_PAGES);
     }
 
+    // The backend does not store the alpha-2 code and the flag emoji of a
+    // country, so the flags are resolved from the RestCountries list. This
+    // is what brings the flag images of the admin table back.
+    if (type === 'countries') {
+      await this.resolveCountryFlags(collected);
+    }
+
     return collected;
+  }
+
+  /**
+   * Fills the missing `code` and `flag` of the countries.
+   *
+   * Only the countries that still have no code and no flag are looked up,
+   * so the values the admin typed in are never overwritten.
+   *
+   * @param items - The countries of the panel, modified in place.
+   */
+  private async resolveCountryFlags(items: TaxonomyItem[]): Promise<void> {
+    const missing = items.filter((item) => !item.code && !item.flag);
+    if (missing.length === 0) return;
+
+    await Promise.all(
+      missing.map(async (item) => {
+        const meta = await resolveCountryMeta(item.name, item.slug);
+        if (!meta) return;
+
+        item.code = meta.code;
+        item.flag = meta.flag;
+        rememberExtras(item.id, meta.code, meta.flag);
+      })
+    );
   }
 
   /**
