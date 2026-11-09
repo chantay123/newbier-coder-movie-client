@@ -231,10 +231,6 @@
   border-color: #c10711;
 }
 
-.highlightedButton {
-  /* Clean design without gaudy animations */
-}
-
 .highlightedButton::after {
   display: none !important;
 }
