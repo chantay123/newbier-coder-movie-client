@@ -70,3 +70,6 @@ public/data/dashboard-snapshot.json
 # local dev logs
 dev-log.txt
 *.log
+
+# local ESLint runtime (the TypeScript parser runs with its own TypeScript)
+/.eslint-runtime/
