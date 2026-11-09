@@ -259,6 +259,22 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }: AppPageProps
             overflow-x: hidden;
           }
           ::-webkit-scrollbar { display: none; width: 0px; background: transparent; }
+          /* The tables that are allowed to scroll horizontally keep a
+             visible scrollbar: the global rule above hides every
+             scrollbar, which would make an overflowing table look
+             truncated with no way to reach the hidden columns. */
+          [class*='tableResponsive']::-webkit-scrollbar {
+            display: block;
+            height: 8px;
+            width: 8px;
+          }
+          [class*='tableResponsive']::-webkit-scrollbar-track {
+            background: #141416;
+          }
+          [class*='tableResponsive']::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 4px;
+          }
           .text-muted, .form-text { color: #94a3b8 !important; }
           ::placeholder, .form-control::placeholder, input::placeholder, textarea::placeholder {
             color: #94a3b8 !important;

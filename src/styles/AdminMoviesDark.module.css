@@ -231,10 +231,6 @@
   border-color: #c10711;
 }
 
-.highlightedButton {
-  /* Clean design without gaudy animations */
-}
-
 .highlightedButton::after {
   display: none !important;
 }
@@ -897,4 +893,136 @@
   color: #94a3b8;
   font-size: 0.95rem;
   font-weight: 500;
+}
+
+/* ================================================================
+   RESPONSIVE
+   The rules live at the END of the file on purpose: a rule with the
+   same specificity that comes later wins, so the media queries below
+   override the base styles above.
+   ================================================================ */
+
+/* Small desktop: the toolbar starts to feel cramped. */
+@media (max-width: 1200px) {
+  .searchInput {
+    flex: 1 1 220px;
+  }
+
+  .filterControls {
+    gap: 8px;
+  }
+}
+
+/* Tablet: the action buttons wrap under the search field. */
+@media (max-width: 1024px) {
+  .container {
+    padding: 18px 16px;
+  }
+
+  .toolBar {
+    padding: 14px 16px;
+  }
+
+  .searchInput {
+    max-width: 100%;
+  }
+
+  .actionButtons {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* The filter dropdowns share the row and are allowed to shrink. */
+  .filterControls > * {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .filterControls > .refreshButton {
+    flex: 0 0 36px;
+  }
+}
+
+/* Mobile: everything is stacked and the buttons fill the width. */
+@media (max-width: 768px) {
+  .container {
+    padding: 14px 12px;
+  }
+
+  .header {
+    margin-bottom: 14px;
+    gap: 8px;
+  }
+
+  .headerTitle {
+    font-size: 1.15rem;
+    padding-left: 10px;
+  }
+
+  .toolBar {
+    padding: 12px;
+    gap: 12px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+
+  .toolBarHeader {
+    gap: 10px;
+  }
+
+  .searchInput {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .actionButtons {
+    gap: 6px;
+  }
+
+  .actionButtons > button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+
+  /* The filters are laid out on a two-column grid. */
+  .filterControls {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .filterControls > * {
+    flex: 1 1 calc(50% - 4px);
+    max-width: calc(50% - 4px);
+  }
+
+  .filterControls > .refreshButton {
+    flex: 0 0 36px;
+    max-width: 36px;
+    align-self: center;
+  }
+}
+
+@media (max-width: 400px) {
+  /* On a small phone the filters go back to a single column. */
+  .filterControls > * {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .filterControls > .refreshButton {
+    flex: 0 0 36px;
+    max-width: 36px;
+  }
+
+  .actionButtons > button span {
+    display: none;
+  }
+
+  .actionButtons > button {
+    flex: 1 1 0;
+    padding: 0 8px;
+  }
 }

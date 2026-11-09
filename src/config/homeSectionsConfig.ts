@@ -16,6 +16,7 @@
 
 import movieService from '@/API/services/movieService';
 import { SYSTEM_CONFIG } from './systemConfig';
+import { filterMoviesWithValidTrailer } from '@/utils/trailer';
 
 /**
  * The default waiting time (ms) before a batch is revealed when the scroll
@@ -211,6 +212,124 @@ export async function fetchFirstAvailable(
   return mode === 'api_only' ? [] : fallback;
 }
 
+/**
+ * The shared anime pool that feeds TWO sections with DIFFERENT content.
+ *
+ * WHY ONE POOL FOR TWO SECTIONS
+ * The `big_slide` banner ("Tiêu Điểm Anime") and the `animation` rail
+ * ("Phim Hoạt Hình & Anime") both show the "hoat-hinh" category. Fetching
+ * the category twice sent two identical requests, so they now share ONE
+ * request through the cache of `movieService`.
+ *
+ * WHY THE CONTENT STILL DIFFERS
+ * Sharing the request does NOT mean showing the same movies: the pool is
+ * sorted once by the spotlight score, then it is PARTITIONED —
+ * - the banner takes the first 6 (the highest-scored = the spotlight);
+ * - the rail takes the NEXT 20 (everything after the banner).
+ *
+ * The two sections therefore never show the same movie, while the backend
+ * is still called only once.
+ */
+
+/** How many anime the shared pool fetches. */
+const ANIME_POOL_LIMIT = 30;
+
+/** How many movies the spotlight banner shows. */
+const SPOTLIGHT_COUNT = 6;
+
+/** How many movies the animation rail shows. */
+const RAIL_COUNT = 20;
+
+/**
+ * Reads the first positive number found under one of the keys.
+ *
+ * The backend payload is loose: the rating may live under `rating`,
+ * `rate` or `vote_average`, and the views under `view`, `views` or
+ * `viewCount`, as a number or as a numeric string.
+ *
+ * @param movie - The raw movie object.
+ * @param keys - The candidate field names, in priority order.
+ * @returns The first positive finite number, or 0.
+ */
+const readPositiveNumber = (movie: unknown, keys: string[]): number => {
+  const record = movie as Record<string, unknown>;
+  for (const key of keys) {
+    const value = Number(record?.[key]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
+};
+
+/**
+ * The spotlight score of an anime: the rating first, the views second.
+ *
+ * The rating (usually 0–10) dominates, so a 9-point movie always outranks
+ * an 8-point one no matter how many views it has. The views only break
+ * the tie between two movies with the same rating.
+ *
+ * @param movie - The raw movie object.
+ * @returns The score used to order the spotlight.
+ */
+const animeSpotlightScore = (movie: unknown): number =>
+  readPositiveNumber(movie, ['rating', 'rate', 'score', 'imdb', 'vote_average']) * 1_000_000_000 +
+  Math.min(readPositiveNumber(movie, ['view', 'views', 'viewCount', 'totalViews', 'watchCount']), 999_999_999);
+
+/**
+ * Sorts the pool with the spotlight movies first.
+ *
+ * A copy is sorted — the cached array is never mutated, because other
+ * callers read that same array through the shared cache.
+ *
+ * @param pool - The raw anime pool.
+ * @returns The pool ordered with the highest-scored movies first.
+ */
+const sortSpotlightFirst = (pool: unknown[]): unknown[] =>
+  [...pool].sort((a, b) => animeSpotlightScore(b) - animeSpotlightScore(a));
+
+/**
+ * Fetches the shared anime pool (ONE request for both sections).
+ *
+ * The pool is filtered on the TRAILER before it is partitioned, so:
+ * - both sections only show movies the user can actually play;
+ * - the partition never "wastes" a slot on a movie without a trailer, so
+ *   the banner is not left with 4 movies while the rail skips them.
+ *
+ * @param mock - The mock fallback used in `mock_only` mode.
+ * @returns The raw anime pool.
+ */
+const fetchAnimePool = (mock: unknown[] = []): Promise<unknown[]> =>
+  fetchFirstAvailable([
+    async () => {
+      const pool = await movieService.getMoviesByCategory('hoat-hinh', ANIME_POOL_LIMIT);
+      return filterMoviesWithValidTrailer(pool as unknown[]);
+    }
+  ], mock);
+
+/**
+ * The loader of the `big_slide` banner: the 6 highest-scored anime.
+ */
+const loadSpotlightAnime = (mock: unknown[] = []): Promise<unknown[]> =>
+  fetchFirstAvailable([
+    async () => sortSpotlightFirst(await fetchAnimePool()).slice(0, SPOTLIGHT_COUNT),
+    () => movieService.getHeroMovies(SPOTLIGHT_COUNT)
+  ], mock);
+
+/**
+ * The loader of the `animation` rail: the pool WITHOUT the spotlight.
+ *
+ * The first 6 (already shown in the banner) are skipped, so the rail never
+ * repeats the banner. When the pool is too small to leave anything over,
+ * the head of the pool is shown instead of an empty rail.
+ */
+const loadAnimationRail = (mock: unknown[] = []): Promise<unknown[]> =>
+  fetchFirstAvailable([
+    async () => {
+      const pool = sortSpotlightFirst(await fetchAnimePool());
+      const rest = pool.slice(SPOTLIGHT_COUNT, SPOTLIGHT_COUNT + RAIL_COUNT);
+      return rest.length > 0 ? rest : pool.slice(0, RAIL_COUNT);
+    }
+  ], mock);
+
 /** The registry of the home page sections. */
 export const HOME_SECTIONS: Record<string, HomeSection> = {
   // === BATCH 1: loaded as soon as the page opens ===
@@ -298,10 +417,8 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     autoPlayInterval: 7000,
     viewAllHref: '/genre/hoat-hinh',
     loadAfterScroll: false,
-    load: (mock = []) => fetchFirstAvailable([
-      () => movieService.getMoviesByCategory('hoat-hinh', 6),
-      () => movieService.getHeroMovies(6)
-    ], mock)
+    // The banner shows the 6 highest-scored anime of the shared pool.
+    load: (mock = []) => loadSpotlightAnime(mock)
   }),
 
   animation: defineSection({
@@ -313,9 +430,9 @@ export const HOME_SECTIONS: Record<string, HomeSection> = {
     limit: 20,
     viewAllHref: '/genre/hoat-hinh',
     loadAfterScroll: false,
-    load: (mock = []) => fetchFirstAvailable([
-      () => movieService.getMoviesByCategory('hoat-hinh', 20)
-    ], mock)
+    // The rail shows the NEXT 20 anime of the same pool, so it never
+    // repeats the banner. Same request, different content.
+    load: (mock = []) => loadAnimationRail(mock)
   }),
 
   // === BATCH 3: loaded when the user scrolls to them (breakpoint 2) ===

@@ -575,3 +575,104 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+  .modalOverlay {
+    padding: 0;
+  }
+
+  .modalContent {
+    max-width: 100%;
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .modalHeader {
+    padding: 0.85rem 1rem;
+    gap: 0.6rem;
+  }
+
+  .headerIconBox {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .movieTitle {
+    font-size: 1rem;
+  }
+
+  .movieSub {
+    font-size: 0.72rem;
+  }
+
+  /* The buttons of the header take a line of their own when the title
+     is long, so they never squeeze the title. */
+  .headerActions {
+    flex-shrink: 0;
+  }
+
+  .externalLinkBtn span,
+  .editMovieBtn span {
+    display: none;
+  }
+
+  .externalLinkBtn,
+  .editMovieBtn {
+    padding: 0 0.65rem;
+  }
+
+  .tabBar {
+    padding: 0.4rem 0.75rem;
+  }
+
+  .modalBody {
+    padding: 0.9rem 0.85rem;
+    gap: 1rem;
+  }
+
+  .primaryName {
+    font-size: 1.15rem;
+  }
+
+  .infoCardsGrid,
+  .techGrid {
+    grid-template-columns: 1fr;
+    padding: 0.7rem;
+  }
+
+  .episodesBanner {
+    padding: 0.9rem;
+  }
+
+  .episodesBannerHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+
+  .openEpisodeManagerBtn {
+    justify-content: center;
+  }
+
+  .ratingsOverview {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .ratingBigScore {
+    font-size: 2rem;
+  }
+
+  .modalFooter {
+    padding: 0.75rem 1rem;
+  }
+
+  .footerCloseBtn {
+    width: 100%;
+  }
+}

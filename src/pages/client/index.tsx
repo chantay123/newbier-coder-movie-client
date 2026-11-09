@@ -123,22 +123,37 @@ export default function Home({ initialSnapshot }: HomeProps): ReactElement {
 
   // Preload: as soon as batch 1 is unlocked, start fetching the data of
   // batch 2 before the user scrolls down to it.
+  //
+  // WHY THE RESULT IS NOT THROWN AWAY
+  // The preload used to fetch the data and drop it, so the rail component
+  // fetched the SAME data again when it mounted. Now the result is stored
+  // in the shared request cache of `movieService`, so when the rail mounts
+  // it is served from that cache and NO second request is sent.
+  //
+  // The `preloadStartedRef` makes the effect idempotent: React StrictMode
+  // runs it twice in development, and the preload must not fire twice.
+  const preloadStartedRef = useRef<boolean>(false);
   useEffect(() => {
-    if (!unlockedBatches.has(1) && unlockedBatches.has(0)) {
-      // Batch 1 has just been unlocked, so dispatch the data fetch early
-      const batch1Sections = sectionBatches[1] || [];
-      batch1Sections.forEach((sectionId) => {
-        const config = HOME_SECTIONS[sectionId];
-        if (config?.rails) {
-          // The country sections hold several child rails
-          config.rails.forEach((rail) => {
-            if (rail.load) rail.load([]).catch(() => {/* silent */});
-          });
-        } else if (config?.load) {
-          config.load([]).catch(() => {/* silent */});
-        }
-      });
-    }
+    // The preload runs when batch 0 is unlocked (the page has just opened)
+    // and batch 1 is not unlocked yet (the user has not scrolled down to
+    // it).
+    if (!unlockedBatches.has(0) || unlockedBatches.has(1)) return;
+    if (preloadStartedRef.current) return;
+    preloadStartedRef.current = true;
+
+    // Batch 1 has just been unlocked, so dispatch the data fetch early
+    const batch1Sections = sectionBatches[1] || [];
+    batch1Sections.forEach((sectionId) => {
+      const config = HOME_SECTIONS[sectionId];
+      if (config?.rails) {
+        // The country sections hold several child rails
+        config.rails.forEach((rail) => {
+          if (rail.load) rail.load([]).catch(() => {/* silent */});
+        });
+      } else if (config?.load) {
+        config.load([]).catch(() => {/* silent */});
+      }
+    });
   }, [unlockedBatches, sectionBatches]);
 
   const isAllBatchesUnlocked = unlockedBatches.has(sectionBatches.length - 1);

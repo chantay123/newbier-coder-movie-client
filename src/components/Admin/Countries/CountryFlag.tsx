@@ -54,41 +54,56 @@ export function getCountryInitials(name: string, code?: string): string {
 
 /**
  * Renders the flag image of a country.
- * When the image is missing or fails to load, it falls back to the
- * short text code of the country, such as "VN".
+ *
+ * The image is loaded from the FIRST URL that works. Two CDNs are tried,
+ * because one of them can be blocked by the network of the user. When no
+ * image loads, the component falls back to the short text code of the
+ * country, such as "VN".
  */
 export default function CountryFlag({ name, code, flag, className }: CountryFlagProps) {
-  const [imgError, setImgError] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  // Compute flag image URL
-  const flagSrc = useMemo(() => {
-    // 1. Direct image URL
+  /**
+   * The candidate URLs of the flag image, in priority order.
+   *
+   * 1. The direct image URL, when the admin pasted one.
+   * 2. The alpha-2 code, on the two flag CDNs.
+   * 3. The flag emoji, whose two letters are the alpha-2 code.
+   */
+  const flagSources = useMemo(() => {
+    const sources: string[] = [];
+
     if (flag && (flag.startsWith('http://') || flag.startsWith('https://') || flag.startsWith('/') || flag.startsWith('data:'))) {
-      return flag;
+      sources.push(flag);
     }
-    // 2. Alpha-2 code
+
     const cleanCode = (code || '').trim().toLowerCase();
-    if (/^[a-z]{2}$/.test(cleanCode)) {
-      return `https://flagcdn.com/w40/${cleanCode}.png`;
-    }
-    // 3. Emoji flag
     const emojiCode = getCodeFromEmoji(flag);
-    if (emojiCode) {
-      return `https://flagcdn.com/w40/${emojiCode}.png`;
+    const alpha2 = /^[a-z]{2}$/.test(cleanCode)
+      ? cleanCode
+      : emojiCode;
+
+    if (alpha2) {
+      sources.push(`https://flagcdn.com/w40/${alpha2}.png`);
+      sources.push(`https://flags.restcountries.com/v5/w320/${alpha2}.png`);
     }
-    return null;
+
+    return sources;
   }, [code, flag]);
 
   const initials = useMemo(() => getCountryInitials(name, code), [name, code]);
 
-  if (flagSrc && !imgError) {
+  // The first source that has not failed yet.
+  const flagSrc = flagSources.find((src) => src !== failedSrc) ?? null;
+
+  if (flagSrc) {
     return (
       <span className={`${styles.flagImgWrapper} ${className || ''}`} title={`${name} (${initials})`}>
         <img
           src={flagSrc}
           alt={name}
           className={styles.flagImg}
-          onError={() => setImgError(true)}
+          onError={() => setFailedSrc(flagSrc)}
           loading="lazy"
         />
       </span>

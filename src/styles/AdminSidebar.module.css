@@ -113,7 +113,9 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
+/* Tablet: the sidebar becomes an off-canvas drawer so the content
+   gets the full width of the viewport. */
+@media (max-width: 1024px) {
   .sidebar {
     transform: translateX(-100%);
   }

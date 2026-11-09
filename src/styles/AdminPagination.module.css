@@ -132,7 +132,7 @@
   border-color: #e50914;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .paginationContainer {
     flex-direction: column;
     align-items: flex-start;

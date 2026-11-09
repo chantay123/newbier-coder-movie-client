@@ -66,3 +66,13 @@ DESIGN.md
 AGENTS.md
 CLAUDE.md
 public/data/dashboard-snapshot.json
+
+# local dev logs
+dev-log.txt
+*.log
+
+# local ESLint runtime (the TypeScript parser runs with its own TypeScript)
+/.eslint-runtime/
+
+# local ESLint report (generated when the lint is analyzed rule by rule)
+.eslint-report.json

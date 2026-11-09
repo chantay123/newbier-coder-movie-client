@@ -11,18 +11,6 @@ import { apiUrl } from './apiPaths';
 export const AUTH_CONFIG = {
   // The endpoint and the contract used by the backend authentication.
   api: {
-    /**
-     * The login endpoint of the backend.
-     *
-     * The URL is built by `apiUrl()`, which returns the relative path
-     * joined with the base URL of the current runtime. The backend host
-     * never reaches the client bundle.
-     *
-     * This URL used to be built by applying a manual string replacement to
-     * `NEXT_PUBLIC_API_URL`. With the environment set to `https://host/api/v1`
-     * the pattern `replace(/\/api\/?$/, '')` did not match, so the endpoint
-     * became `https://host/api/v1/api/v1/auth/login` and answered 404.
-     */
     endpoint: apiUrl('authLogin'),
     successCode: '000000',
     invalidCredentialsCode: '00000204'

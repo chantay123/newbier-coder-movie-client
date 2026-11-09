@@ -617,7 +617,7 @@ const MoviesAdmin = () => {
           </div>
         </div>
 
-        <div className={combinedStyles.filterControls} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', alignItems: 'center' }}>
+        <div className={combinedStyles.filterControls}>
           <CinemaDropdown
             options={[
               { value: '', label: ADMIN_MOVIES_I18N.filters.allCategories },
@@ -710,16 +710,16 @@ const MoviesAdmin = () => {
         </div>
       </div>
 
-      <div className={cinemaTable.tableCard}>
-        <div className={cinemaTable.tableResponsive}>
-          <table className={cinemaTable.dataTable}>
+      <div className={`${cinemaTable.tableCard} ${cinemaTable.cardMobile}`}>
+        <div className={`${cinemaTable.tableResponsive} ${cinemaTable.cardMobileTableWrap}`}>
+              <table className={`${cinemaTable.dataTable} ${cinemaTable.cardMobile} ${cinemaTable.fixedLayout}`}>
             <thead>
               <tr>
-                <th style={{ minWidth: 260 }}>{ADMIN_MOVIES_I18N.tableHeaders.movieName}</th>
-                <th className={cinemaTable.hideMobile} style={{ minWidth: 160 }}>Thể loại & Quốc gia</th>
-                <th className={cinemaTable.hideTablet} style={{ minWidth: 140 }}>Tương tác</th>
-                <th style={{ minWidth: 110 }}>Trạng thái</th>
-                <th style={{ textAlign: 'center', width: 140 }}>{ADMIN_MOVIES_I18N.tableHeaders.actions}</th>
+                <th className={cinemaTable.colMovie}>{ADMIN_MOVIES_I18N.tableHeaders.movieName}</th>
+                <th className={`${cinemaTable.colGenre} ${cinemaTable.hideMobile}`}>Thể loại & Quốc gia</th>
+                <th className={`${cinemaTable.colMetrics} ${cinemaTable.hideTablet}`}>Tương tác</th>
+                <th className={cinemaTable.colStatus}>Trạng thái</th>
+                <th className={cinemaTable.colActions} style={{ textAlign: 'center' }}>{ADMIN_MOVIES_I18N.tableHeaders.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -767,7 +767,7 @@ const MoviesAdmin = () => {
                     key={movie._id}
                     className={combinedStyles.movieRow}
                   >
-                    <td>
+                    <td data-label="Phim">
                       <div className={cinemaTable.posterCell} onClick={() => setDetailModal({ isOpen: true, movie })} style={{ cursor: 'pointer' }}>
                         <div className={cinemaTable.posterThumb}>
                           <img
@@ -791,7 +791,7 @@ const MoviesAdmin = () => {
                       </div>
                     </td>
 
-                    <td className={cinemaTable.hideMobile}>
+                    <td className={cinemaTable.hideMobile} data-label="Thể loại & Quốc gia">
                       <div className={cinemaTable.badgeList}>
                         {movie.category && movie.category.length > 0 ? (
                           movie.category.slice(0, 2).map((cat, idx) => (
@@ -808,7 +808,7 @@ const MoviesAdmin = () => {
                       </div>
                     </td>
 
-                    <td className={cinemaTable.hideTablet}>
+                    <td className={cinemaTable.hideTablet} data-label="Tương tác">
                       <div className={cinemaTable.metricCell}>
                         <div className={cinemaTable.metricItem} title="Tổng lượt xem">
                           <FaEye className={cinemaTable.metricIconViews} />
@@ -827,7 +827,7 @@ const MoviesAdmin = () => {
                       </div>
                     </td>
 
-                    <td>
+                    <td data-label="Trạng thái">
                       <label className={cinemaTable.statusSwitch} title={movie.isHidden ? 'Nhấn để hiển thị phim' : 'Nhấn để ẩn phim'}>
                         <span className={cinemaTable.toggleSwitch}>
                           <input
@@ -843,7 +843,7 @@ const MoviesAdmin = () => {
                       </label>
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
+                    <td data-label="Thao tác" style={{ textAlign: 'center' }}>
                       <div className={cinemaTable.rowActions} style={{ justifyContent: 'center' }}>
                         <button
                           className={`${cinemaTable.actionBtn} ${cinemaTable.actionBtnView}`}

@@ -14,6 +14,7 @@ import {
 } from '@/config/taxonomyConfig';
 import { pickMovieImage } from '@/utils/imageSource';
 import { apiPath } from '@/config/apiPaths';
+import { cachedRequest, invalidateMovieCache } from './movieRequestCache';
 
 // The auth service is imported lazily to avoid a circular dependency
 // between the auth and the movie modules.
@@ -93,7 +94,12 @@ const ensureFreshToken = async (): Promise<string | null> => {
     const auth = await getAuthService();
     if (!auth) return token;
     try {
-      return await auth.refreshToken();
+      const refreshed = await auth.refreshToken();
+      // The token changed, so the entries that failed with a 401 are
+      // dropped: they would otherwise survive for the short TTL and the
+      // page would keep showing the empty fallback.
+      if (refreshed) invalidateMovieCache();
+      return refreshed;
     } catch (refreshErr) {
       const err = refreshErr as { code?: string; message?: string };
       if (SYSTEM_CONFIG.debugMovies) {
@@ -299,6 +305,95 @@ export async function safeFetchMovieList(
   return typeof limit === 'number' && limit > 0 ? list.slice(0, limit) : list;
 }
 
+/**
+ * Awaits a promise, but gives up as soon as the signal is aborted.
+ *
+ * The underlying promise is NOT cancelled: it keeps running and it still
+ * fills the cache, so the next caller benefits from it.
+ *
+ * ON ABORT THE EMPTY LIST IS RETURNED (the promise is NOT rejected)
+ * The previous behaviour of `safeFetchJson` was to swallow the abort and
+ * return the fallback (an empty list). This helper keeps that behaviour, so
+ * the callers do not have to handle a new error type they never saw before.
+ *
+ * @param promise - The promise to await.
+ * @param signal - The abort signal of the caller.
+ * @returns The resolved value of the promise, or an empty list on abort.
+ */
+const raceWithAbort = async <T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> => {
+  if (!signal) return promise;
+  if (signal.aborted) return [] as T;
+
+  return new Promise<T>((resolve) => {
+    const onAbort = (): void => {
+      signal.removeEventListener('abort', onAbort);
+      resolve([] as T);
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    promise
+      .then((value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      })
+      .catch(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve([] as T);
+      });
+  });
+};
+
+/**
+ * The same as `safeFetchMovieList`, but the result goes through the shared
+ * cache (see `movieRequestCache`).
+ *
+ * WHY
+ * Several call sites ask for the SAME list at the same time:
+ * - the `big_slide` and the `animation` section both load the "hoat-hinh"
+ *   category;
+ * - the country rails are preloaded by the page AND loaded again by the
+ *   rail component;
+ * - React StrictMode runs every effect twice in development.
+ *
+ * Without the cache, every one of those call sites produced its own HTTP
+ * request, even though the backend answers the exact same payload.
+ *
+ * THE CACHE KEY IS THE ENDPOINT
+ * The limit is NOT part of the key, because it is applied AFTER the cache
+ * is read. Two callers with a different limit (`6` for the banner and `20`
+ * for the rail) therefore share ONE request instead of sending two.
+ *
+ * THE ABORT SIGNAL
+ * The signal of the caller only cancels the WAIT of that caller. It never
+ * cancels the shared request, because that request may be serving other
+ * callers at the same time.
+ *
+ * @param endpoint - The API path.
+ * @param limit - The maximum number of movies returned.
+ * @param options - The fetch options.
+ * @returns The array of movies.
+ */
+export async function cachedFetchMovieList(
+  endpoint: string,
+  limit?: number,
+  options: FetchOptions = {}
+): Promise<RawMovie[]> {
+  // The shared request is sent WITHOUT the signal of the caller: the
+  // request may be shared, so one caller must not be able to cancel it for
+  // everybody else.
+  const shared = cachedRequest(
+    `list:${endpoint}`,
+    async () => {
+      const json = await safeFetchJson<unknown>(endpoint, { ...options, signal: undefined }, []);
+      return extractMovieList(json);
+    }
+  );
+
+  const list = await raceWithAbort(shared, options.signal);
+  return typeof limit === 'number' && limit > 0 ? list.slice(0, limit) : list;
+}
+
 /** The main service object for the movie API. */
 const movieService = {
   /**
@@ -318,23 +413,23 @@ const movieService = {
    * @returns The list of movies.
    */
   getHeroMovies: (limit = 6, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiPath(`moviesLatest`), Math.max(limit * 4, 24), { signal }),
+    cachedFetchMovieList(apiPath(`moviesLatest`), Math.max(limit * 4, 24), { signal }),
 
   /** Loads the trending movies. */
   getTrendingMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiPath(`moviesTrending`), undefined, { signal }),
+    cachedFetchMovieList(apiPath(`moviesTrending`), undefined, { signal }),
 
   /** Loads the top rated movies. */
   getTopRatedMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiPath(`moviesTopRated`), undefined, { signal }),
+    cachedFetchMovieList(apiPath(`moviesTopRated`), undefined, { signal }),
 
   /** Loads one page of movies. */
   getMoviesPage: (page = 1, limit = 10, signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiPath(`moviesList`) + `?page=${page}&limit=${limit}`, limit, { signal }),
+    cachedFetchMovieList(apiPath(`moviesList`) + `?page=${page}&limit=${limit}`, limit, { signal }),
 
   /** Loads the latest movies without a limit. */
   getLatestMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiPath(`moviesList`), undefined, { signal }),
+    cachedFetchMovieList(apiPath(`moviesList`), undefined, { signal }),
 
   /**
    * Loads the home page movie list.
@@ -345,7 +440,7 @@ const movieService = {
    * @returns The normalized array of movies, or an empty array on failure.
    */
   getHomeMovies: (signal?: AbortSignal): Promise<RawMovie[]> =>
-    safeFetchMovieList(apiPath(`moviesList`) + '?page=1&limit=20', 20, { signal }),
+    cachedFetchMovieList(apiPath(`moviesList`) + '?page=1&limit=20', 20, { signal }),
 
   /**
    * Loads the movies of a country with a multi-level fallback:
@@ -372,7 +467,7 @@ const movieService = {
 
     // Tier 1: query the backend route `/countries/{slug}/movies`.
     for (const v of variants) {
-      const list = await safeFetchMovieList(
+      const list = await cachedFetchMovieList(
         apiPath(`moviesByCountry`, encodeURIComponent(v)),
         fetchLimit,
         { signal }
@@ -383,7 +478,7 @@ const movieService = {
     // Tier 2: search by keyword as a fallback.
     const keyword = meta?.searchKeyword;
     if (keyword) {
-      const searchList = await safeFetchMovieList(
+      const searchList = await cachedFetchMovieList(
         apiPath(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
         fetchLimit,
         { signal }
@@ -404,7 +499,7 @@ const movieService = {
     // "-" is checked too. For example "han-quoc" matches
     // `country.slug === "han-quoc"` or a `country.name` containing
     // "han quoc" (South Korea).
-    const all = await safeFetchMovieList(apiPath(`moviesList`) + '?page=1&limit=100', undefined, { signal });
+    const all = await cachedFetchMovieList(apiPath(`moviesList`) + '?page=1&limit=100', undefined, { signal });
     if (Array.isArray(all) && all.length > 0) {
       const slugTokens = countrySlug.split('-').filter(Boolean);
       const filtered = all.filter((m) => {
@@ -456,7 +551,7 @@ const movieService = {
 
     // Tier 1: query the backend route `/categories/{slug}/movies`.
     for (const v of variants) {
-      const list = await safeFetchMovieList(
+      const list = await cachedFetchMovieList(
         apiPath(`categoriesBySlugMovies`, encodeURIComponent(v)),
         fetchLimit,
         { signal }
@@ -467,7 +562,7 @@ const movieService = {
     // Tier 2: search by keyword as a fallback.
     const keyword = meta?.searchKeyword;
     if (keyword) {
-      const searchList = await safeFetchMovieList(
+      const searchList = await cachedFetchMovieList(
         apiPath(`moviesSearch`) + `?q=${encodeURIComponent(keyword)}`,
         fetchLimit,
         { signal }

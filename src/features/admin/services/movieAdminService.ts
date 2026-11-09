@@ -468,117 +468,17 @@ export const applyVisibilityFilter = (movies: AdminMovie[], status?: string): Ad
   });
 };
 
-/**
- * Counts the movies whose visibility is unknown.
- *
- * @param movies - The movies of the received page.
- * @returns The number of movies with an unknown visibility.
- */
-const countUnknownVisibility = (movies: AdminMovie[]): number =>
-  movies.filter((movie) => !movie.visibilityKnown).length;
-
 // ============================================================
-// THE AUDIT LOG
+// THE AUDIT LOG (REMOVED)
 // ============================================================
-
-/**
- * The counters of the audit log.
- *
- * They accumulate over the pages of ONE dataset (the counters are reset
- * when the page 1 is loaded again), so the log can prove whether the
- * frontend walked through the whole list or only a part of it.
- */
-const auditState = {
-  totalRetrieved: 0,
-  uniqueIds: new Set<string>(),
-  duplicateIds: 0
-};
-
-/**
- * Resets the counters of the audit log.
- *
- * It is called when a new dataset starts (page 1), so the counters of the
- * previous dataset do not pollute the new one.
- */
-export const resetAdminMoviesAudit = (): void => {
-  auditState.totalRetrieved = 0;
-  auditState.uniqueIds.clear();
-  auditState.duplicateIds = 0;
-};
-
-/** The information of one audit report. */
-export interface AdminMoviesAuditReport {
-  apiTotal: number;
-  currentPage: number;
-  pageLimit: number;
-  totalPages: number;
-  currentPageRetrieved: number;
-  hasNextPage: boolean;
-  fetchCompleted: boolean;
-  source: 'api' | 'mock';
-  ids: string[];
-  error?: string;
-  /**
-   * How many movies of the received page have an UNKNOWN visibility.
-   *
-   * The list DTO of the backend does not carry `isHidden`, so the frontend
-   * cannot tell a hidden movie from a visible one. The number is printed in
-   * the audit log so the gap is visible instead of silent.
-   */
-  visibilityUnknown?: number;
-  /**
-   * The visibility filter that was asked for (`active` / `inactive`).
-   */
-  visibilityFilter?: string;
-}
-
-/**
- * Writes the audit log of the movie list in the console.
- *
- * The log only runs in development, and it prints the numbers of the
- * CURRENT dataset: how many movies the API announces, how many the
- * frontend received, how many IDs are unique and how many are duplicates.
- *
- * @param report - The numbers of the fetch that just finished.
- */
-export const logAdminMoviesAudit = (report: AdminMoviesAuditReport): void => {
-  if (process.env.NODE_ENV !== 'development') return;
-
-  report.ids.forEach((id) => {
-    if (!id) return;
-    if (auditState.uniqueIds.has(id)) auditState.duplicateIds += 1;
-    else auditState.uniqueIds.add(id);
-  });
-  auditState.totalRetrieved += report.ids.length;
-
-  console.log('[ADMIN MOVIES AUDIT]');
-  console.log('API Total:', report.apiTotal);
-  console.log('Current Page:', report.currentPage);
-  console.log('Page Limit:', report.pageLimit);
-  console.log('Total Pages:', report.totalPages);
-  console.log('Current Page Retrieved:', report.currentPageRetrieved);
-  console.log('Total Retrieved:', auditState.totalRetrieved);
-  console.log('Unique Movie IDs:', auditState.uniqueIds.size);
-  console.log('Duplicate Movie IDs:', auditState.duplicateIds);
-  console.log('Has Next Page:', report.hasNextPage);
-  console.log('Fetch Completed:', report.fetchCompleted);
-  if (report.visibilityFilter) {
-    console.log('Visibility Filter:', report.visibilityFilter);
-  }
-  if (report.visibilityUnknown) {
-    console.log(
-      'Movies With Unknown Visibility:',
-      report.visibilityUnknown,
-      '(the list DTO of the backend does not carry the isHidden field)'
-    );
-  }
-  if (report.source === 'mock') {
-    console.log('Data Source: mock fallback (the API did not answer)');
-  }
-  if (report.error) {
-    console.log('Error:', report.error);
-  }
-};
+// The audit log was a temporary diagnostic that printed the numbers of the
+// movie list (API total, retrieved rows, unique IDs, unknown visibility)
+// in the console. It is removed, because it flooded the terminal of the
+// admin panel with one block of ten lines per page.
+//
+// The information it printed is still available where it belongs:
+// - the errors are logged by the `console.warn` of each catch block;
+// - the pagination of the table is the visible result of the totals.
 
 // ============================================================
 // API FUNCTIONS
@@ -608,9 +508,6 @@ export const getMoviesForAdmin = async (
     return searchMoviesWithElasticsearch(page, limit, query, category, status, year, type, isHidden);
   }
 
-  // A new dataset starts on the page 1, so the audit counters restart.
-  if (page <= 1) resetAdminMoviesAudit();
-
   // The parameters the backend declares on `/movies`. Every other parameter
   // (`order`, `categoryId`, `status=active|inactive`, `isHidden`) is either
   // unknown or invalid, and an invalid value of a DECLARED parameter is
@@ -637,7 +534,6 @@ export const getMoviesForAdmin = async (
     hasNext: false,
     found: false
   };
-  let usedFilters = true;
 
   try {
     try {
@@ -650,26 +546,12 @@ export const getMoviesForAdmin = async (
       // The backend refused one of the FILTER parameters. The list itself
       // is still reachable, so the request is repeated with the safe
       // parameters only, instead of losing the whole page.
-      usedFilters = false;
       const response = await axiosInstance.get(apiPath(`moviesList`), { params: buildParams(false) });
       payload = parseMovieListEnvelope(response.data, page, limit);
     }
   } catch (error) {
     console.warn('[AdminMovies] API unavailable, using mock data:', error);
     const mock = getMockResponse(page, limit, sortField, sortDirection, category, status, '', year, type);
-    const mockIds = mock.movies.map((m) => m._id);
-    logAdminMoviesAudit({
-      apiTotal: mock.pagination.totalItems,
-      currentPage: page,
-      pageLimit: limit,
-      totalPages: mock.pagination.totalPages,
-      currentPageRetrieved: mock.movies.length,
-      hasNextPage: page < mock.pagination.totalPages,
-      fetchCompleted: true,
-      source: 'mock',
-      ids: mockIds,
-      error: error instanceof Error ? error.message : String(error)
-    });
     return { ...mock, source: 'mock' };
   }
 
@@ -695,21 +577,6 @@ export const getMoviesForAdmin = async (
     filteredOut > 0
       ? Math.max(1, Math.ceil(total / (payload.limit || limit)))
       : payload.totalPages;
-
-  logAdminMoviesAudit({
-    apiTotal: payload.total,
-    currentPage: payload.page,
-    pageLimit: payload.limit,
-    totalPages: payload.totalPages,
-    currentPageRetrieved: movies.length,
-    hasNextPage: payload.hasNext,
-    fetchCompleted: true,
-    source: 'api',
-    ids: movies.map((m) => m._id),
-    visibilityFilter: status,
-    visibilityUnknown: countUnknownVisibility(movies),
-    error: usedFilters ? undefined : 'The filter parameters were rejected, the list was loaded without them.'
-  });
 
   return {
     movies: visibleMovies,
@@ -737,8 +604,6 @@ export const searchMoviesWithElasticsearch = async (
   if (!query) {
     return { movies: [], pagination: buildPagination(0, page, limit), source: 'api' };
   }
-
-  if (page <= 1) resetAdminMoviesAudit();
 
   try {
     // The search route of the backend is `/movies/search` and it takes `q`
@@ -772,20 +637,6 @@ export const searchMoviesWithElasticsearch = async (
         ? Math.max(1, Math.ceil(total / (payload.limit || limit)))
         : payload.totalPages;
 
-    logAdminMoviesAudit({
-      apiTotal: payload.total,
-      currentPage: payload.page,
-      pageLimit: payload.limit,
-      totalPages: payload.totalPages,
-      currentPageRetrieved: allMovies.length,
-      hasNextPage: payload.hasNext,
-      fetchCompleted: true,
-      source: 'api',
-      ids: allMovies.map((m) => m._id),
-      visibilityFilter: status,
-      visibilityUnknown: countUnknownVisibility(allMovies)
-    });
-
     return {
       movies,
       pagination: {
@@ -808,19 +659,6 @@ export const searchMoviesWithElasticsearch = async (
     const start = (page - 1) * limit;
     const slice = filtered.slice(start, start + limit);
     const movies = slice.map(toAdminMovie);
-
-    logAdminMoviesAudit({
-      apiTotal: total,
-      currentPage: page,
-      pageLimit: limit,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-      currentPageRetrieved: movies.length,
-      hasNextPage: page < Math.ceil(total / limit),
-      fetchCompleted: true,
-      source: 'mock',
-      ids: movies.map((m) => m._id),
-      error: error instanceof Error ? error.message : String(error)
-    });
 
     return {
       movies,
