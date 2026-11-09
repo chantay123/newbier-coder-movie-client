@@ -444,6 +444,14 @@ export interface BackendAuthResult {
   status: number;
   message: string;
   tokens: BackendTokenPayload | null;
+  /**
+   * `true` when the backend could not be reached at all (it is still
+   * starting, or the free tier is doing a cold start).
+   *
+   * The client uses this flag to show the "waiting for the server" notice
+   * and to retry automatically, instead of showing a generic failure.
+   */
+  serverStarting?: boolean;
 }
 
 /**
@@ -483,7 +491,16 @@ export const backendLogin = async (
     const data = await response.json().catch(() => null);
     return interpretBackendAuthResponse(response.status, data);
   } catch {
-    return { ok: false, status: 502, message: 'Authentication service unreachable.', tokens: null };
+    // The backend did not answer at all: it is either still starting (a cold
+    // start of the free tier) or it is down. The flag lets the client show
+    // the "waiting for the server" notice instead of a dead-end error.
+    return {
+      ok: false,
+      status: 502,
+      message: 'Authentication service unreachable.',
+      tokens: null,
+      serverStarting: true,
+    };
   }
 };
 

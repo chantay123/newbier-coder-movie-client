@@ -214,6 +214,17 @@ export interface LoginResult {
   rememberMe?: boolean;
 }
 
+/**
+ * The error thrown when the backend could not be reached.
+ *
+ * It carries the `serverStarting` flag, so the caller can tell a "wrong
+ * password" apart from a "the server is not up yet" situation.
+ */
+export interface LoginServiceError extends Error {
+  code?: string;
+  serverStarting?: boolean;
+}
+
 /** The registration information. */
 export interface RegisterData {
   username: string;
@@ -445,7 +456,13 @@ const authService = {
         body: JSON.stringify({ ...payload, rememberMe })
       });
     } catch {
-      throw new Error('Cannot reach the server. Please check your connection.');
+      // The local route itself could not be reached, or it did not answer.
+      const error: LoginServiceError = new Error(
+        'Cannot reach the server. Please check your connection.'
+      );
+      error.code = 'SERVER_STARTING';
+      error.serverStarting = true;
+      throw error;
     }
 
     let data: Record<string, unknown> | null = null;
@@ -457,11 +474,19 @@ const authService = {
 
     if (!response.ok) {
       const message = (data?.message as string) || 'Authentication failed';
-      throw new Error(
+      const error: LoginServiceError = new Error(
         response.status === 401 || response.status === 403
           ? 'Invalid username or password'
           : message
       );
+      // The backend did not answer at all (it is still starting, or the free
+      // tier is doing a cold start). The flag lets the UI show the "waiting
+      // for the server" notice and retry automatically.
+      if (data?.serverStarting === true) {
+        error.code = 'SERVER_STARTING';
+        error.serverStarting = true;
+      }
+      throw error;
     }
 
     const rawAccessToken = (data?.token as string) || null;

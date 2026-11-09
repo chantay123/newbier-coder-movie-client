@@ -60,6 +60,16 @@ export const AUTH_CONFIG = {
       registeredSuccess: 'Đăng ký thành công! Vui lòng đăng nhập bằng tài khoản mới.',
       loginSuccess: 'Đăng nhập thành công! Đang chuyển hướng...'
     },
+    serverStarting: {
+      title: 'Server is starting up',
+      message:
+        'The server is not ready yet. Please wait a moment, the system will retry automatically.',
+      retrying: 'Retrying...',
+      attempts: 'Attempt {0}',
+      giveUp:
+        'The server is still not responding. Please try again in a few minutes or check your network connection.',
+      button: 'Retry now'
+    },
     buttons: {
       submit: 'SignIn',
       submitting: 'Processing...'

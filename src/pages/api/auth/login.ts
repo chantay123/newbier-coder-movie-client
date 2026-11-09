@@ -72,7 +72,13 @@ export default async function handler(
 
     if (!result.ok || !result.tokens) {
       const status = result.status >= 400 && result.status < 600 ? result.status : 401;
-      return res.status(status).json({ message: result.message });
+      // The backend did not answer (it is still starting). The flag is
+      // forwarded so the client can show the "waiting for the server" notice
+      // and retry automatically, instead of a dead-end error.
+      return res.status(status).json({
+        message: result.message,
+        ...(result.serverStarting ? { serverStarting: true } : {}),
+      });
     }
 
     const { accessToken, refreshToken, user } = result.tokens;
