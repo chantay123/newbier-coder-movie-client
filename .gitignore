@@ -73,3 +73,6 @@ dev-log.txt
 
 # local ESLint runtime (the TypeScript parser runs with its own TypeScript)
 /.eslint-runtime/
+
+# local ESLint report (generated when the lint is analyzed rule by rule)
+.eslint-report.json
