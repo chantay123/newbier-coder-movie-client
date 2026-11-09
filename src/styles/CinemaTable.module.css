@@ -303,11 +303,13 @@
   align-items: center;
   gap: 0.4rem;
   white-space: nowrap;
+  justify-content: center;
 }
 
 .actionBtn {
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -388,14 +390,77 @@
   margin: 0 auto 1.25rem;
 }
 
+/* Column sizing — the widths are in CSS (and not inline) so the
+   media queries below can shrink or drop them.
+
+   The movie table uses `fixedLayout` (table-layout: fixed): the column
+   widths are percentages, so the table can NEVER be wider than its
+   container and the last column (the actions) is never pushed out of
+   the viewport. */
+.colMovie {
+  width: 32%;
+}
+
+.colGenre {
+  width: 16%;
+}
+
+.colMetrics {
+  width: 14%;
+}
+
+.colStatus {
+  width: 12%;
+}
+
+.colActions {
+  width: 26%;
+}
+
+.dataTable.fixedLayout {
+  table-layout: fixed;
+}
+
+.dataTable.fixedLayout thead th,
+.dataTable.fixedLayout tbody td {
+  overflow: hidden;
+}
+
+.dataTable.fixedLayout .genreBadge {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dataTable.fixedLayout .badgeList {
+  max-width: 100%;
+}
+
 /* Responsive Utilities */
-@media (max-width: 992px) {
+@media (max-width: 1200px) {
   .hideTablet {
     display: none !important;
   }
+
+  /* The "Tương tác" column is gone: the rest share its space. */
+  .colMovie {
+    width: 34%;
+  }
+
+  .colGenre {
+    width: 20%;
+  }
+
+  .colStatus {
+    width: 16%;
+  }
+
+  .colActions {
+    width: 30%;
+  }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .hideMobile {
     display: none !important;
   }
@@ -427,5 +492,181 @@
     width: 28px;
     height: 28px;
     font-size: 0.75rem;
+  }
+}
+
+/* ================================================================
+   MOBILE CARD LAYOUT (≤ 768px)
+   The table becomes a stack of cards: every row is a card and every
+   cell shows its own label (the `data-label` attribute of the cell).
+
+   The layout is OPT-IN: only the tables with the `cardMobile` class
+   (the movie list) turn into cards. The other tables that share this
+   stylesheet keep the horizontal scroll.
+   ================================================================ */
+@media (max-width: 768px) {
+  .cardMobile.tableCard {
+    border-radius: 10px;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .cardMobileTableWrap {
+    overflow-x: visible;
+  }
+
+  .dataTable.cardMobile,
+  .dataTable.cardMobile tbody,
+  .dataTable.cardMobile tr,
+  .dataTable.cardMobile td {
+    display: block;
+    width: 100%;
+  }
+
+  /* The fixed layout of the table view does not apply to the cards:
+     the cells must be free to grow with their content. */
+  .dataTable.cardMobile.fixedLayout tbody td {
+    overflow: visible;
+  }
+
+  /* The header row disappears: the cells carry their own label. */
+  .dataTable.cardMobile thead {
+    display: none;
+  }
+
+  .dataTable.cardMobile tbody tr {
+    background-color: #141416 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .dataTable.cardMobile tbody tr:hover {
+    background-color: #141416 !important;
+  }
+
+  .dataTable.cardMobile tbody td {
+    background-color: transparent !important;
+    border-bottom: none !important;
+    padding: 0.4rem 0 !important;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    text-align: left !important;
+  }
+
+  /* The label of the cell, rendered from `data-label`. */
+  .dataTable.cardMobile tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: #6b7280;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-top: 0.1rem;
+    white-space: nowrap;
+  }
+
+  /* A cell without a label (the loading row and the empty row) does not
+     need the extra flex item. */
+  .dataTable.cardMobile tbody td:not([data-label])::before {
+    display: none;
+  }
+
+  .dataTable.cardMobile tbody td:not([data-label]) {
+    display: block;
+  }
+
+  /* The first cell is the movie itself: it takes the whole width and
+     it does NOT show a label. */
+  .dataTable.cardMobile tbody td:first-child {
+    display: block;
+    padding-bottom: 0.65rem !important;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  }
+
+  /* The row of the loading state and of the empty state has a single
+     cell without a label: it must not look like a card cell. */
+  .dataTable.cardMobile tbody td:first-child:not([data-label]) {
+    border-bottom: none !important;
+    margin-bottom: 0;
+    padding: 0 !important;
+  }
+
+  .dataTable.cardMobile tbody td:first-child::before {
+    display: none;
+  }
+
+  /* The columns that are hidden on mobile in the TABLE view are
+     useful inside the card, so they are shown again. */
+  .dataTable.cardMobile tbody td.hideMobile,
+  .dataTable.cardMobile tbody td.hideTablet {
+    display: flex !important;
+  }
+
+  /* The poster gets a bit bigger to be a real card thumbnail. */
+  .dataTable.cardMobile .posterThumb {
+    width: 46px;
+    height: 64px;
+  }
+
+  .dataTable.cardMobile .primaryTitle {
+    font-size: 0.86rem;
+    white-space: normal;
+  }
+
+  .dataTable.cardMobile .secondaryTitle {
+    font-size: 0.74rem;
+  }
+
+  .dataTable.cardMobile .metaRow {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .dataTable.cardMobile .badgeList {
+    max-width: none;
+  }
+
+  .dataTable.cardMobile .rowActions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .dataTable.cardMobile .actionBtn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.8rem;
+  }
+
+  .statusSwitch {
+    gap: 0.4rem;
+  }
+
+  .dataTable.cardMobile .emptyStateContainer {
+    padding: 2.5rem 1rem;
+  }
+}
+
+/* Small phones: the label of a cell sits above its value. */
+@media (max-width: 420px) {
+  .dataTable.cardMobile tbody td {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.3rem;
+  }
+
+  .dataTable.cardMobile tbody td::before {
+    padding-top: 0;
+  }
+
+  .dataTable.cardMobile .rowActions {
+    justify-content: flex-start !important;
   }
 }
