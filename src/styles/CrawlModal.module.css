@@ -446,3 +446,43 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 768px) {
+  .modalOverlay {
+    padding: 0.75rem;
+  }
+
+  .modalContent {
+    max-width: 100%;
+    border-radius: 14px;
+    max-height: 92vh;
+  }
+
+  .modalHeader {
+    padding: 1rem 1.1rem;
+  }
+
+  .modalBody {
+    padding: 1.1rem;
+    max-height: calc(92vh - 130px);
+  }
+
+  .tabsContainer {
+    overflow-x: auto;
+  }
+
+  .modalFooter {
+    padding: 0.85rem 1.1rem;
+    flex-direction: column-reverse;
+    gap: 0.6rem;
+  }
+
+  .btnCancel,
+  .btnStartCrawl {
+    width: 100%;
+    justify-content: center;
+  }
+}

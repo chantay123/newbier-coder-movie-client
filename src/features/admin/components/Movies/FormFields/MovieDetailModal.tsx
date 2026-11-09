@@ -141,7 +141,7 @@ export default function MovieDetailModal({
               className={styles.externalLinkBtn}
               title="Xem trang phim trên website"
             >
-              <FaExternalLinkAlt /> Xem trên web
+              <FaExternalLinkAlt /> <span>Xem trên web</span>
             </a>
 
             <button
@@ -150,7 +150,7 @@ export default function MovieDetailModal({
               onClick={handleEditClick}
               title="Đi tới trang chỉnh sửa đầy đủ"
             >
-              <FaPen /> Chỉnh sửa
+              <FaPen /> <span>Chỉnh sửa</span>
             </button>
 
             <button className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
@@ -489,7 +489,7 @@ export default function MovieDetailModal({
             Đóng
           </button>
           <button className={styles.editMovieBtn} onClick={handleEditClick}>
-            <FaPen /> Chỉnh Sửa Phim Này
+            <FaPen /> <span>Chỉnh Sửa Phim Này</span>
           </button>
         </div>
       </div>

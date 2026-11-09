@@ -1211,3 +1211,110 @@
   transform: rotate(45deg);
 }
 
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 992px) {
+  .actionToolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbarRight {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .searchBox {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .serverAndRangeBar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .modalOverlay {
+    padding: 0;
+  }
+
+  .modalContent {
+    max-width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .modalHeader {
+    padding: 0.85rem 1rem;
+    gap: 0.6rem;
+  }
+
+  .headerIconBox {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .movieTitle {
+    font-size: 0.98rem;
+  }
+
+  .modalBody {
+    padding: 0.7rem 0.85rem;
+  }
+
+  .actionToolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarLeft,
+  .toolbarCenter,
+  .toolbarRight {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .searchBox {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .episodesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .bulkActionBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .bulkRight {
+    width: 100%;
+  }
+
+  .paginationBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .paginationControls {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .modalFooter {
+    padding: 0.7rem 1rem;
+  }
+
+  .subModalContent {
+    max-width: 100%;
+    border-radius: 12px 12px 0 0;
+    max-height: 90vh;
+  }
+}
+
