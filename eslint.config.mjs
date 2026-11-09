@@ -1,16 +1,38 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextPlugin from '@next/eslint-plugin-next';
+import reactHooks from 'eslint-plugin-react-hooks';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
+/**
+ * The ESLint flat configuration of the project.
+ *
+ * WHY THE PLUGINS ARE USED DIRECTLY
+ * The `eslint-config-next` package pulls in `typescript-eslint`, and the
+ * version that ships with it does not support TypeScript 7 yet. The
+ * project uses TypeScript 7, so the preset cannot be loaded at all.
+ *
+ * The rules of Next.js and of the React hooks are registered directly
+ * instead. The type-aware rules stay out of the config, so the lint runs
+ * again.
+ */
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  {
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'out/**',
+      'build/**',
+      'next-env.d.ts'
+    ]
+  },
+  nextPlugin.configs['core-web-vitals'],
+  {
+    files: ['**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    plugins: {
+      'react-hooks': reactHooks
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules
+    }
+  }
 ];
 
 export default eslintConfig;

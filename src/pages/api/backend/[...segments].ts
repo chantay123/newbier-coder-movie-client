@@ -1,27 +1,4 @@
-/**
- * [...segments].ts
- *
- * The backend proxy.
- *
- * WHY THIS FILE EXISTS
- * The backend host must not appear in the client bundle. So the frontend
- * calls a SAME-ORIGIN path (`/api/backend/movies`) and this route forwards
- * it to the backend, using the SERVER-ONLY `BACKEND_API_URL` variable.
- *
- * The result:
- *   - the client bundle contains no host, no port and no scheme;
- *   - the backend host never reaches the browser;
- *   - the browser only ever talks to the same origin.
- *
- * HOW THE PATH IS RESOLVED
- * The first segment is the endpoint path. It is looked up in the optional
- * server-only `API_ROUTE_MAP` variable first, so a backend path can be
- * remapped on the server without rebuilding the frontend. When the map is
- * empty (the normal case) the path is forwarded as it is.
- *
- * The remaining segments are appended to the path, which is why the client
- * does not need to know where a parameter belongs.
- */
+
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
@@ -165,15 +142,7 @@ const proxy = async (req: NextApiRequest, res: NextApiResponse): Promise<void> =
 
   const headers: Record<string, string> = {};
   if (req.headers.authorization) headers.Authorization = req.headers.authorization;
-  // The cookies of the SESSION are NOT forwarded to the backend.
-  //
-  // The `mv_session` cookie holds the encrypted access token AND the
-  // refresh token. It belongs to this Next.js application only: the
-  // backend authenticates the calls with the `Authorization: Bearer` header
-  // and has its own (not implemented) cookie support. Forwarding it would
-  // hand the refresh token to the backend on EVERY call, which widens the
-  // exposure for no benefit. The `mv_csrf` cookie is dropped for the same
-  // reason.
+  
   const forwardedCookie = stripSessionCookies(req.headers.cookie);
   if (forwardedCookie) headers.cookie = forwardedCookie;
   if (req.headers['user-agent']) headers['user-agent'] = req.headers['user-agent'];
@@ -201,6 +170,7 @@ const proxy = async (req: NextApiRequest, res: NextApiResponse): Promise<void> =
     if (setCookies.length) res.setHeader('set-cookie', setCookies);
 
     const buffer = Buffer.from(await upstream.arrayBuffer());
+
     res.send(buffer);
   } catch (error) {
     res.status(502).json({

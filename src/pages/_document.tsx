@@ -6,7 +6,7 @@ import type { DocumentContext, DocumentInitialProps } from 'next/document';
 
 export default function Document() {
   return (
-    <Html lang="vi">
+    <Html lang="vi" data-scroll-behavior="smooth">
       <Head>
         {/* Google Fonts: Plus Jakarta Sans for pristine Vietnamese typography */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
