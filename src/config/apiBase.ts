@@ -173,7 +173,10 @@ export const assertApiBaseConfigured = (): void => {
     '[config] Missing backend API configuration. Set BACKEND_API_URL to the ' +
       'backend base URL, for example https://your-backend.example.com/api/v1. ' +
       'The variable is intentionally NOT prefixed with NEXT_PUBLIC_, so the ' +
-      'backend host stays out of the browser bundle.'
+      'backend host stays out of the browser bundle. ' +
+      'Check the environment variables of the deployment (for example the ' +
+      'project settings of the hosting platform) and make sure the build ' +
+      'step can read it.'
   );
 };
 

@@ -126,6 +126,12 @@ export interface AuthResult {
   user?: AuthUser;
   error?: string;
   isAccountLocked?: boolean;
+  /**
+   * `true` when the backend could not be reached (it is still starting).
+   * The login form shows the "waiting for the server" notice and retries
+   * automatically in that case.
+   */
+  serverStarting?: boolean;
 }
 
 export interface AuthContextValue {
@@ -562,7 +568,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       const message = error.message || 'Login failed';
       setError(message);
-      return { success: false, error: message };
+      // The backend did not answer (it is still starting). The flag is
+      // forwarded to the login form, so it can show the "waiting for the
+      // server" notice instead of a dead-end error.
+      const serverStarting =
+        (err as { code?: string })?.code === 'SERVER_STARTING' ||
+        (err as { serverStarting?: boolean })?.serverStarting === true;
+      return { success: false, error: message, serverStarting };
     }
   };
 
